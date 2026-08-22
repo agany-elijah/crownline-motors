@@ -1,0 +1,2 @@
+# CI pipeline: install -> typecheck -> lint -> test -> build
+# Fill in once package.json scripts exist.
