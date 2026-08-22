@@ -1,1 +1,3 @@
-// Admin dashboard home (KPIs)
+export default function Page() {
+  return <main />;
+}

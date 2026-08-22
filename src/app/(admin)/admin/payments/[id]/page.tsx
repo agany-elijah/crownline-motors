@@ -1,1 +1,3 @@
-// Payment detail / verification
+export default function Page() {
+  return <main />;
+}

@@ -1,1 +1,3 @@
-// Add vehicle
+export default function Page() {
+  return <main />;
+}

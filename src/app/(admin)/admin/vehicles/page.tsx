@@ -1,1 +1,3 @@
-// Vehicle list (admin)
+export default function Page() {
+  return <main />;
+}

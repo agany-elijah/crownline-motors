@@ -1,1 +1,3 @@
-// Settings: WhatsApp number, payment instructions
+export default function Page() {
+  return <main />;
+}

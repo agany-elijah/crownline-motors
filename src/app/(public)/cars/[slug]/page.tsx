@@ -1,1 +1,3 @@
-// Vehicle detail page
+export default function Page() {
+  return <main />;
+}

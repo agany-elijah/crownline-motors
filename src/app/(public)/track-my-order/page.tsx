@@ -1,1 +1,3 @@
-// Track My Order page
+export default function Page() {
+  return <main />;
+}

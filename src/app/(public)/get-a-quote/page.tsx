@@ -1,1 +1,3 @@
-// Get a Quote form page
+export default function Page() {
+  return <main />;
+}

@@ -1,1 +1,3 @@
-// Update tracking events
+export default function Page() {
+  return <main />;
+}

@@ -1,1 +1,5 @@
-// Quote API route handlers
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  return NextResponse.json({ message: "Quotes API placeholder" });
+}

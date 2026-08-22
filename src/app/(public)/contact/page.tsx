@@ -1,1 +1,3 @@
-// Contact page
+export default function Page() {
+  return <main />;
+}

@@ -1,1 +1,3 @@
-// Customer detail
+export default function Page() {
+  return <main />;
+}

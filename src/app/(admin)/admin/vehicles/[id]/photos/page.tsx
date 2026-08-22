@@ -1,1 +1,3 @@
-// Manage vehicle photos
+export default function Page() {
+  return <main />;
+}

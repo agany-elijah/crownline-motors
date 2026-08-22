@@ -1,1 +1,3 @@
-// How It Works timeline page
+export default function Page() {
+  return <main />;
+}

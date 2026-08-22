@@ -1,1 +1,3 @@
-// About Us page
+export default function Page() {
+  return <main />;
+}

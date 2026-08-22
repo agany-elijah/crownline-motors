@@ -1,1 +1,3 @@
-// Cars listing + filters
+export default function Page() {
+  return <main />;
+}
