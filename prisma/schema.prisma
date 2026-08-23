@@ -1,2 +1,11 @@
-// Wave A schema: Vehicle, VehiclePhoto, Customer, Quote, Order, OrderItem, Payment, Shipment, TrackingEvent
-// To be defined in Step 2 — Core Schema.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Models (Vehicle, Customer, Quote, Order, OrderItem, Payment, Shipment, TrackingEvent)
+// are added in Step 2 — Core Schema.
