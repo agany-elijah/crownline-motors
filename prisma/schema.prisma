@@ -132,6 +132,13 @@ enum TrackingStatus {
   // (IN_TRANSIT and DELIVERED are intentionally shared across both product types)
 }
 
+enum MilestoneStatus {
+  PENDING // not yet activated
+  DUE // currently the active/owed milestone
+  PARTIALLY_PAID
+  PAID
+}
+
 // ─────────────────────────────────────────────
 // ADMIN / AUDIT
 // ─────────────────────────────────────────────
@@ -334,11 +341,12 @@ model Order {
   // Locked in at the moment the quote is accepted — deliberately independent
   // of Vehicle's live *estimate* fields, so a price change on the listing
   // never silently changes what a customer already committed to.
-  shippingCost          Decimal? @db.Decimal(12, 2)
-  clearingCost          Decimal? @db.Decimal(12, 2)
-  otherCharges          Decimal? @db.Decimal(12, 2)
-  totalAmount           Decimal  @db.Decimal(12, 2)
-  requiredDepositAmount Decimal? @db.Decimal(12, 2)
+  shippingCost          Decimal?           @db.Decimal(12, 2)
+  clearingCost          Decimal?           @db.Decimal(12, 2)
+  otherCharges          Decimal?           @db.Decimal(12, 2)
+  totalAmount           Decimal            @db.Decimal(12, 2)
+  requiredDepositAmount Decimal?           @db.Decimal(12, 2)
+  milestones            PaymentMilestone[]
 
   notes String? @db.Text
 
@@ -391,7 +399,9 @@ model Payment {
   paymentDate          DateTime?
   receiptStoragePath   String?
 
-  status PaymentStatus @default(PENDING)
+  status      PaymentStatus     @default(PENDING)
+  milestoneId String?
+  milestone   PaymentMilestone? @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
 
   verifiedByAdminId String?
   verifiedByAdmin   AdminProfile? @relation(fields: [verifiedByAdminId], references: [id], onDelete: Restrict)
@@ -404,6 +414,7 @@ model Payment {
   @@index([orderId])
   @@index([status])
   @@index([paymentDate])
+  @@index([milestoneId])
 }
 
 // ─────────────────────────────────────────────
@@ -467,4 +478,38 @@ model TrackingEvent {
 
   @@index([shipmentId, eventDate])
   @@index([isVoided])
+}
+
+model BusinessSettings {
+  id                       Int      @id @default(1) // always exactly one row, id=1 — enforced by app logic, not a DB constraint
+  whatsappNumber           String
+  defaultInitialPercentage Decimal  @default(50.00) @db.Decimal(5, 2)
+  defaultMombasaPercentage Decimal  @default(25.00) @db.Decimal(5, 2)
+  defaultFinalPercentage   Decimal  @default(25.00) @db.Decimal(5, 2)
+  updatedAt                DateTime @updatedAt
+}
+
+model PaymentMilestone {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  sequence   Int // 1, 2, 3 — processing/display order
+  label      String // e.g. "Initial Payment (50%)", "Mombasa Payment (25%)", "Final Payment (25%)"
+  percentage Decimal @db.Decimal(5, 2) // locked in from BusinessSettings at order-creation time
+  amountDue  Decimal @db.Decimal(12, 2) // locked in = percentage% of Order.totalAmount at creation time
+
+  status        MilestoneStatus @default(PENDING)
+  triggerStatus TrackingStatus? // e.g. ARRIVED_AT_MOMBASA — informs automation, doesn't enforce it
+  becameDueAt   DateTime?
+  completedAt   DateTime?
+
+  payments Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orderId, sequence])
+  @@index([orderId])
+  @@index([status])
 }
