@@ -11,3 +11,4 @@ test-results/
 .vercel/
 src/generated/
 *.tsbuildinfo
+.env.test
