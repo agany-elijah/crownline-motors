@@ -1,3 +1,4 @@
+/* src/app/globals.css */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -39,6 +40,14 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+
+  /* Crownline brand tokens — used directly where the semantic
+     shadcn tokens aren't specific enough (e.g. gold accents that
+     are NOT "primary button", like active-nav-state underlines) */
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+  --color-charcoal: var(--charcoal);
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -46,75 +55,125 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Motion — deliberately restricted to two speeds per the brand
+     brief: 250ms for micro-interactions (hover, buttons, arrows),
+     400ms for section/gallery/modal-scale movements. Don't add a
+     third speed without a reason. */
+  --duration-fast: 250ms;
+  --duration-base: 400ms;
+  --ease-crownline: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /* Warm white surface — not pure #fff, carries a whisper of gold undertone */
+  --background: oklch(0.99 0.004 90);
+  --foreground: oklch(0.16 0.004 90);
+
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.16 0.004 90);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.16 0.004 90);
+
+  /* Primary = the ONE gold CTA per surface (e.g. "GET A QUOTE" in the header).
+     Dark text on gold per the contrast/affordance rule in the brief. */
+  --primary: oklch(0.78 0.12 83);
+  --primary-foreground: oklch(0.16 0.01 83);
+
+  /* Secondary = neutral supporting surface, not a second gold button.
+     Secondary CTAs ("TRACK MY ORDER") should use the outline Button
+     variant, which already reads --border/--background — no change needed there. */
+  --secondary: oklch(0.96 0.003 90);
+  --secondary-foreground: oklch(0.22 0.004 90);
+
+  --muted: oklch(0.96 0.003 90);
+  --muted-foreground: oklch(0.5 0.004 90);
+
+  /* Accent = gold-tinted hover/selected surface (nav active state,
+     selected filter chip, etc.) — distinct from --primary so we don't
+     end up with gold everywhere. */
+  --accent: oklch(0.95 0.02 83);
+  --accent-foreground: oklch(0.18 0.01 83);
+
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+
+  --border: oklch(0.9 0.003 90);
+  --input: oklch(0.9 0.003 90);
+  --ring: oklch(0.78 0.12 83);
+
+  --chart-1: oklch(0.78 0.12 83);
+  --chart-2: oklch(0.55 0.02 90);
+  --chart-3: oklch(0.44 0.02 90);
+  --chart-4: oklch(0.32 0.01 90);
+  --chart-5: oklch(0.2 0 0);
+
+  --radius: 0.5rem;
+
+  --sidebar: oklch(0.97 0.003 90);
+  --sidebar-foreground: oklch(0.16 0.004 90);
+  --sidebar-primary: oklch(0.78 0.12 83);
+  --sidebar-primary-foreground: oklch(0.16 0.01 83);
+  --sidebar-accent: oklch(0.95 0.02 83);
+  --sidebar-accent-foreground: oklch(0.18 0.01 83);
+  --sidebar-border: oklch(0.9 0.003 90);
+  --sidebar-ring: oklch(0.78 0.12 83);
+
+  /* Raw brand tokens, for one-off gold/black usage outside the
+     semantic shadcn roles (e.g. footer background, hero overlays) */
+  --gold: oklch(0.78 0.12 83);
+  --gold-foreground: oklch(0.16 0.01 83);
+  --charcoal: oklch(0.22 0.004 90);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  /* Deep black — main dark section background (hero, footer) */
+  --background: oklch(0.11 0.003 90);
+  --foreground: oklch(0.98 0.004 90);
+
+  /* Elevated surface black — cards/blocks sitting on the deep black */
+  --card: oklch(0.16 0.004 90);
+  --card-foreground: oklch(0.98 0.004 90);
+  --popover: oklch(0.16 0.004 90);
+  --popover-foreground: oklch(0.98 0.004 90);
+
+  /* Gold reads slightly brighter/more saturated on dark backgrounds
+     to hold contrast without going neon */
+  --primary: oklch(0.8 0.13 83);
+  --primary-foreground: oklch(0.14 0.01 83);
+
+  --secondary: oklch(0.22 0.004 90);
+  --secondary-foreground: oklch(0.96 0.004 90);
+
+  --muted: oklch(0.22 0.004 90);
+  --muted-foreground: oklch(0.68 0.004 90);
+
+  --accent: oklch(0.24 0.02 83);
+  --accent-foreground: oklch(0.96 0.02 83);
+
   --destructive: oklch(0.704 0.191 22.216);
+
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.8 0.13 83);
+
+  --chart-1: oklch(0.8 0.13 83);
+  --chart-2: oklch(0.6 0.02 90);
+  --chart-3: oklch(0.48 0.02 90);
+  --chart-4: oklch(0.36 0.01 90);
+  --chart-5: oklch(0.24 0 0);
+
+  --sidebar: oklch(0.16 0.004 90);
+  --sidebar-foreground: oklch(0.98 0.004 90);
+  --sidebar-primary: oklch(0.8 0.13 83);
+  --sidebar-primary-foreground: oklch(0.14 0.01 83);
+  --sidebar-accent: oklch(0.24 0.02 83);
+  --sidebar-accent-foreground: oklch(0.96 0.02 83);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.8 0.13 83);
+
+  --gold: oklch(0.8 0.13 83);
+  --gold-foreground: oklch(0.14 0.01 83);
+  --charcoal: oklch(0.9 0.004 90);
 }
 
 @layer base {
@@ -125,6 +184,21 @@
     @apply bg-background text-foreground;
   }
   html {
-    @apply font-sans;
+    @apply font-sans scroll-smooth;
+  }
+
+  /* Section reveal-on-scroll primitive (Phase 3.7 will wire the
+     intersection-observer hook that toggles this class; defining
+     the CSS contract now so components can start using it) */
+  [data-reveal] {
+    opacity: 0;
+    transform: translateY(12px);
+    transition:
+      opacity var(--duration-base) var(--ease-crownline),
+      transform var(--duration-base) var(--ease-crownline);
+  }
+  [data-reveal="in"] {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
