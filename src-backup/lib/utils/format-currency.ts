@@ -1,1 +1,0 @@
-// Currency formatting helper

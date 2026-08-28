@@ -13,10 +13,23 @@ datasource db {
 // ENUMS
 // ─────────────────────────────────────────────
 
+// One role for Wave A.
+//
+// The roadmap (Stage 6) allows exactly this: "Initially, you may only need
+// ADMIN, CUSTOMER — but the architecture should not make staff roles
+// difficult later." Crownline launches with a single operator, so splitting
+// authority between MANAGER and STAFF would have been governance theatre:
+// separation of duties only means something when there are two people to
+// separate.
+//
+// Nothing about re-introducing them is hard. The permission matrix in
+// src/lib/auth/permissions.ts still maps role -> permissions, every page and
+// action still asks `can(role, permission)`, and adding a value here is an
+// additive `ALTER TYPE ... ADD VALUE` in Postgres. What would have been
+// expensive is removing that layer entirely and hard-coding "is an admin"
+// across forty call sites — so the layer stays, holding one role.
 enum AdminRole {
-  SUPER_ADMIN
-  MANAGER
-  STAFF
+  ADMIN
 }
 
 enum VehicleStatus {
@@ -147,7 +160,7 @@ model AdminProfile {
   id          String    @id // Supabase auth.users UID — no @default, set explicitly on first login
   email       String    @unique
   displayName String
-  role        AdminRole @default(STAFF)
+  role        AdminRole @default(ADMIN)
   isActive    Boolean   @default(true)
 
   verifiedPayments      Payment[]

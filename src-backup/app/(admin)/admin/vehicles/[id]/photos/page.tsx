@@ -1,1 +1,0 @@
-// Manage vehicle photos

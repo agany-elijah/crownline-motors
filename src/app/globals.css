@@ -8,9 +8,12 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  /* Manrope for headings, Inter for body/UI. `font-heading` is a real,
+     separate family here — not an alias of font-sans — so headings carry
+     their own voice. No bundled mono family: see layout.tsx. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-manrope), var(--font-inter), ui-sans-serif, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -45,6 +48,7 @@
      shadcn tokens aren't specific enough (e.g. gold accents that
      are NOT "primary button", like active-nav-state underlines) */
   --color-gold: var(--gold);
+  --color-gold-ink: var(--gold-ink);
   --color-gold-foreground: var(--gold-foreground);
   --color-charcoal: var(--charcoal);
 
@@ -63,6 +67,72 @@
   --duration-fast: 250ms;
   --duration-base: 400ms;
   --ease-crownline: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ── Type scale ───────────────────────────────────────────────
+     A closed set of seven steps. The brief is explicit that font sizes
+     must not be chosen ad hoc per page, so pages use `text-display`,
+     `text-h1` … `text-meta` and never a raw `text-[2.375rem]`.
+
+     Display through h3 are fluid (clamp) so headline sizing is driven by
+     viewport width rather than by breakpoint-specific overrides scattered
+     across components — one definition holds from 320px to ultrawide.
+
+     Negative tracking tightens as size grows, which is what stops large
+     headings reading loose and web-default; the uppercase `meta` step
+     goes the other way with wide positive tracking for eyebrow labels. */
+  --text-display: clamp(2.75rem, 1.6rem + 5.2vw, 5.25rem);
+  --text-display--line-height: 0.95;
+  --text-display--letter-spacing: -0.035em;
+  --text-display--font-weight: 700;
+
+  --text-h1: clamp(2.125rem, 1.4rem + 3.2vw, 3.5rem);
+  --text-h1--line-height: 1.05;
+  --text-h1--letter-spacing: -0.03em;
+  --text-h1--font-weight: 700;
+
+  --text-h2: clamp(1.625rem, 1.2rem + 1.9vw, 2.5rem);
+  --text-h2--line-height: 1.15;
+  --text-h2--letter-spacing: -0.022em;
+  --text-h2--font-weight: 600;
+
+  --text-h3: clamp(1.1875rem, 1.05rem + 0.7vw, 1.5rem);
+  --text-h3--line-height: 1.3;
+  --text-h3--letter-spacing: -0.015em;
+  --text-h3--font-weight: 600;
+
+  --text-body-lg: 1.0625rem;
+  --text-body-lg--line-height: 1.65;
+
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.65;
+
+  --text-small: 0.8125rem;
+  --text-small--line-height: 1.55;
+
+  /* Eyebrow / label / spec-key text. Always uppercase in use. */
+  --text-meta: 0.6875rem;
+  --text-meta--line-height: 1.4;
+  --text-meta--letter-spacing: 0.14em;
+  --text-meta--font-weight: 600;
+
+  /* ── Elevation ────────────────────────────────────────────────
+     Deliberately shallow. Premium reads as a soft, wide, low-opacity
+     shadow; a tight dark drop shadow reads as a generic Bootstrap card.
+     Each is two layers — a tight contact shadow plus a wide ambient one —
+     which is what makes the lift look like light rather than a filter. */
+  --shadow-subtle:
+    0 1px 2px oklch(0.16 0.004 90 / 0.04), 0 2px 8px oklch(0.16 0.004 90 / 0.04);
+  --shadow-raised:
+    0 2px 4px oklch(0.16 0.004 90 / 0.05), 0 12px 28px oklch(0.16 0.004 90 / 0.1);
+  --shadow-header: 0 1px 0 oklch(0.16 0.004 90 / 0.06), 0 4px 16px oklch(0.16 0.004 90 / 0.04);
+  /* Gold-tinted elevation for the primary CTA. Two layers again: a tight
+     neutral contact shadow so the button still sits on the page, plus a
+     wide gold bloom that reads as the button's own colour spilling onto
+     the surface. `-strong` is the hover step. */
+  --shadow-gold:
+    0 1px 2px oklch(0.16 0.004 90 / 0.12), 0 6px 18px oklch(0.8 0.145 85 / 0.34);
+  --shadow-gold-strong:
+    0 2px 4px oklch(0.16 0.004 90 / 0.14), 0 12px 30px oklch(0.8 0.145 85 / 0.46);
 }
 
 :root {
@@ -76,9 +146,10 @@
   --popover-foreground: oklch(0.16 0.004 90);
 
   /* Primary = the ONE gold CTA per surface (e.g. "GET A QUOTE" in the header).
-     Dark text on gold per the contrast/affordance rule in the brief. */
-  --primary: oklch(0.78 0.12 83);
-  --primary-foreground: oklch(0.16 0.01 83);
+     Dark text on gold per the contrast/affordance rule in the brief —
+     measured at 10.3:1, so the label reads as confidently as the fill. */
+  --primary: var(--gold);
+  --primary-foreground: var(--gold-foreground);
 
   /* Secondary = neutral supporting surface, not a second gold button.
      Secondary CTAs ("TRACK MY ORDER") should use the outline Button
@@ -92,16 +163,16 @@
   /* Accent = gold-tinted hover/selected surface (nav active state,
      selected filter chip, etc.) — distinct from --primary so we don't
      end up with gold everywhere. */
-  --accent: oklch(0.95 0.02 83);
-  --accent-foreground: oklch(0.18 0.01 83);
+  --accent: oklch(0.955 0.03 88);
+  --accent-foreground: oklch(0.18 0.01 88);
 
   --destructive: oklch(0.577 0.245 27.325);
 
   --border: oklch(0.9 0.003 90);
   --input: oklch(0.9 0.003 90);
-  --ring: oklch(0.78 0.12 83);
+  --ring: var(--gold);
 
-  --chart-1: oklch(0.78 0.12 83);
+  --chart-1: var(--gold);
   --chart-2: oklch(0.55 0.02 90);
   --chart-3: oklch(0.44 0.02 90);
   --chart-4: oklch(0.32 0.01 90);
@@ -111,17 +182,32 @@
 
   --sidebar: oklch(0.97 0.003 90);
   --sidebar-foreground: oklch(0.16 0.004 90);
-  --sidebar-primary: oklch(0.78 0.12 83);
-  --sidebar-primary-foreground: oklch(0.16 0.01 83);
-  --sidebar-accent: oklch(0.95 0.02 83);
-  --sidebar-accent-foreground: oklch(0.18 0.01 83);
+  --sidebar-primary: var(--gold);
+  --sidebar-primary-foreground: var(--gold-foreground);
+  --sidebar-accent: oklch(0.95 0.03 88);
+  --sidebar-accent-foreground: oklch(0.18 0.01 88);
   --sidebar-border: oklch(0.9 0.003 90);
-  --sidebar-ring: oklch(0.78 0.12 83);
+  --sidebar-ring: var(--gold);
 
-  /* Raw brand tokens, for one-off gold/black usage outside the
-     semantic shadcn roles (e.g. footer background, hero overlays) */
-  --gold: oklch(0.78 0.12 83);
-  --gold-foreground: oklch(0.16 0.01 83);
+  /* ── Brand gold, in two jobs ──────────────────────────────────
+     These are two tokens because one cannot do both jobs. A gold bright
+     enough to work as a *fill* is far too light to work as *text* on the
+     warm-white background: the previous single token measured 1.79:1
+     against --background, well under the 4.5:1 WCAG AA floor, which is
+     why gold eyebrows and active nav links read as washed out.
+
+     --gold      the champagne fill. Button backgrounds, rules, icons and
+                 text on dark surfaces. 10.3:1 against --gold-foreground.
+     --gold-ink  the same hue walked down in lightness until it is legible
+                 as text on a light surface. 5.5:1 against --background.
+
+     Use --gold when gold is the *background*, --gold-ink when gold is the
+     *ink*. On dark surfaces that distinction collapses, so the rule in the
+     base layer below re-points --gold-ink at --gold there and every
+     `text-gold-ink` in the app adapts without a per-surface class. */
+  --gold: oklch(0.8 0.145 85);
+  --gold-ink: oklch(0.52 0.11 72);
+  --gold-foreground: oklch(0.16 0.01 88);
   --charcoal: oklch(0.22 0.004 90);
 }
 
@@ -138,8 +224,8 @@
 
   /* Gold reads slightly brighter/more saturated on dark backgrounds
      to hold contrast without going neon */
-  --primary: oklch(0.8 0.13 83);
-  --primary-foreground: oklch(0.14 0.01 83);
+  --primary: var(--gold);
+  --primary-foreground: var(--gold-foreground);
 
   --secondary: oklch(0.22 0.004 90);
   --secondary-foreground: oklch(0.96 0.004 90);
@@ -147,16 +233,16 @@
   --muted: oklch(0.22 0.004 90);
   --muted-foreground: oklch(0.68 0.004 90);
 
-  --accent: oklch(0.24 0.02 83);
-  --accent-foreground: oklch(0.96 0.02 83);
+  --accent: oklch(0.245 0.035 88);
+  --accent-foreground: oklch(0.96 0.02 88);
 
   --destructive: oklch(0.704 0.191 22.216);
 
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.8 0.13 83);
+  --ring: var(--gold);
 
-  --chart-1: oklch(0.8 0.13 83);
+  --chart-1: var(--gold);
   --chart-2: oklch(0.6 0.02 90);
   --chart-3: oklch(0.48 0.02 90);
   --chart-4: oklch(0.36 0.01 90);
@@ -164,15 +250,19 @@
 
   --sidebar: oklch(0.16 0.004 90);
   --sidebar-foreground: oklch(0.98 0.004 90);
-  --sidebar-primary: oklch(0.8 0.13 83);
-  --sidebar-primary-foreground: oklch(0.14 0.01 83);
-  --sidebar-accent: oklch(0.24 0.02 83);
-  --sidebar-accent-foreground: oklch(0.96 0.02 83);
+  --sidebar-primary: var(--gold);
+  --sidebar-primary-foreground: var(--gold-foreground);
+  --sidebar-accent: oklch(0.245 0.035 88);
+  --sidebar-accent-foreground: oklch(0.96 0.02 88);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.8 0.13 83);
+  --sidebar-ring: var(--gold);
 
-  --gold: oklch(0.8 0.13 83);
-  --gold-foreground: oklch(0.14 0.01 83);
+  --gold: oklch(0.82 0.15 88);
+  /* On a dark surface the fill gold is already the most legible gold
+     available (10.9:1), so ink and fill converge — same reasoning as the
+     [data-tone="dark"] rule in the base layer. */
+  --gold-ink: var(--gold);
+  --gold-foreground: oklch(0.14 0.01 88);
   --charcoal: oklch(0.9 0.004 90);
 }
 
@@ -181,24 +271,216 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background font-sans text-foreground;
+    /* Stops iOS Safari inflating text in landscape, which otherwise breaks
+       the fluid type scale on exactly the devices the brief prioritises. */
+    -webkit-text-size-adjust: 100%;
   }
   html {
-    @apply font-sans scroll-smooth;
+    @apply scroll-smooth;
   }
 
-  /* Section reveal-on-scroll primitive (Phase 3.7 will wire the
-     intersection-observer hook that toggles this class; defining
-     the CSS contract now so components can start using it) */
-  [data-reveal] {
-    opacity: 0;
-    transform: translateY(12px);
-    transition:
-      opacity var(--duration-base) var(--ease-crownline),
-      transform var(--duration-base) var(--ease-crownline);
+  /* Headings take the display family by default so no component has to
+     remember `font-heading`. Sizing still comes from the scale above —
+     this sets voice, not size. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading;
+    text-wrap: balance;
   }
-  [data-reveal="in"] {
-    opacity: 1;
-    transform: translateY(0);
+
+  /* Keeps a lone short word from stranding on its own final line. */
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background-color: var(--gold);
+    color: var(--gold-foreground);
+  }
+
+  /* ── Dark surfaces ────────────────────────────────────────────
+     `data-tone="dark"` marks any region that paints itself on the deep
+     black end of the palette: the header over the hero, the footer, the
+     mobile drawer, and Section variant="dark".
+
+     Its job is to re-point --gold-ink at the fill gold. On a light surface
+     those are deliberately different colours (see the palette above); on a
+     dark one the fill gold is already the most legible gold available, so
+     they converge. Because --gold-ink is consumed through an `@theme
+     inline` token, redefining it on an ancestor re-resolves every
+     `text-gold-ink` underneath at runtime — which is what lets one class
+     be correct on both surfaces with no per-placement conditional.
+
+     Note what is deliberately NOT redefined here: --foreground and
+     --background. Section variant="dark" builds its own dark surface out
+     of `bg-foreground text-background`, so overriding either token in this
+     block would resolve against the element's own declarations and cancel
+     the very background it is describing. */
+  [data-tone="dark"] {
+    --gold-ink: var(--gold);
+  }
+
+
+  /* One consistent, visible keyboard focus treatment across every
+     interactive element — including plain links, which shadcn's component
+     styles don't otherwise cover. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* ── Scroll reveal ────────────────────────────────────────────
+     The hidden starting state is applied ONLY when scripting is available
+     and the user has not asked for reduced motion.
+
+     That guard is load-bearing, not defensive dressing: this rule sets
+     `opacity: 0`, and the only thing that ever clears it is the
+     IntersectionObserver in use-reveal.ts. Applied unconditionally, any
+     visitor without JS — and every visitor who prefers reduced motion —
+     would get permanently invisible content. Scoping the hidden state to
+     the conditions under which it can actually be undone means the
+     content is simply visible by default everywhere else, and the
+     animation is pure enhancement on top.
+
+     Revealing is one-way: use-reveal.ts unobserves the element after the
+     first intersection, so content never re-animates or fades back out
+     while scrolling up (an explicit requirement in the brief). */
+  @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+    [data-reveal] {
+      opacity: 0;
+      transform: translateY(var(--reveal-distance, 14px));
+      transition:
+        opacity var(--duration-base) var(--ease-crownline),
+        transform var(--duration-base) var(--ease-crownline);
+      transition-delay: var(--reveal-delay, 0ms);
+      will-change: opacity, transform;
+    }
+
+    [data-reveal="in"] {
+      opacity: 1;
+      transform: none;
+      /* Released once the element has landed so the compositor isn't
+         holding a layer for every revealed section on a long page. */
+      will-change: auto;
+    }
+  }
+
+  /* Global reduced-motion honouring. Animation in this design is
+     decorative throughout — nothing communicates state through motion
+     alone — so collapsing it to near-zero is safe and complete. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ── Neutral buttons on a dark surface ──────────────────────────
+   Descendant rules keyed off the data attributes Button already emits,
+   rather than extra variants threaded through every call site. The
+   alternative — an `onDark` prop passed down through the header, footer
+   and drawer — puts the same conditional in three places and guarantees
+   one of them eventually drifts.
+
+   Deliberately NOT inside `@layer base`. Tailwind's own utilities live in
+   `@layer utilities`, and layer order beats specificity: a base-layer rule
+   loses to `bg-background` on the variant no matter how specific it is.
+   Unlayered rules outrank every layer, which is exactly the escape hatch
+   this needs — kept narrow (two variants, one attribute) so it cannot
+   quietly swallow other overrides. */
+[data-tone="dark"] [data-slot="button"][data-variant="outline"] {
+  border-color: oklch(1 0 0 / 0.28);
+  background-color: transparent;
+  color: oklch(0.98 0.004 90);
+  box-shadow: none;
+}
+
+[data-tone="dark"] [data-slot="button"][data-variant="outline"]:hover {
+  border-color: oklch(1 0 0 / 0.55);
+  background-color: oklch(1 0 0 / 0.1);
+  color: oklch(1 0 0);
+}
+
+[data-tone="dark"] [data-slot="button"][data-variant="ghost"]:hover {
+  background-color: oklch(1 0 0 / 0.1);
+  color: oklch(1 0 0);
+}
+
+/* ── Utilities ──────────────────────────────────────────────────
+   Small, named, reusable pieces of the visual language. Kept here rather
+   than repeated as long class strings so the treatment stays consistent
+   and is changed in one place. */
+
+/* Lining, fixed-width figures. For prices, mileage, years, spec tables and
+   CLM reference numbers — anywhere digits sit in a column or update in
+   place and must not jitter. */
+@utility tabular {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* The uppercase eyebrow label used above section headings. */
+@utility eyebrow {
+  font-family: var(--font-heading);
+  font-size: var(--text-meta);
+  line-height: var(--text-meta--line-height);
+  letter-spacing: var(--text-meta--letter-spacing);
+  font-weight: var(--text-meta--font-weight);
+  text-transform: uppercase;
+}
+
+/* Soft gold ambient glow for high-priority CTA blocks on dark surfaces.
+   A wide, very low-opacity radial — it should read as warm light in the
+   room, never as a visible circle. */
+@utility gold-ambient {
+  position: relative;
+  isolation: isolate;
+
+  &::before {
+    content: "";
+    position: absolute;
+    /* Bleeds vertically but NOT horizontally.
+       An earlier `inset: -20% -10%` let the glow extend 10% past each
+       edge. Vertically that is free — it just overlaps the neighbouring
+       section. Horizontally it added its width to the document's
+       scrollable area, and on a 390px phone that 39px of invisible
+       overhang was enough to make the page wider than the screen. Mobile
+       browsers respond by shrinking the whole layout to fit, which pushed
+       the header's menu button off the right edge of the display.
+
+       The horizontal spread is recovered inside the gradient instead,
+       where an oversized ellipse costs nothing: it paints wider than the
+       box and is simply clipped, rather than claiming layout width. */
+    inset-block: -20%;
+    inset-inline: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(
+      ellipse 130% 100% at 50% 40%,
+      oklch(0.8 0.145 85 / 0.2) 0%,
+      oklch(0.8 0.145 85 / 0.07) 35%,
+      transparent 70%
+    );
+  }
+}
+
+/* Wraps an image so it can scale on hover without nudging the layout —
+   the crop stays fixed and only the picture inside it moves. Pairs with
+   `group-hover:scale-[1.04]` on the <Image> itself. */
+@utility media-frame {
+  overflow: hidden;
+  position: relative;
+  background-color: var(--muted);
+
+  & img {
+    transition: transform var(--duration-base) var(--ease-crownline);
   }
 }

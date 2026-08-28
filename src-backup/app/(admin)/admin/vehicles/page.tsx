@@ -1,1 +1,0 @@
-// Vehicle list (admin)

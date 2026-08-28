@@ -1,2 +1,62 @@
-# CI pipeline: install -> typecheck -> lint -> test -> build
-# Fill in once package.json scripts exist.
+name: CI
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+    branches: [main, development]
+
+# A new push to the same branch supersedes an in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck · Lint · Test · Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # src/generated/ is gitignored, so the Prisma Client does not exist in a
+      # fresh checkout. This must run before typecheck/lint/build or every
+      # import of the generated client fails to resolve. `generate` reads the
+      # schema only — it does not open a database connection.
+      - name: Generate Prisma Client
+        run: npm run db:generate
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          # Non-secret public config. Supplied so the build produces correct
+          # absolute canonical/OG URLs rather than falling back to the
+          # hardcoded default in src/config/site.ts.
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          NEXT_PUBLIC_WHATSAPP_NUMBER: ${{ vars.NEXT_PUBLIC_WHATSAPP_NUMBER }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+
+# Playwright is intentionally not wired in yet. Per Stage 40 it joins CI
+# "where the CI environment supports it reliably" — it needs browser
+# binaries, system libraries and a running server, and the e2e suite is
+# still mostly placeholders. Run it locally with `npm run test:e2e`.

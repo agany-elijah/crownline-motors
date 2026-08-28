@@ -7,7 +7,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/",
     "/cars",
     "/how-it-works",
-    "/track-my-vehicle",
+    "/track-my-order",
     "/get-a-quote",
     "/about-us",
     "/contact",
