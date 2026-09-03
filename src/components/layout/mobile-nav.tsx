@@ -10,11 +10,21 @@ import { buttonVariants } from "@/components/ui/button"
 import { BrandMark } from "@/components/layout/brand-mark"
 import { isNavLinkAvailable } from "@/lib/constants/nav-links"
 import { siteConfig } from "@/config/site"
-import { buildGeneralWhatsAppMessage, buildWhatsAppUrl } from "@/lib/utils/whatsapp"
 
 interface MobileNavProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /**
+   * The pre-built wa.me link, or null when no number is configured.
+   *
+   * Passed in rather than built here. The number lives in BusinessSettings
+   * so an operator can change it without a deploy, and reading the database
+   * is a server concern — this drawer is a Client Component and could only
+   * have got the value from a NEXT_PUBLIC_ env var, which is exactly the
+   * hard-coding the brief asks us to avoid. The chain is:
+   * layout (server) → SiteHeader → here.
+   */
+  whatsappUrl: string | null
 }
 
 function isLinkActive(pathname: string, href: string): boolean {
@@ -41,13 +51,8 @@ function isLinkActive(pathname: string, href: string): boolean {
  * reads as a deliberate piece of the brand on a phone, where this drawer
  * is the primary way most customers will navigate the site.
  */
-export function MobileNav({ open, onOpenChange }: MobileNavProps) {
+export function MobileNav({ open, onOpenChange, whatsappUrl }: MobileNavProps) {
   const pathname = usePathname()
-
-  const whatsappUrl = buildWhatsAppUrl({
-    phoneNumber: siteConfig.whatsappNumber,
-    message: buildGeneralWhatsAppMessage(siteConfig.name),
-  })
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -63,12 +68,18 @@ export function MobileNav({ open, onOpenChange }: MobileNavProps) {
           id="mobile-nav-panel"
           data-tone="dark"
           className={cn(
-            "fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-sm flex-col",
+            // Anchored to the left edge, under the brand mark, and it
+            // enters from there. The trigger stays at the right of the
+            // header — the drawer is a full-height panel that takes over
+            // the screen, not a popover hanging off its button, so it is
+            // read as the site's navigation arriving rather than as that
+            // control unfolding.
+            "fixed inset-y-0 left-0 z-50 flex h-full w-full max-w-sm flex-col",
             "bg-foreground text-background outline-none",
             "shadow-[0_0_60px_oklch(0_0_0/0.4)]",
             "duration-base ease-crownline",
-            "data-open:animate-in data-open:slide-in-from-right-full",
-            "data-closed:animate-out data-closed:slide-out-to-right-full"
+            "data-open:animate-in data-open:slide-in-from-left-full",
+            "data-closed:animate-out data-closed:slide-out-to-left-full"
           )}
         >
           <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
@@ -102,7 +113,7 @@ export function MobileNav({ open, onOpenChange }: MobileNavProps) {
                           "flex items-center justify-between gap-4",
                           "border-b border-white/5 py-4 pl-4",
                           "font-heading text-lg font-semibold tracking-tight text-background/35",
-                          "animate-in fade-in-0 slide-in-from-right-4 fill-mode-backwards"
+                          "animate-in fade-in-0 slide-in-from-left-4 fill-mode-backwards"
                         )}
                       >
                         {link.label}
@@ -149,7 +160,7 @@ export function MobileNav({ open, onOpenChange }: MobileNavProps) {
                         // rule collapses these to ~0ms, so the delays
                         // above never strand content for anyone who has
                         // asked for less movement.
-                        "animate-in fade-in-0 slide-in-from-right-4 fill-mode-backwards",
+                        "animate-in fade-in-0 slide-in-from-left-4 fill-mode-backwards",
                         active ? "text-gold" : "text-background/80 hover:text-background"
                       )}
                     >
@@ -179,8 +190,23 @@ export function MobileNav({ open, onOpenChange }: MobileNavProps) {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => onOpenChange(false)}
-                // Dark-surface colours come from the [data-tone="dark"]
-                // rules in globals.css via the drawer's own marker.
+                /**
+                 * The two markers the dark-surface rules in globals.css
+                 * actually key off.
+                 *
+                 * They are set by hand here because this is a plain anchor
+                 * styled with `buttonVariants`, not the `Button` component
+                 * — which is deliberate, for the link-semantics reason
+                 * given on the nav items above, but it means the
+                 * attributes `Button` would have emitted have to be
+                 * supplied. Without them the selector
+                 * `[data-tone="dark"] [data-slot="button"][data-variant="outline"]`
+                 * does not match, and this button fell back to the light
+                 * treatment: a warm-white fill sitting on the drawer's
+                 * black panel.
+                 */
+                data-slot="button"
+                data-variant="outline"
                 className={cn(buttonVariants({ variant: "outline", size: "lg" }), "w-full")}
               >
                 WhatsApp Us
@@ -191,6 +217,12 @@ export function MobileNav({ open, onOpenChange }: MobileNavProps) {
             <Link
               href="/get-a-quote"
               onClick={() => onOpenChange(false)}
+              // Same markers, for the same reason. The gold fill needs no
+              // dark-surface override, but tagging only one of the two
+              // buttons is how the next person concludes the attributes
+              // are optional.
+              data-slot="button"
+              data-variant="default"
               className={cn(buttonVariants({ variant: "default", size: "lg" }), "w-full")}
             >
               Get a Quote

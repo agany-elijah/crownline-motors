@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useId } from "react"
+import { useActionState, useId, useState } from "react"
 import { AlertCircle, Loader2 } from "lucide-react"
 
 import { signInAction, type AuthFormState } from "@/lib/actions/auth.actions"
@@ -34,6 +34,31 @@ interface AdminLoginFormProps {
  */
 export function AdminLoginForm({ next }: AdminLoginFormProps) {
   const [state, formAction, isPending] = useActionState(signInAction, INITIAL_STATE)
+
+  /**
+   * Re-mounts the email field when a failed attempt comes back, so it is
+   * born holding the address that was submitted.
+   *
+   * React resets a `<form action={fn}>` to its defaults once the action
+   * settles, on failure as much as on success — so a mistyped password used
+   * to clear the email too, and every retry started from an empty form.
+   * Assigning a changed `defaultValue` to the mounted input would fix the
+   * value but move a default underneath a live control, which Base UI's
+   * FieldControl rightly objects to; a fresh instance per attempt has no
+   * such contradiction.
+   *
+   * The password field is untouched. It is not echoed by the action and
+   * must not be: clearing a credential on a failed attempt is what both the
+   * user and their password manager expect.
+   */
+  const [attemptKey, setAttemptKey] = useState(0)
+  const [lastState, setLastState] = useState(state)
+
+  if (state !== lastState) {
+    setLastState(state)
+    setAttemptKey((key) => key + 1)
+  }
+
   const emailId = useId()
   const passwordId = useId()
   const errorId = useId()
@@ -52,9 +77,11 @@ export function AdminLoginForm({ next }: AdminLoginFormProps) {
       <div className="flex flex-col gap-2">
         <Label htmlFor={emailId}>Email address</Label>
         <Input
+          key={attemptKey}
           id={emailId}
           name="email"
           type="email"
+          defaultValue={state.email}
           autoComplete="username"
           // Autofocus is right here and almost nowhere else: this page has
           // exactly one purpose and the caret has exactly one place to be.

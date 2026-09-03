@@ -38,6 +38,7 @@ import { PrismaPg } from "@prisma/adapter-pg"
 import { PrismaClient } from "../src/generated/prisma/client"
 import { AdminRole } from "../src/generated/prisma/enums"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { adminPath } from "../src/lib/constants/admin-routes"
 
 /**
  * Builds the service-key client locally rather than importing
@@ -151,7 +152,7 @@ async function main() {
   // The invite email links here; /auth/confirm exchanges the one-time token
   // for a session and forwards to the set-a-password form.
   const siteUrl = resolveSiteUrl()
-  const redirectTo = `${siteUrl}/auth/confirm?next=${encodeURIComponent("/admin/reset-password")}`
+  const redirectTo = `${siteUrl}/auth/confirm?next=${encodeURIComponent(adminPath("/reset-password"))}`
 
   console.log(`→ Invite links will point at ${siteUrl}`)
   console.log(

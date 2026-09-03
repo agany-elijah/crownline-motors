@@ -18,6 +18,40 @@ function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
   return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
 }
 
+/**
+ * The menu panel.
+ *
+ * ── Why it is not clamped to `--available-height` ─────────────────────
+ * This used to carry `max-h-(--available-height)` alongside
+ * `overflow-y-auto`. Base UI defines that variable as "the available height
+ * between the trigger and the edge of the viewport", so the two together
+ * shrink the menu to whatever gap happens to sit below the button and let
+ * the rest scroll out of sight — with no visible affordance saying there is
+ * more.
+ *
+ * That alone truncates a menu opened near the bottom of the window. What
+ * made it worse is the second-order effect: the positioner decides whether
+ * to flip a menu to the other side by measuring whether it overflows, and a
+ * panel already clamped to the space available can never overflow. So the
+ * flip never fired, and the menu stayed squashed against the edge instead of
+ * opening upwards where it would have fitted whole.
+ *
+ * The symptom was a photograph's ⋯ menu showing two of its five actions on a
+ * desktop window while showing all five on a phone — same component, same
+ * props, different amount of room under the trigger.
+ *
+ * Measuring the natural height instead lets the flip work, so the menu opens
+ * on whichever side it fits. The cap stays, as a genuine last resort for a
+ * menu taller than the screen: `svh` rather than `vh` so a mobile browser's
+ * collapsing toolbar cannot push the panel off-screen.
+ *
+ * ── Why the width is not the anchor's ─────────────────────────────────
+ * `w-(--anchor-width)` belongs to Select, where the popup lining up with its
+ * trigger is the point. A dropdown's trigger is often an icon button — the
+ * photo tile's is 32px square — and sizing a menu of labelled actions to it
+ * is meaningless. It sizes to its content, with a floor and a viewport-aware
+ * ceiling so a long label cannot push the panel off the side of a phone.
+ */
 function DropdownMenuContent({
   align = "start",
   alignOffset = 0,
@@ -41,7 +75,7 @@ function DropdownMenuContent({
       >
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
-          className={cn("z-50 max-h-(--available-height) w-(--anchor-width) min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95", className )}
+          className={cn("z-50 max-h-[85svh] w-max min-w-32 max-w-[calc(100vw-2rem)] origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95", className )}
           {...props}
         />
       </MenuPrimitive.Positioner>

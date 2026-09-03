@@ -7,6 +7,7 @@ import {
   loginPathWithReturn,
   resolveReturnPath,
 } from "@/lib/auth/return-path"
+import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
 
 /**
  * These tests exist because `isSafeReturnPath` is the only thing standing
@@ -17,16 +18,21 @@ import {
  *
  * Written negative-first on purpose (SECURITY.MD §63): the interesting cases
  * are the ones that must be refused.
+ *
+ * Paths are built from ADMIN_BASE_PATH rather than written out, so these
+ * assertions keep testing the real boundary if the dashboard is relocated
+ * again — a suite hard-coding "/admin" would go green against a guard that
+ * no longer protects anything.
  */
 describe("isSafeReturnPath", () => {
   it("accepts the admin home and paths beneath it", () => {
-    expect(isSafeReturnPath("/admin")).toBe(true)
-    expect(isSafeReturnPath("/admin/vehicles")).toBe(true)
-    expect(isSafeReturnPath("/admin/orders/abc-123")).toBe(true)
+    expect(isSafeReturnPath(ADMIN_BASE_PATH)).toBe(true)
+    expect(isSafeReturnPath(`${ADMIN_BASE_PATH}/vehicles`)).toBe(true)
+    expect(isSafeReturnPath(`${ADMIN_BASE_PATH}/orders/abc-123`)).toBe(true)
   })
 
   it("rejects absolute URLs to other origins", () => {
-    expect(isSafeReturnPath("https://evil.example/admin")).toBe(false)
+    expect(isSafeReturnPath(`https://evil.example${ADMIN_BASE_PATH}`)).toBe(false)
     expect(isSafeReturnPath("http://evil.example")).toBe(false)
   })
 
@@ -35,7 +41,7 @@ describe("isSafeReturnPath", () => {
     // "starts with a slash" check, but a browser treats them as
     // scheme-relative and navigates straight off-site.
     expect(isSafeReturnPath("//evil.example")).toBe(false)
-    expect(isSafeReturnPath("//evil.example/admin")).toBe(false)
+    expect(isSafeReturnPath(`//evil.example${ADMIN_BASE_PATH}`)).toBe(false)
   })
 
   it("rejects backslash-prefixed URLs", () => {
@@ -54,16 +60,19 @@ describe("isSafeReturnPath", () => {
     expect(isSafeReturnPath("/get-a-quote")).toBe(false)
   })
 
-  it("rejects a path that merely starts with the word admin", () => {
-    // "/administrator-portal" shares a prefix with "/admin" but is a
+  it("rejects a path that merely shares a prefix with the admin base", () => {
+    // A sibling route whose name begins with the same characters is a
     // different route entirely; the check must be on a segment boundary.
-    expect(isSafeReturnPath("/administrator-portal")).toBe(false)
-    expect(isSafeReturnPath("/adminx")).toBe(false)
+    expect(isSafeReturnPath(`${ADMIN_BASE_PATH}-portal`)).toBe(false)
+    expect(isSafeReturnPath(`${ADMIN_BASE_PATH}x`)).toBe(false)
+    // The path the dashboard used to live at must no longer be accepted.
+    expect(isSafeReturnPath("/admin")).toBe(false)
+    expect(isSafeReturnPath("/admin/vehicles")).toBe(false)
   })
 
   it("rejects empty and non-path values", () => {
     expect(isSafeReturnPath("")).toBe(false)
-    expect(isSafeReturnPath("admin")).toBe(false)
+    expect(isSafeReturnPath(ADMIN_BASE_PATH.slice(1))).toBe(false)
     expect(isSafeReturnPath("javascript:alert(1)")).toBe(false)
   })
 })
@@ -82,9 +91,18 @@ describe("loginPathWithReturn", () => {
   })
 
   it("encodes a safe return path", () => {
-    expect(loginPathWithReturn("/admin/vehicles")).toBe(
-      "/admin/login?next=%2Fadmin%2Fvehicles"
+    expect(loginPathWithReturn(`${ADMIN_BASE_PATH}/vehicles`)).toBe(
+      `${ADMIN_LOGIN_PATH}?next=${encodeURIComponent(`${ADMIN_BASE_PATH}/vehicles`)}`
     )
+  })
+
+  it("percent-encodes the return path rather than concatenating it", () => {
+    // The base path contains "@", which is legal in a path but must not be
+    // allowed to sit raw inside a query-string value.
+    const encoded = loginPathWithReturn(`${ADMIN_BASE_PATH}/vehicles`)
+
+    expect(encoded).toContain("next=%2F")
+    expect(encoded.split("next=")[1]).not.toContain("/")
   })
 })
 
@@ -97,6 +115,8 @@ describe("resolveReturnPath", () => {
   })
 
   it("passes a safe path through unchanged", () => {
-    expect(resolveReturnPath("/admin/payments")).toBe("/admin/payments")
+    expect(resolveReturnPath(`${ADMIN_BASE_PATH}/payments`)).toBe(
+      `${ADMIN_BASE_PATH}/payments`
+    )
   })
 })

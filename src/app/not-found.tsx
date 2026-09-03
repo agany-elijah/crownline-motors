@@ -4,6 +4,9 @@ import { buttonVariants } from "@/components/ui/button"
 import { Container } from "@/components/layout/container"
 import { SiteFooter } from "@/components/layout/site-footer"
 import { SiteHeader } from "@/components/layout/site-header"
+import { siteConfig } from "@/config/site"
+import { getWhatsAppNumber } from "@/lib/queries/settings.queries"
+import { buildGeneralWhatsAppMessage, buildWhatsAppUrl } from "@/lib/utils/whatsapp"
 
 export const metadata = {
   title: "Page not found",
@@ -25,10 +28,19 @@ export const metadata = {
  * until Wave B, so this page is what a visitor gets when they follow it.
  * It is written to be a useful redirect rather than a dead end.
  */
-export default function NotFound() {
+export default async function NotFound() {
+  // Same reason as the public layout: SiteHeader is a Client Component and
+  // the number lives in BusinessSettings, so the link is built here and
+  // passed down. This page composes the shell itself, so it has to supply it
+  // itself too.
+  const whatsappUrl = buildWhatsAppUrl({
+    phoneNumber: await getWhatsAppNumber(),
+    message: buildGeneralWhatsAppMessage(siteConfig.name),
+  })
+
   return (
     <div className="flex flex-1 flex-col">
-      <SiteHeader />
+      <SiteHeader whatsappUrl={whatsappUrl} />
 
       <main className="flex flex-1 items-center pt-16 md:pt-20">
         <Container className="py-20 md:py-32">

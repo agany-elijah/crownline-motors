@@ -114,7 +114,19 @@ function isLinkActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-export function SiteHeader() {
+interface SiteHeaderProps {
+  /**
+   * The pre-built wa.me link for the mobile drawer's "WhatsApp Us" action,
+   * or null when no number is configured.
+   *
+   * Threaded from the public layout because the number comes from
+   * BusinessSettings, and this component is a Client Component — see the
+   * note on MobileNavProps.
+   */
+  whatsappUrl: string | null
+}
+
+export function SiteHeader({ whatsappUrl }: SiteHeaderProps) {
   const pathname = usePathname()
   const headerRef = React.useRef<HTMLElement>(null)
   const hasHeroBehind = useHeroBehindHeader(headerRef)
@@ -216,7 +228,11 @@ export function SiteHeader() {
         </nav>
       </Container>
 
-      <MobileNav open={mobileOpen} onOpenChange={setMobileOpen} />
+      <MobileNav
+        open={mobileOpen}
+        onOpenChange={setMobileOpen}
+        whatsappUrl={whatsappUrl}
+      />
     </header>
   )
 }

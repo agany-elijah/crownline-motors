@@ -46,10 +46,119 @@ export function buildWhatsAppUrl({ phoneNumber, message }: BuildWhatsAppUrlOptio
   return url.toString()
 }
 
-/** Generic message for contexts with no specific vehicle, part, or order
- *  to reference yet (header/footer/floating button). Vehicle-specific and
- *  part-specific message builders arrive alongside those respective pages
- *  — no need to build them ahead of the content that would use them. */
+/**
+ * ── House style for every message below ───────────────────────────────
+ *
+ * All of them are written in the customer's voice, not the business's.
+ * This text lands in the customer's own composer and they may well edit it
+ * before sending, so it has to read as something a person would plausibly
+ * type — an opening they can send as-is, not a form they have to fill in.
+ *
+ * Every message that can carry a reference does. "I am interested in the
+ * Toyota Harrier 2021" is ambiguous when three are on the floor; the
+ * reference is what lets whoever answers reply about the car rather than
+ * spend two messages working out which car. The same reasoning applies to
+ * an order number and a tracking number, where it is the difference between
+ * a support conversation that starts with an answer and one that starts
+ * with "which order?".
+ *
+ * None of these interpolate into a URL themselves — `buildWhatsAppUrl`
+ * percent-encodes the whole message through URLSearchParams, so a model
+ * name containing "&" is text, never a second query parameter.
+ */
+
+/** Generic message for contexts with no specific vehicle, part or order to
+ *  reference — the floating button, the footer, the mobile drawer. */
 export function buildGeneralWhatsAppMessage(siteName: string): string {
   return `Hello ${siteName}, I'd like to enquire about a vehicle.`
+}
+/**
+ * The message a customer sends from a vehicle's page.
+ *
+ * Carries the listing reference as well as the vehicle's name, because the
+ * name alone is ambiguous — an importer can have three 2021 Harriers on the
+ * floor at once, and the first thing whoever answers has to establish is
+ * which one. Including it means the reply can be about the car rather than
+ * about working out which car.
+ *
+ * Phrased as the customer, not as the business: this text lands in the
+ * customer's own composer, and they may well edit it before sending.
+ */
+export function buildVehicleWhatsAppMessage({
+  siteName,
+  year,
+  make,
+  model,
+  referenceNumber,
+}: {
+  siteName: string
+  year: number
+  make: string
+  model: string
+  referenceNumber: string
+}): string {
+  return `Hello ${siteName}, I am interested in the ${make} ${model} ${year}, listing reference ${referenceNumber}.`
+}
+
+/**
+ * The message a customer sends from a spare part's page.
+ *
+ * Wave B: there is no spare-parts catalogue yet, and this builder is not
+ * called from anywhere. It is here because the brief specifies the wording
+ * and because writing it beside its vehicle counterpart is what keeps the
+ * two consistent — the part number plays exactly the role the listing
+ * reference does above, and a version written from scratch six months from
+ * now would drift. It costs one function and no runtime.
+ */
+export function buildSparePartWhatsAppMessage({
+  siteName,
+  partName,
+  partNumber,
+}: {
+  siteName: string
+  partName: string
+  partNumber: string
+}): string {
+  return `Hello ${siteName}, I am interested in the ${partName}, part number ${partNumber}.`
+}
+
+/**
+ * The message a customer sends about an existing order.
+ *
+ * Deliberately says "I need assistance with" rather than naming a problem:
+ * this is reached from an order or payment screen where the customer may be
+ * asking about anything from a bank reference to a delivery date, and a
+ * message that presumes the complaint puts words in their mouth.
+ */
+export function buildOrderWhatsAppMessage({
+  siteName,
+  orderNumber,
+}: {
+  siteName: string
+  orderNumber: string
+}): string {
+  return `Hello ${siteName}, I need assistance with order ${orderNumber}.`
+}
+
+/**
+ * The message a customer sends from the tracking page.
+ *
+ * The tracking number is the only identifier this customer has — they may
+ * have no account yet (Wave A has none) and may not know their order
+ * number. Carrying it is what makes the conversation resolvable.
+ *
+ * Nothing else from the shipment is included. The message is composed in a
+ * public page and the customer may forward it; the reference is the one
+ * thing they already typed in to get here, and the vehicle, the value and
+ * the delivery address are all things the dealership can look up and the
+ * customer has not asked to broadcast.
+ */
+export function buildTrackingWhatsAppMessage({
+  siteName,
+  trackingNumber,
+}: {
+  siteName: string
+  trackingNumber: string
+}): string {
+  return `Hello ${siteName}, I need assistance with tracking number ${trackingNumber}.`
 }

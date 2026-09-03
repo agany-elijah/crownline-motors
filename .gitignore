@@ -3,6 +3,10 @@ node_modules/
 .env
 .env.local
 .env*.local
+# Backups and copies of env files carry the same live credentials as the
+# originals. ".env*.local" does not match ".env.local.bak", which is exactly
+# the sort of near-miss that puts a database URL in a public repository.
+*.bak
 *.log
 .DS_Store
 coverage/
@@ -12,3 +16,4 @@ test-results/
 src/generated/
 *.tsbuildinfo
 .env.test
+tests/e2e/.auth/

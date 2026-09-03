@@ -6,6 +6,7 @@ import { Container } from "@/components/layout/container"
 import { BrandMark } from "@/components/layout/brand-mark"
 import { siteConfig } from "@/config/site"
 import { footerLinkGroups, isNavLinkAvailable } from "@/lib/constants/nav-links"
+import { getWhatsAppNumber } from "@/lib/queries/settings.queries"
 import { buildGeneralWhatsAppMessage, buildWhatsAppUrl } from "@/lib/utils/whatsapp"
 
 const socialLinks = [
@@ -54,9 +55,13 @@ function SocialIcon({ name }: { name: (typeof socialLinks)[number]["icon"] }) {
   )
 }
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  // The number comes from BusinessSettings, not from the env var, so the
+  // dealership can change it in the dashboard without a deploy (brief §13).
+  // `buildWhatsAppUrl` returns null when neither is configured, and the
+  // block below renders nothing rather than a broken wa.me link.
   const whatsappUrl = buildWhatsAppUrl({
-    phoneNumber: siteConfig.whatsappNumber,
+    phoneNumber: await getWhatsAppNumber(),
     message: buildGeneralWhatsAppMessage(siteConfig.name),
   })
 

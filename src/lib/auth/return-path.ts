@@ -1,3 +1,5 @@
+import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
+
 /**
  * Where an administrator lands after authenticating, and how that
  * destination is decided.
@@ -8,11 +10,16 @@
  * suite. Given the whole point of `isSafeReturnPath` is to close an open
  * redirect, being able to test it exhaustively matters more than keeping it
  * beside its caller.
+ *
+ * Every path here is derived from ADMIN_BASE_PATH rather than spelled out,
+ * so relocating the dashboard cannot leave the login redirect pointing at an
+ * address that no longer exists — or, worse, leave `isSafeReturnPath`
+ * accepting the old prefix after the routes have moved.
  */
 
-export const ADMIN_LOGIN_PATH = "/admin/login"
-export const ADMIN_FORBIDDEN_PATH = "/admin/forbidden"
-export const ADMIN_HOME_PATH = "/admin"
+export const ADMIN_LOGIN_PATH = `${ADMIN_BASE_PATH}/login`
+export const ADMIN_FORBIDDEN_PATH = `${ADMIN_BASE_PATH}/forbidden`
+export const ADMIN_HOME_PATH = ADMIN_BASE_PATH
 
 /**
  * Is this a destination we are willing to send an authenticated session to?
@@ -30,9 +37,11 @@ export const ADMIN_HOME_PATH = "/admin"
  *     protocol-relative URLs, so `//evil.example` navigates off-site
  *     despite passing a naive "starts with a slash" check. This is the
  *     bypass that catches most hand-rolled versions of this function.
- *   - Must be inside /admin. A successful staff sign-in has no business
- *     landing anywhere else, and narrowing the allowed set is stronger
- *     than trying to enumerate what to forbid.
+ *   - Must be inside the dashboard. A successful staff sign-in has no
+ *     business landing anywhere else, and narrowing the allowed set is
+ *     stronger than trying to enumerate what to forbid. Compared on a
+ *     segment boundary, so "/Ricky@2000-portal" is rejected the way
+ *     "/administrator-portal" was under the old prefix.
  */
 export function isSafeReturnPath(value: string): boolean {
   if (!value.startsWith("/")) return false

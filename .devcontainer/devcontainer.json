@@ -1,6 +1,6 @@
 {
   "name": "Crownline Motors",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -11,7 +11,7 @@
       ]
     }
   },
-  "forwardPorts": [3000],
+  "forwardPorts": [3000, 3001],
   "postCreateCommand": "npm install",
   "postAttachCommand": "npx prisma generate"
 }

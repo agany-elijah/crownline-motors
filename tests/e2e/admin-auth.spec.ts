@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test"
+import { ADMIN_BASE_PATH, adminPath } from "../../src/lib/constants/admin-routes"
+import { adminUrlPattern } from "./setup/paths"
 
 /**
  * Negative-first authentication tests (SECURITY.MD §63).
@@ -12,22 +14,21 @@ import { expect, test } from "@playwright/test"
 
 /** Every admin route that must be unreachable without a session. */
 const PROTECTED_ADMIN_ROUTES = [
-  "/admin",
-  "/admin/vehicles",
-  "/admin/vehicles/new",
-  "/admin/vehicles/some-id",
-  "/admin/vehicles/some-id/photos",
-  "/admin/quotes",
-  "/admin/quotes/some-id",
-  "/admin/orders",
-  "/admin/orders/some-id",
-  "/admin/payments",
-  "/admin/payments/some-id",
-  "/admin/customers",
-  "/admin/customers/some-id",
-  "/admin/tracking/some-shipment",
-  "/admin/settings",
-  "/admin/forbidden",
+  ADMIN_BASE_PATH,
+  adminPath("/vehicles"),
+  adminPath("/vehicles/new"),
+  adminPath("/vehicles/some-id"),
+  adminPath("/quotes"),
+  adminPath("/quotes/some-id"),
+  adminPath("/orders"),
+  adminPath("/orders/some-id"),
+  adminPath("/payments"),
+  adminPath("/payments/some-id"),
+  adminPath("/customers"),
+  adminPath("/customers/some-id"),
+  adminPath("/tracking/some-shipment"),
+  adminPath("/settings"),
+  adminPath("/forbidden"),
 ]
 
 test.describe("unauthenticated access to the admin area", () => {
@@ -35,7 +36,7 @@ test.describe("unauthenticated access to the admin area", () => {
     test(`${route} redirects an anonymous visitor to sign in`, async ({ page }) => {
       await page.goto(route)
 
-      await expect(page).toHaveURL(/\/admin\/login/)
+      await expect(page).toHaveURL(adminUrlPattern("/login"))
       await expect(
         page.getByRole("heading", { level: 1, name: "Sign in" })
       ).toBeVisible()
@@ -43,16 +44,16 @@ test.describe("unauthenticated access to the admin area", () => {
   }
 
   test("preserves the requested page so sign-in returns there", async ({ page }) => {
-    await page.goto("/admin/payments")
+    await page.goto(adminPath("/payments"))
 
     const url = new URL(page.url())
-    expect(url.searchParams.get("next")).toBe("/admin/payments")
+    expect(url.searchParams.get("next")).toBe(adminPath("/payments"))
   })
 
   test("does not render admin content before redirecting", async ({ page }) => {
     // A layout-based guard would still stream the page's own markup into the
     // RSC payload. The body must not contain dashboard content at all.
-    const response = await page.goto("/admin")
+    const response = await page.goto(ADMIN_BASE_PATH)
 
     expect(response?.status()).toBe(200) // the login page, after the redirect
     await expect(page.getByText("Your permissions")).toHaveCount(0)
@@ -61,7 +62,7 @@ test.describe("unauthenticated access to the admin area", () => {
 
 test.describe("sign-in page", () => {
   test("is reachable without a session", async ({ page }) => {
-    await page.goto("/admin/login")
+    await page.goto(adminPath("/login"))
 
     await expect(page.getByLabel("Email address")).toBeVisible()
     await expect(page.getByLabel("Password")).toBeVisible()
@@ -70,7 +71,7 @@ test.describe("sign-in page", () => {
   test("does not reveal whether an account exists", async ({ page }) => {
     // Makes a real request to Supabase Auth, which is the point: the
     // generic message has to survive the provider's own error text.
-    await page.goto("/admin/login")
+    await page.goto(adminPath("/login"))
 
     await page.getByLabel("Email address").fill("definitely-not-a-user@example.com")
     await page.getByLabel("Password").fill("not-the-right-password")
@@ -92,7 +93,7 @@ test.describe("sign-in page", () => {
   })
 
   test("refuses to carry an off-site return path into the form", async ({ page }) => {
-    await page.goto("/admin/login?next=https://evil.example/admin")
+    await page.goto(adminPath("/login?next=https://evil.example/admin"))
 
     // The hidden field is only rendered for a path that passed validation,
     // so an unsafe value must leave no trace in the DOM at all.
@@ -100,7 +101,7 @@ test.describe("sign-in page", () => {
   })
 
   test("refuses a protocol-relative return path", async ({ page }) => {
-    await page.goto("/admin/login?next=//evil.example")
+    await page.goto(adminPath("/login?next=//evil.example"))
 
     await expect(page.locator('input[name="next"]')).toHaveCount(0)
   })
@@ -110,7 +111,7 @@ test.describe("sign-in page", () => {
     // (SECURITY.MD §42). Without this notice the administrator lands on a
     // bare login form seconds after setting a password and reasonably
     // concludes it did not work.
-    await page.goto("/admin/login?notice=password_updated")
+    await page.goto(adminPath("/login?notice=password_updated"))
 
     await expect(page.locator('[data-slot="alert"]')).toContainText(
       "Password updated. Sign in with your new password."
@@ -118,15 +119,26 @@ test.describe("sign-in page", () => {
   })
 
   test("keeps a safe return path", async ({ page }) => {
-    await page.goto("/admin/login?next=%2Fadmin%2Fvehicles")
+    const target = adminPath("/vehicles")
+    await page.goto(adminPath(`/login?next=${encodeURIComponent(target)}`))
 
-    await expect(page.locator('input[name="next"]')).toHaveValue("/admin/vehicles")
+    await expect(page.locator('input[name="next"]')).toHaveValue(target)
+  })
+
+  test("drops a return path pointing at the old /admin prefix", async ({ page }) => {
+    // The dashboard moved. A stale link — a bookmark, an old email — must
+    // not be honoured: `isSafeReturnPath` now allows only the current base
+    // path, so the field is not rendered at all and sign-in falls back to
+    // the dashboard home.
+    await page.goto(adminPath("/login?next=%2Fadmin%2Fvehicles"))
+
+    await expect(page.locator('input[name="next"]')).toHaveCount(0)
   })
 })
 
 test.describe("password recovery", () => {
   test("gives the same answer for an unknown address", async ({ page }) => {
-    await page.goto("/admin/forgot-password")
+    await page.goto(adminPath("/forgot-password"))
 
     await page.getByLabel("Email address").fill("nobody-here@example.com")
     await page.getByRole("button", { name: "Send reset link" }).click()
@@ -139,9 +151,9 @@ test.describe("password recovery", () => {
   test("set-a-password page rejects a visitor with no recovery session", async ({
     page,
   }) => {
-    await page.goto("/admin/reset-password")
+    await page.goto(adminPath("/reset-password"))
 
-    await expect(page).toHaveURL(/\/admin\/login/)
+    await expect(page).toHaveURL(adminUrlPattern("/login"))
   })
 })
 
@@ -149,13 +161,13 @@ test.describe("auth callback", () => {
   test("rejects a request with no token", async ({ page }) => {
     await page.goto("/auth/confirm")
 
-    await expect(page).toHaveURL(/\/admin\/login\?error=invalid_link/)
+    await expect(page).toHaveURL(adminUrlPattern("/login?error=invalid_link"))
   })
 
   test("rejects a forged token", async ({ page }) => {
     await page.goto("/auth/confirm?token_hash=not-a-real-token&type=recovery")
 
-    await expect(page).toHaveURL(/\/admin\/login\?error=invalid_link/)
+    await expect(page).toHaveURL(adminUrlPattern("/login?error=invalid_link"))
   })
 
   test("ignores an off-site next parameter", async ({ page }) => {
@@ -180,7 +192,7 @@ test.describe("legibility", () => {
     // Asserting a real contrast ratio rather than "colour !== background"
     // catches the near-miss cases too, and encodes the accessibility
     // requirement from the brief (§17, readable contrast) as a number.
-    await page.goto("/admin/login")
+    await page.goto(adminPath("/login"))
 
     for (const label of ["Email address", "Password"]) {
       const field = page.getByLabel(label, { exact: true })
@@ -223,15 +235,25 @@ test.describe("legibility", () => {
 })
 
 test.describe("hardening", () => {
-  test("keeps the admin area out of robots.txt", async ({ request }) => {
+  test("never publishes the admin path in robots.txt", async ({ request }) => {
+    // Inverted from what this test used to assert, deliberately.
+    //
+    // While the dashboard lived at /admin, listing it cost nothing — every
+    // scanner tries that path anyway. It now lives at an unguessable
+    // segment, and robots.txt is a world-readable file at a fixed address:
+    // a Disallow line would hand that segment straight to the automated
+    // traffic the move exists to shake off.
     const response = await request.get("/robots.txt")
     const body = await response.text()
 
-    expect(body).toContain("Disallow: /admin")
+    expect(body).not.toContain(ADMIN_BASE_PATH)
+    // The old path must not reappear either — it would be a live hint that
+    // an admin area exists and was moved.
+    expect(body).not.toContain("/admin")
   })
 
   test("sends baseline security headers", async ({ request }) => {
-    const response = await request.get("/admin/login")
+    const response = await request.get(adminPath("/login"))
     const headers = response.headers()
 
     expect(headers["x-content-type-options"]).toBe("nosniff")
@@ -260,7 +282,7 @@ test.describe("hardening", () => {
     // which is how the Codespaces failure survived an earlier version of
     // this test. Both are covered below.
     const post = (origin: string, forwardedHost?: string) =>
-      request.post("/admin/login", {
+      request.post(adminPath("/login"), {
         headers: {
           Origin: origin,
           ...(forwardedHost ? { "X-Forwarded-Host": forwardedHost } : {}),
@@ -296,7 +318,7 @@ test.describe("hardening", () => {
     // meaningful under both servers. Once the Playwright webServer switches
     // to `build && start` (see playwright.config.ts), a rendered admin page
     // can be asserted here directly.
-    const response = await request.get("/admin/payments", { maxRedirects: 0 })
+    const response = await request.get(adminPath("/payments"), { maxRedirects: 0 })
 
     expect(response.status()).toBe(307)
     expect(response.headers()["cache-control"]).toContain("no-store")

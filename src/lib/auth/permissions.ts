@@ -47,6 +47,16 @@ export const ADMIN_PERMISSIONS = [
   "vehicle:publish",
   "vehicle:archive",
 
+  /**
+   * Spare parts (Wave B).
+   *
+   * Only `sparePart:read` exists so far, because only the navigation needs
+   * one. The write/publish/archive permissions arrive with the feature that
+   * uses them — inventing Wave B's full permission model now would be
+   * guessing at decisions that phase has not made yet.
+   */
+  "sparePart:read",
+
   // Quotes (Phase 10)
   "quote:read",
   "quote:respond",

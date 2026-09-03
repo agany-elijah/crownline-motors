@@ -24,6 +24,21 @@ export default defineConfig({
       // Mirrors the "@/*" -> "./src/*" mapping in tsconfig.json. Kept as a
       // plain alias instead of pulling in vite-tsconfig-paths for one line.
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+
+      /**
+       * `server-only` throws the moment it is imported outside a React
+       * Server Component — Next.js swaps it for an empty module through the
+       * `react-server` export condition, which this environment does not
+       * set. Without the alias, importing any server module under test
+       * (the photograph pipeline, the catalogue reads) fails at import time.
+       *
+       * It replaces the guard *in tests only*. Every real build still
+       * resolves the package itself, so a `server-only` module pulled into a
+       * client bundle is still a build error.
+       */
+      "server-only": fileURLToPath(
+        new URL("./tests/support/server-only.ts", import.meta.url)
+      ),
     },
   },
 })

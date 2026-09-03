@@ -1,10 +1,12 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider   = "postgresql"
+  extensions = [pg_trgm]
 }
 
 // ── enums and models unchanged from before ──
@@ -32,6 +34,31 @@ enum AdminRole {
   ADMIN
 }
 
+/// The state of a *listing*, not of a car in transit.
+///
+/// The brief's Stage 8 sketch listed "In Transit" and "Delivered" alongside
+/// these. They are deliberately absent, and the distinction is load-bearing:
+///
+///   VehicleStatus  — may a customer see this listing, and can it still be
+///                    bought? Owned by the inventory, changed by
+///                    `updateVehicleStatusAction` through
+///                    ALLOWED_VEHICLE_TRANSITIONS.
+///   TrackingStatus — where the physical car has got to on its way to Juba.
+///                    Owned by Shipment/TrackingEvent, changed by
+///                    `updateTrackingStatus`, and shown to the customer who
+///                    bought it.
+///
+/// Adding IN_TRANSIT here would create a second place that answers "where is
+/// the car", reachable by an operator editing a dropdown on the listing
+/// screen rather than by recording a tracking event — so the two would drift,
+/// and the marketplace card and the customer's tracking page would disagree
+/// about the same vehicle. It would also blur the one question this column
+/// exists to answer: a car that is shipping has been SOLD, and SOLD is
+/// already how the listing says so.
+///
+/// One vehicle can also carry more than one shipment over its life (a
+/// re-export, a Wave B order containing parts as well), which a single
+/// column on Vehicle cannot represent at all.
 enum VehicleStatus {
   DRAFT
   PUBLISHED
@@ -40,17 +67,20 @@ enum VehicleStatus {
   ARCHIVED
 }
 
-enum VehiclePhotoCategory {
-  FRONT
-  REAR
-  SIDE
-  INTERIOR
-  DASHBOARD
-  ENGINE
-  WHEELS
-  DAMAGE
-  AUCTION_SHEET
-  OTHER
+// Whether the vehicle has had a previous owner.
+//
+// Two values, and deliberately only two. An importer's stock is either a
+// brand-new unit or a used import, and the grades in between ("nearly new",
+// "ex-demo") are judgements a buyer reads out of the mileage, the year and
+// the description rather than out of a badge. A third value would be an
+// opinion presented as a fact on a listing that is also a price quotation.
+//
+// USED is the default in the database because it is the honest one: a
+// listing that has not been told otherwise is not a new car, and a wrong
+// NEW on a public page is a misrepresentation, not a cosmetic slip.
+enum VehicleCondition {
+  NEW
+  USED
 }
 
 enum FuelType {
@@ -223,6 +253,7 @@ model Vehicle {
   interiorColor   String
   countryOfOrigin CountryOfOrigin
   currentLocation String
+  condition       VehicleCondition @default(USED)
 
   // Live estimates shown on the public listing — NOT the same as the
   // figures locked into Order once a quote is accepted (see Order below).
@@ -233,6 +264,25 @@ model Vehicle {
   description String        @db.Text
   status      VehicleStatus @default(DRAFT)
   isFeatured  Boolean       @default(false)
+
+  // The equipment list a buyer scans before enquiring — "Sunroof", "Reverse
+  // camera", "Leather seats" — one entry per line as the operator typed
+  // them, in that order.
+  //
+  // ── Why a scalar list and not a VehicleFeature table ────────────────
+  // A feature here has no identity of its own: nothing references one, no
+  // query selects by one, and none of them outlive the vehicle they were
+  // typed against. A join table would buy referential integrity over data
+  // that has no referents, at the cost of a second write path, a second
+  // ordering column, and a join on every read of a listing.
+  //
+  // The one thing it would eventually buy is filtering ("show me cars with
+  // a sunroof"), which the brief does not ask for and which free text
+  // cannot answer honestly anyway — "Sun roof" and "Sunroof" are the same
+  // feature and different strings. When that becomes a requirement it wants
+  // a curated vocabulary, not this column promoted; a Postgres text[] can
+  // be GIN-indexed in the meantime if a contains-search is ever needed.
+  features String[] @default([])
 
   photos     VehiclePhoto[]
   quotes     Quote[]
@@ -246,17 +296,42 @@ model Vehicle {
   @@index([make, model])
   @@index([year])
   @@index([price])
+  // Trigram indexes backing the admin list's search box.
+  //
+  // That search is `contains` + `mode: "insensitive"`, which Prisma compiles
+  // to ILIKE '%term%'. A leading wildcard makes a B-tree index useless — the
+  // planner has no prefix to seek on — so the three columns below were being
+  // sequentially scanned on every keystroke of a debounced search.
+  //
+  // A GIN index over trigrams is the standard answer: it indexes every
+  // three-character substring, so an infix match becomes an index lookup.
+  // The cost is a slightly slower write per vehicle, which is irrelevant on a
+  // table an operator appends to a few times a day.
+  //
+  // Modelled here rather than only in raw SQL so `prisma migrate` knows they
+  // exist. An index created by a migration but absent from this schema is one
+  // Prisma proposes to DROP the next time a migration is generated.
+  @@index([make(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([model(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([referenceNumber(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model VehiclePhoto {
-  id           String               @id @default(cuid())
-  vehicleId    String
-  vehicle      Vehicle              @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  storagePath  String
-  altText      String?
-  category     VehiclePhotoCategory @default(OTHER)
-  isPrimary    Boolean              @default(false)
-  displayOrder Int                  @default(0)
+  id          String  @id @default(cuid())
+  vehicleId   String
+  vehicle     Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  storagePath String
+  // Reserved for the public gallery and SEO work (Stages 11 / 34). Not
+  // written by the dashboard: an operator arranging a walk-around should not
+  // be asked to write alt text for every frame, so the gallery generates a
+  // truthful description from the vehicle and the photo's position instead.
+  altText     String?
+
+  // A vehicle with at least one live photograph has exactly one primary —
+  // the image customers see on the card and at the top of the gallery.
+  // Maintained at write time by reconcilePrimary(), never derived on read.
+  isPrimary    Boolean @default(false)
+  displayOrder Int     @default(0)
 
   deletedAt DateTime? // soft delete — admin "delete photo" sets this, never a hard delete
 
@@ -525,4 +600,64 @@ model PaymentMilestone {
   @@unique([orderId, sequence])
   @@index([orderId])
   @@index([status])
+}
+
+// ─────────────────────────────────────────────
+// RATE LIMITING
+// ─────────────────────────────────────────────
+
+/// One recorded attempt at a rate-limited action. Currently only admin
+/// sign-in.
+///
+/// ── Why this is a table and not an in-memory counter ──────────────────
+/// The application runs on Vercel, where each request may be served by a
+/// different serverless instance and instances are recycled constantly. A
+/// Map in module scope would therefore count a fraction of the attempts, and
+/// an attacker would get seven tries *per instance* — a limit that looks
+/// present in code review and is absent in production. Postgres is the only
+/// state every instance already shares, so it is where the counter belongs.
+///
+/// Redis (Upstash) is the conventional home for this and is explicitly a
+/// Phase 2 item in the roadmap. Nothing here blocks that move: the limiter in
+/// src/lib/auth/rate-limit.ts is the only module that reads or writes this
+/// table, so swapping its storage is a change to one file. The volume this
+/// carries — a handful of rows per failed sign-in on a single-dealership
+/// admin panel — does not justify the infrastructure yet.
+///
+/// ── Why a log of attempts rather than a counter row ───────────────────
+/// A counter needs a window start, and a fixed window lets an attacker fire
+/// the full budget at the end of one window and again at the start of the
+/// next: fourteen attempts in seconds while never technically exceeding
+/// seven per window. Counting rows inside a rolling window has no such seam,
+/// and at this volume the extra rows are free. Expired rows are pruned by
+/// the limiter itself.
+model LoginAttempt {
+  id String @id @default(cuid())
+
+  /// What is being limited, hashed — never the email address or IP itself.
+  ///
+  /// This table exists to *reject* traffic, so it accumulates rows for
+  /// people who mistyped a password and for whoever is attacking them. In
+  /// plain text it would become a durable list of staff email addresses
+  /// beside the IPs they sign in from: a small privacy problem in normal
+  /// operation, and a ready-made target list if the database is ever
+  /// exposed. A SHA-256 of "<scope>:<identifier>" answers the only question
+  /// the limiter asks — "how many attempts share this key?" — without
+  /// storing anything worth stealing (SECURITY.MD §38).
+  identifierHash String
+
+  /// Which bucket this belongs to, e.g. "admin-login:email" /
+  /// "admin-login:ip". Kept in the clear because it names a category, not a
+  /// person, and a limiter that cannot tell its buckets apart cannot expire
+  /// one without the other.
+  scope String
+
+  createdAt DateTime @default(now())
+
+  /// The limiter's only query: count rows for one key newer than a cutoff.
+  /// Ordered to match — equality columns first, range column last — so the
+  /// window scan is an index range rather than a filter over the bucket.
+  @@index([scope, identifierHash, createdAt])
+  /// Supports the housekeeping delete that drops rows past every window.
+  @@index([createdAt])
 }

@@ -4,7 +4,17 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 
 import { logSecurityEvent, recordAuditLogBestEffort, redactEmail } from "@/lib/audit"
+import { getClientIp } from "@/lib/auth/client-ip"
 import { getSessionUser } from "@/lib/auth/dal"
+import {
+  ADMIN_LOGIN_RATE_LIMITED_MESSAGE,
+  RATE_LIMIT_SCOPES,
+  checkRateLimit,
+  clearAttempts,
+  pruneExpiredAttempts,
+  recordFailedAttempt,
+  type RateLimitKey,
+} from "@/lib/auth/rate-limit"
 import {
   ADMIN_LOGIN_PATH,
   resolveReturnPath,
@@ -17,6 +27,7 @@ import {
   signInSchema,
   updatePasswordSchema,
 } from "@/lib/validations/auth.schema"
+import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
 
 /**
  * Authentication actions for the administrator dashboard.
@@ -40,6 +51,20 @@ export interface AuthFormState {
   fieldErrors?: Record<string, string[]>
   /** Non-error confirmation, used by the password-reset request form. */
   notice?: string
+  /**
+   * The address that was submitted, echoed back.
+   *
+   * React resets a `<form action={fn}>` to its `defaultValue`s once the
+   * action settles — on failure as much as on success — so without this a
+   * mistyped password clears the email field too, and every retry starts
+   * from an empty form.
+   *
+   * The password is deliberately *never* echoed. It is a credential; the
+   * server has no business handing it back into a page, and clearing it on
+   * a failed attempt is the behaviour a browser's password manager and the
+   * user both expect.
+   */
+  email?: string
 }
 
 /**
@@ -54,6 +79,31 @@ export interface AuthFormState {
  */
 const GENERIC_SIGN_IN_ERROR =
   "Those details did not match an active administrator account."
+
+/**
+ * The keys one sign-in attempt is counted against.
+ *
+ * The email is lower-cased and trimmed by the Zod schema before it gets
+ * here, so "Admin@Crownline.com" and "admin@crownline.com " land in the same
+ * bucket rather than buying an attacker a fresh budget per capitalisation.
+ *
+ * The IP key is omitted entirely when no address can be read, rather than
+ * bucketed under a placeholder — see the note in client-ip.ts. In that state
+ * the email counter is the whole limit, which is the correct degradation:
+ * still bounded, just not additionally bounded by origin.
+ */
+async function buildLoginRateLimitKeys(email: string): Promise<RateLimitKey[]> {
+  const keys: RateLimitKey[] = [
+    { scope: RATE_LIMIT_SCOPES.adminLoginEmail, identifier: email },
+  ]
+
+  const ip = await getClientIp()
+  if (ip) {
+    keys.push({ scope: RATE_LIMIT_SCOPES.adminLoginIp, identifier: ip })
+  }
+
+  return keys
+}
 
 /**
  * Absolute origin for links embedded in authentication emails.
@@ -116,30 +166,66 @@ export async function signInAction(
     next: formData.get("next") ?? undefined,
   })
 
+  const submittedEmail = formData.get("email")
+
   if (!parsed.success) {
     return {
       error: "Check the details below and try again.",
       fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      email: typeof submittedEmail === "string" ? submittedEmail.slice(0, 320) : undefined,
     }
   }
 
   const { email, password, next } = parsed.data
+  const rateLimitKeys = await buildLoginRateLimitKeys(email)
+
+  /**
+   * Checked before the credentials are, and that order matters.
+   *
+   * Verifying the password first would make the endpoint a password oracle
+   * that happens to be slow: an attacker could keep testing candidates and
+   * simply read the timing or the eventual success, with the limit only
+   * deciding how loudly it complained afterwards. Refusing before any
+   * credential is examined is what makes the budget mean something.
+   *
+   * The refusal is deliberately distinguishable from a wrong password, and
+   * that is not an enumeration leak: it is keyed on how many attempts this
+   * address or host has made, which the attacker already knows, and it tells
+   * them nothing about whether the account exists. The trade is worth it —
+   * the alternative leaves a locked-out administrator retyping a password
+   * that is already correct.
+   */
+  const verdict = await checkRateLimit(rateLimitKeys)
+
+  if (!verdict.allowed) {
+    logSecurityEvent("admin_sign_in_rate_limited", {
+      email: redactEmail(email),
+      reason: "attempt_limit_reached",
+    })
+
+    return { error: ADMIN_LOGIN_RATE_LIMITED_MESSAGE, email }
+  }
+
   const supabase = await createClient()
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error || !data.user) {
-    // Supabase applies its own per-IP and per-account rate limiting to this
-    // endpoint, which is the brute-force control for Wave A (SECURITY.MD
-    // §5.5). Application-level limiting arrives with Upstash in Phase 2
-    // rather than being bolted on here; the roadmap defers that
-    // infrastructure deliberately.
+    // Supabase applies its own per-IP and per-account limiting to this
+    // endpoint as well. The counter below is Crownline's own layer: seven
+    // attempts per fifteen minutes, per address and per host, with a message
+    // the operator can act on. See lib/auth/rate-limit.ts.
+    await recordFailedAttempt(rateLimitKeys)
+    // Housekeeping rides on the failure path, where one extra statement on
+    // an already-failing request is free, and never on the success path.
+    await pruneExpiredAttempts()
+
     logSecurityEvent("admin_sign_in_failed", {
       email: redactEmail(email),
       reason: error?.code ?? "no_user",
     })
 
-    return { error: GENERIC_SIGN_IN_ERROR }
+    return { error: GENERIC_SIGN_IN_ERROR, email }
   }
 
   const profile = await prisma.adminProfile.findUnique({
@@ -154,13 +240,31 @@ export async function signInAction(
     // that a session obtained this way must not silently reach.
     await supabase.auth.signOut()
 
+    /**
+     * Counted as a failure, and the counters are NOT cleared.
+     *
+     * The credentials were valid, so Supabase is satisfied — but they do not
+     * belong to an administrator. That is the signature of a leftover or
+     * compromised auth user being probed against the staff entrance, which
+     * is exactly the traffic the limit exists to stop. Treating it as a
+     * success because the password matched would hand an attacker an
+     * unlimited budget on precisely the account worth attacking.
+     */
+    await recordFailedAttempt(rateLimitKeys)
+
     logSecurityEvent("admin_sign_in_rejected_not_admin", {
       email: redactEmail(email),
       reason: profile ? "inactive_profile" : "no_admin_profile",
     })
 
-    return { error: GENERIC_SIGN_IN_ERROR }
+    return { error: GENERIC_SIGN_IN_ERROR, email }
   }
+
+  // A genuine administrator signed in: the earlier failures were this
+  // person mistyping, not an attack, so the slate is wiped for both keys.
+  // Without this, an admin who fumbles a password six times and then
+  // succeeds is one mistake away from a lockout for the rest of the window.
+  await clearAttempts(rateLimitKeys)
 
   await recordAuditLogBestEffort({
     actorId: profile.id,
@@ -220,14 +324,15 @@ export async function requestPasswordResetAction(
   _prevState: AuthFormState,
   formData: FormData
 ): Promise<AuthFormState> {
-  const parsed = passwordResetRequestSchema.safeParse({
-    email: formData.get("email"),
-  })
+  const submittedEmail = formData.get("email")
+
+  const parsed = passwordResetRequestSchema.safeParse({ email: submittedEmail })
 
   if (!parsed.success) {
     return {
       error: "Check the details below and try again.",
       fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      email: typeof submittedEmail === "string" ? submittedEmail.slice(0, 320) : undefined,
     }
   }
 
@@ -256,7 +361,7 @@ export async function requestPasswordResetAction(
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     // Supabase sends a one-time token to this URL; /auth/confirm exchanges
     // it for a recovery session and then forwards to the form below.
-    redirectTo: `${origin}/auth/confirm?next=${encodeURIComponent("/admin/reset-password")}`,
+    redirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(`${ADMIN_BASE_PATH}/reset-password`)}`,
   })
 
   if (error) {

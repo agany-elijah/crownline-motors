@@ -1,12 +1,19 @@
 import type { Metadata } from "next"
-import { ArrowRightIcon, CarFrontIcon, SearchXIcon } from "lucide-react"
+import {
+  ArrowRightIcon,
+  BoltIcon,
+  CarFrontIcon,
+  CogIcon,
+  FuelIcon,
+  GaugeIcon,
+  SearchXIcon,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
 import {
   Table,
   TableBody,
@@ -48,7 +55,9 @@ const swatches = [
   { name: "Foreground", token: "--foreground", className: "bg-foreground" },
   { name: "Gold (fill)", token: "--gold", className: "bg-gold" },
   { name: "Gold (ink)", token: "--gold-ink", className: "bg-gold-ink" },
+  { name: "Gold (bright)", token: "--gold-bright", className: "bg-gold-bright" },
   { name: "Accent", token: "--accent", className: "bg-accent" },
+  { name: "Price", token: "--price", className: "bg-price" },
   { name: "Charcoal", token: "--charcoal", className: "bg-charcoal" },
   { name: "Secondary", token: "--secondary", className: "bg-secondary" },
   { name: "Muted fg", token: "--muted-foreground", className: "bg-muted-foreground" },
@@ -73,20 +82,12 @@ const typeSteps = [
   { name: "h1", cls: "text-h1", sample: "Toyota Harrier 2021" },
   { name: "h2", cls: "text-h2", sample: "Featured Vehicles" },
   { name: "h3", cls: "text-h3", sample: "Key Specifications" },
+  { name: "title", cls: "text-title", sample: "Toyota Harrier" },
   { name: "body-lg", cls: "text-body-lg", sample: "Quality vehicles sourced from Japan and Korea." },
   { name: "body", cls: "text-body", sample: "Quality vehicles sourced from Japan and Korea." },
   { name: "small", cls: "text-small", sample: "42,000 km · Automatic · Petrol" },
   { name: "meta", cls: "eyebrow", sample: "CLM-V-2026-000123" },
 ]
-
-function SpecRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="eyebrow text-muted-foreground">{label}</span>
-      <span className="tabular text-small font-medium">{value}</span>
-    </div>
-  )
-}
 
 export default function DesignSystemPage() {
   return (
@@ -209,7 +210,7 @@ export default function DesignSystemPage() {
         <SectionHeading
           eyebrow="04 — Surfaces"
           title="Cards & elevation"
-          description="Hover lifts the card 2–4px, deepens a soft two-layer shadow, scales the image inside its fixed crop, and shifts the arrow. Roughly 300ms, once — nothing bounces."
+          description="Three bands: a 16:10 photograph holding roughly 60% of the height, an identity line in Inter with the price in green, then a 2×2 specification matrix beside the gold Explore cue, its icons deliberately faint. Hover lifts the card 6px, swells it 1.5%, deepens a soft two-layer shadow and drifts the photograph closer — 800ms on a curve that spends the whole 800ms, long enough to be felt, never enough to bounce."
         />
 
         <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -220,32 +221,55 @@ export default function DesignSystemPage() {
                   styles, so the two cannot drift apart. */}
               <a href="#" className="block">
                 <Card interactive className="gap-0 py-0">
-                {/* Fixed 16:9 crop. Photography lands here — the gradient is
-                    a stand-in until real vehicle imagery exists. */}
-                <div className="media-frame aspect-video">
-                  <div className="size-full bg-gradient-to-br from-charcoal via-muted-foreground/40 to-muted transition-transform duration-base ease-crownline group-hover/card:scale-[1.04]" />
+                {/* Fixed 16:10 crop. Photography lands here — the gradient
+                    is a stand-in until real vehicle imagery exists. */}
+                <div className="media-frame aspect-[16/10]">
+                  {/* The real card scales an <img>, which `media-frame`
+                      transitions for it. This stand-in is a div, so it
+                      carries the same timing explicitly. */}
+                  <div className="size-full bg-gradient-to-br from-charcoal via-muted-foreground/40 to-muted transition-transform duration-cinematic ease-crownline-soft group-hover/card:scale-[1.08]" />
                 </div>
 
-                <div className="flex flex-col gap-4 p-5">
-                  <div className="flex flex-col gap-0.5">
-                    <h3 className="text-h3">{name}</h3>
-                    <span className="tabular text-small text-muted-foreground">2021</span>
+                <div className="@container flex flex-1 flex-col p-4 sm:p-5">
+                  <div className="flex items-baseline justify-between gap-3 font-sans">
+                    <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                      <h3 className="truncate font-sans text-title font-semibold text-foreground">
+                        {name}
+                      </h3>
+                      <span className="tabular text-body font-normal text-foreground/60">
+                        2021
+                      </span>
+                    </div>
+                    <span className="tabular shrink-0 text-title font-bold text-price">
+                      $22,500
+                    </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-y-3">
-                    <SpecRow label="Mileage" value="42,000 km" />
-                    <SpecRow label="Transmission" value="Automatic" />
-                    <SpecRow label="Fuel" value="Petrol" />
-                    <SpecRow label="Engine" value="2.0L" />
-                  </div>
+                  <div className="mt-auto flex items-end justify-between gap-4 border-t border-border pt-5 @max-[322px]:gap-2 @max-[288px]:flex-col @max-[288px]:items-stretch @max-[288px]:gap-4">
+                    <div className="grid min-w-0 flex-1 grid-cols-[auto_auto] justify-start gap-x-6 gap-y-3 @max-[322px]:gap-x-2 @max-[322px]:gap-y-2.5">
+                      {[
+                        { icon: CogIcon, value: "Automatic" },
+                        { icon: FuelIcon, value: "Petrol" },
+                        { icon: BoltIcon, value: "2.0L" },
+                        { icon: GaugeIcon, value: "42,000 km" },
+                      ].map(({ icon: Icon, value }) => (
+                        <div
+                          key={value}
+                          className="flex min-w-0 items-center gap-2 font-sans text-small text-muted-foreground @max-[322px]:gap-1.5"
+                        >
+                          <Icon
+                            aria-hidden="true"
+                            strokeWidth={1.5}
+                            className="size-3 shrink-0 text-muted-foreground/40"
+                          />
+                          <span className="tabular truncate">{value}</span>
+                        </div>
+                      ))}
+                    </div>
 
-                  <Separator />
-
-                  <div className="flex items-center justify-between">
-                    <span className="tabular text-h3">$22,500</span>
-                    <span className="flex items-center gap-1.5 text-small font-medium text-muted-foreground transition-colors group-hover/card:text-gold-ink">
-                      View details
-                      <ArrowRightIcon className="size-4 transition-transform duration-fast group-hover/card:translate-x-1" />
+                    <span className="eyebrow inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-gold-bright px-3 py-2.5 text-gold-bright-foreground @max-[322px]:px-2 shadow-[var(--shadow-gold)] transition-[box-shadow,transform,translate,scale] duration-slow ease-crownline-soft group-hover/card:shadow-[var(--shadow-gold-strong)]">
+                      Explore
+                      <ArrowRightIcon className="size-3.5 transition-transform duration-slow ease-crownline-soft group-hover/card:translate-x-1" />
                     </span>
                   </div>
                 </div>
@@ -388,11 +412,13 @@ export default function DesignSystemPage() {
         <Container>
           <div className="flex max-w-2xl flex-col gap-5">
             <span className="eyebrow text-gold-ink">08 — Motion</span>
-            <h2 className="text-h2">Two speeds, one curve</h2>
+            <h2 className="text-h2">Four speeds, two curves</h2>
             <p className="text-body-lg text-background/70">
-              250ms for hover and micro-interaction, 400ms for section reveals and modals, on a
-              single easing curve. Reveals fire once and lock. Everything collapses to nothing
-              when a visitor prefers reduced motion.
+              250ms for hover and micro-interaction and 400ms for section reveals and modals, on
+              a fast-out expo curve. The card hover gets 800ms and the photograph inside it
+              1200ms, on a softer curve that spends the whole duration — the one gesture on the
+              site that is meant to be felt rather than registered. Reveals fire once and lock.
+              Everything collapses to nothing when a visitor prefers reduced motion.
             </p>
             <div className="mt-2 flex flex-wrap gap-3">
               <Button size="lg">Primary on dark</Button>

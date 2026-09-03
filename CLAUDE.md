@@ -3548,7 +3548,13 @@ One-to-many with Vehicle, `onDelete: Cascade` (photos have no independent meanin
 
 Has its own soft delete: `deletedAt DateTime?`. An admin's "delete photo" action sets this rather than issuing a real `DELETE` — protects against accidental loss of sourced/auction photography, which can be expensive or impossible to re-obtain.
 
-`category` (enum: `FRONT`, `REAR`, `SIDE`, `INTERIOR`, `DASHBOARD`, `ENGINE`, `WHEELS`, `DAMAGE`, `AUCTION_SHEET`, `OTHER`) drives gallery organization on the vehicle detail page.
+A gallery is **one main photograph plus its supporting images**, and that is the only distinction the schema carries:
+
+- `isPrimary` — the image shown on the vehicle card, in search results, and first in the gallery. A vehicle with at least one live photograph has **exactly one** primary; the invariant is maintained at write time by `reconcilePrimary()` in `src/lib/storage/vehicle-photo-service.ts`, never derived on read.
+- `displayOrder` — the supporting images, in the order they were added.
+- `altText` — nullable and **not written by the dashboard**. Reserved for the public gallery / SEO work (Stages 11, 34); until then the gallery generates a truthful description from the vehicle and the photograph's position.
+
+The former `category` column (`VehiclePhotoCategory`: `FRONT`, `REAR`, `SIDE`, …) was dropped in migration `20260829090000_remove_vehicle_photo_category`. It was a taxonomy an operator had to maintain on every upload and that nothing downstream read — no query, no public surface, no order or shipment depended on it.
 
 ---
 

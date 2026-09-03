@@ -30,8 +30,21 @@ export type AuditAction =
   | "ADMIN_SIGNED_OUT"
   | "ADMIN_PASSWORD_RESET_REQUESTED"
   | "ADMIN_PASSWORD_CHANGED"
+  | "BUSINESS_SETTINGS_UPDATED"
+  | "VEHICLE_CREATED"
+  | "VEHICLE_UPDATED"
+  | "VEHICLE_STATUS_CHANGED"
+  | "VEHICLE_PHOTOS_UPLOADED"
+  // Emitted when a photograph's alternative text is edited. This is the
+  // only per-photograph field an operator can write, so "updated" is
+  // unambiguous; if a second one is ever added, split this rather than
+  // widening what it means.
+  | "VEHICLE_PHOTO_UPDATED"
+  | "VEHICLE_PHOTOS_REORDERED"
+  | "VEHICLE_PHOTO_DELETED"
+  | "VEHICLE_PRIMARY_PHOTO_CHANGED"
 
-export type AuditEntityType = "AdminProfile"
+export type AuditEntityType = "AdminProfile" | "BusinessSettings" | "Vehicle"
 
 export interface AuditLogEntry {
   actorId: string

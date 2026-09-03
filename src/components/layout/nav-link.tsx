@@ -62,7 +62,10 @@ export function NavLink({
       <span
         className={cn(
           "flex items-center gap-2 py-1 text-small font-medium whitespace-nowrap",
-          tone === "dark" ? "text-white/40" : "text-muted-foreground/60",
+          // Light surface: full --muted-foreground. Fading it further put
+          // "Spare Parts" at 2.5:1 in the header — unavailable is not the
+          // same as unreadable.
+          tone === "dark" ? "text-white/55" : "text-muted-foreground",
           className
         )}
       >
@@ -72,7 +75,7 @@ export function NavLink({
             "rounded-4xl border px-1.5 py-px text-[0.625rem] font-semibold tracking-[0.08em] uppercase",
             tone === "dark"
               ? "border-white/20 text-white/50"
-              : "border-border text-muted-foreground/70"
+              : "border-border text-muted-foreground"
           )}
         >
           Soon

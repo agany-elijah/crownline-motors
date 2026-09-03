@@ -106,12 +106,34 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  render,
+  nativeButton,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  /**
+   * Base UI assumes it is rendering a real `<button>` and warns when it is
+   * not, because swapping in another element silently drops native button
+   * semantics — form submission, the space/enter behaviour a screen reader
+   * announces, the implicit role.
+   *
+   * `render` is how a caller deliberately renders something else, which in
+   * this codebase is almost always a Next `<Link>`: an action that navigates
+   * is a link, and making it a button with an onClick would break
+   * middle-click, open-in-new-tab and copy-link-address. So when `render` is
+   * supplied we tell Base UI the element is not a native button and let it
+   * apply the ARIA it needs instead.
+   *
+   * An explicit `nativeButton` always wins, for the case where a caller
+   * renders a genuine `<button>` through `render`.
+   */
+  const isNativeButton = nativeButton ?? render === undefined
+
   return (
     <ButtonPrimitive
       data-slot="button"
       data-variant={variant}
+      render={render}
+      nativeButton={isNativeButton}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />

@@ -5,7 +5,8 @@
  *   npm run admin:reset-link -- --email=someone@example.com
  *
  * ── When to use this ──────────────────────────────────────────────────
- * The normal route is /admin/forgot-password, which emails a link. This
+ * The normal route is the dashboard's forgot-password page, which emails a
+ * link. This
  * script exists for the cases where that round trip is the problem rather
  * than the solution:
  *
@@ -43,6 +44,7 @@ if (existsSync(".env.local")) {
 import { PrismaPg } from "@prisma/adapter-pg"
 import { PrismaClient } from "../src/generated/prisma/client"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { adminPath } from "../src/lib/constants/admin-routes"
 
 const argsSchema = z.object({
   email: z
@@ -173,7 +175,7 @@ async function main() {
     const query = new URLSearchParams({
       token_hash: data.properties.hashed_token,
       type: "recovery",
-      next: "/admin/reset-password",
+      next: adminPath("/reset-password"),
     })
 
     console.log(`\n✅ Reset link for ${profile.displayName} (${profile.role}).\n`)

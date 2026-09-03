@@ -31,6 +31,8 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -50,7 +52,10 @@
   --color-gold: var(--gold);
   --color-gold-ink: var(--gold-ink);
   --color-gold-foreground: var(--gold-foreground);
+  --color-gold-bright: var(--gold-bright);
+  --color-gold-bright-foreground: var(--gold-bright-foreground);
   --color-charcoal: var(--charcoal);
+  --color-price: var(--price);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -60,16 +65,53 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 
-  /* Motion — deliberately restricted to two speeds per the brand
-     brief: 250ms for micro-interactions (hover, buttons, arrows),
-     400ms for section/gallery/modal-scale movements. Don't add a
-     third speed without a reason. */
+  /* Motion — four speeds, each with a job. Don't add a fifth without
+     one.
+
+     --duration-fast       250ms  micro-interactions: buttons, links, arrows.
+     --duration-base       400ms  section reveals, gallery and modal changes.
+     --duration-slow       800ms  the card hover gesture — lift, shadow, CTA.
+     --duration-cinematic 1200ms  an image scaling inside its fixed crop.
+
+     The two slow steps exist because of the curve, not the clock. Paired
+     with the expo ease below, a 250ms hover has already travelled ~93% of
+     its distance by 125ms; the remaining half of the duration is a
+     near-stationary settle. Nominally that is motion, but it reads as an
+     instant state swap — which is exactly the "feels static" complaint a
+     vehicle card's hover attracts.
+
+     A card hover is the one place in this design where the movement is
+     meant to be *felt*, so it gets both a longer duration and a gentler
+     curve. Everything else keeps the fast pair.
+
+     600ms/900ms was the first attempt at that and still read as a snap:
+     the rise and the shadow arrived together, near enough to instantly,
+     and a gesture that resolves before the eye has followed it is
+     indistinguishable from no gesture at all. 800ms on the soft curve is
+     roughly the point where a 6px rise stops being a state change and
+     starts being a movement, and the photograph behind it is given 1200ms
+     so it is still drifting closer after the card itself has settled —
+     which is what makes the two read as one gesture with depth rather
+     than as two properties animating in lockstep. Neither is long enough
+     to be in the way: both are hover-only, and a pointer that leaves
+     early simply reverses.
+
+     --ease-crownline       fast-out expo. Correct for entrances and
+                            reveals, where content should arrive and settle.
+     --ease-crownline-soft  spreads the travel across the whole duration
+                            (~75% done at the halfway point, against ~93%
+                            for the expo). Use it wherever a long duration
+                            is the point — a curve that front-loads the
+                            movement makes the extra milliseconds invisible. */
   --duration-fast: 250ms;
   --duration-base: 400ms;
+  --duration-slow: 800ms;
+  --duration-cinematic: 1200ms;
   --ease-crownline: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-crownline-soft: cubic-bezier(0.4, 0.15, 0.3, 1);
 
   /* ── Type scale ───────────────────────────────────────────────
-     A closed set of seven steps. The brief is explicit that font sizes
+     A closed set of eight steps. The brief is explicit that font sizes
      must not be chosen ad hoc per page, so pages use `text-display`,
      `text-h1` … `text-meta` and never a raw `text-[2.375rem]`.
 
@@ -99,6 +141,24 @@
   --text-h3--line-height: 1.3;
   --text-h3--letter-spacing: -0.015em;
   --text-h3--font-weight: 600;
+
+  /* Card and tile headings — and, on a vehicle card, the price beside
+     them. Deliberately NOT fluid, unlike display–h3. A fluid heading is
+     sized by the viewport, but a card is sized by its grid column — and a
+     column gets *narrower* as a wide screen gains columns, so `text-h3` on
+     a card grows precisely where it has least room to grow. Holding one
+     size is what makes a catalogue read as a set of cards rather than as a
+     page of competing headlines.
+
+     21px, up from 17px. At the smaller size the vehicle and its price —
+     the two things a card exists to communicate — carried barely more
+     weight than the specification line underneath them, and a grid of
+     cards read as uniformly grey. This is the step that makes the identity
+     band the first thing the eye lands on after the photograph. */
+  --text-title: 1.3125rem;
+  --text-title--line-height: 1.35;
+  --text-title--letter-spacing: -0.012em;
+  --text-title--font-weight: 600;
 
   --text-body-lg: 1.0625rem;
   --text-body-lg--line-height: 1.65;
@@ -158,7 +218,12 @@
   --secondary-foreground: oklch(0.22 0.004 90);
 
   --muted: oklch(0.96 0.003 90);
-  --muted-foreground: oklch(0.5 0.004 90);
+  /* Secondary text: field hints, table headers, metadata. Measured at
+     7.1:1 on --card and 6.9:1 on --background. It was 0.5 (6.0:1) — inside
+     WCAG AA, but the whole dashboard is 13px secondary text and at that
+     size 6:1 reads as washed out rather than as quiet. Do not lighten it
+     again to make a page feel calmer; reduce how much of it there is. */
+  --muted-foreground: oklch(0.46 0.004 90);
 
   /* Accent = gold-tinted hover/selected surface (nav active state,
      selected filter chip, etc.) — distinct from --primary so we don't
@@ -167,6 +232,15 @@
   --accent-foreground: oklch(0.18 0.01 88);
 
   --destructive: oklch(0.577 0.245 27.325);
+
+  /* Semantic state colours, deliberately separate from the brand accent.
+     Gold means "Crownline" everywhere in this application; if it also meant
+     "published", an operator scanning a status column would have to work out
+     which sense applied each time. Both are desaturated toward the warm
+     neutral of the rest of the palette so a status column reads as part of
+     the page rather than as a traffic light bolted onto it. */
+  --success: oklch(0.52 0.11 155);
+  --warning: oklch(0.52 0.13 62);
 
   --border: oklch(0.9 0.003 90);
   --input: oklch(0.9 0.003 90);
@@ -208,7 +282,51 @@
   --gold: oklch(0.8 0.145 85);
   --gold-ink: oklch(0.52 0.11 72);
   --gold-foreground: oklch(0.16 0.01 88);
+
+  /* --gold-bright  the third gold, and the only one that is allowed to be
+     loud. The champagne fill above is tuned to sit quietly across large
+     surfaces — headers, section rules, the single header CTA — and at the
+     size of a card's call to action that restraint reads as a dull, washed
+     tan rather than as gold. This is the same hue walked up in lightness
+     and chroma until it reads as metal at 100×36px.
+
+     It is deliberately NOT a replacement for --gold. Repainting the brand
+     gold this bright would put a saturated fill behind every primary
+     button on the site and break the ~10% accent ratio the design system
+     protects. Use it where gold has to carry a small element on its own —
+     currently the vehicle card's "Explore" cue — and use --gold
+     everywhere else. Dark ink on it throughout: 12.8:1. */
+  --gold-bright: oklch(0.855 0.155 88);
+  --gold-bright-foreground: oklch(0.18 0.02 80);
+
+  /* Money. A green — the colour a price is printed in, not the colour a
+     success toast is painted in, which is why it is its own token rather
+     than a second use of --success. Sharing that token would mean a price
+     and a confirmed payment were the same colour, and the moment an order
+     screen shows both side by side one of them is lying about what it
+     means.
+
+     Lighter than it first was (0.47), which read as bottle green — nearly
+     black at a glance, so the price lost the lift that made it worth
+     colouring at all. Held at this chroma so it still reads as considered
+     next to black type and gold rather than as the loudest thing on a card
+     whose job is to sell the photograph.
+
+     ⚠ 4.2:1 on --card, which clears WCAG AA for *large* text (3:1) but not
+     for normal text (4.5:1). That is fine where it is used — the price is
+     set at --text-title in bold, comfortably past the 18.66px-bold
+     threshold — and it is the reason this token must not be reached for as
+     a general body colour. Anything smaller than that needs the darker end
+     of this hue. */
+  --price: oklch(0.56 0.13 152);
+
   --charcoal: oklch(0.22 0.004 90);
+
+  /* Height of a pinned mobile action bar, excluding the safe-area inset it
+     pads itself with. Declared once here because three separate things
+     have to agree on it: the bar's own row height, the footer's bottom
+     clearance, and how far the WhatsApp float lifts to clear it. */
+  --mobile-action-bar-height: 4.5rem;
 }
 
 .dark {
@@ -238,6 +356,11 @@
 
   --destructive: oklch(0.704 0.191 22.216);
 
+  /* Lightened rather than inverted: the same hues at the light-mode
+     lightness would fail contrast against the dark ground. */
+  --success: oklch(0.74 0.13 155);
+  --warning: oklch(0.78 0.13 75);
+
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: var(--gold);
@@ -263,6 +386,11 @@
      [data-tone="dark"] rule in the base layer. */
   --gold-ink: var(--gold);
   --gold-foreground: oklch(0.14 0.01 88);
+  --gold-bright: oklch(0.87 0.16 90);
+  --gold-bright-foreground: oklch(0.14 0.01 88);
+  /* Lightened rather than inverted, for the same reason as --success and
+     --warning above: the light-mode green would fail contrast here. */
+  --price: oklch(0.78 0.13 158);
   --charcoal: oklch(0.9 0.004 90);
 }
 
@@ -420,6 +548,50 @@
    than repeated as long class strings so the treatment stays consistent
    and is changed in one place. */
 
+/* ── Named transition durations ─────────────────────────────────
+   Tailwind v4 has an `--ease-*` theme namespace but NO `--duration-*`
+   one. Its built-in `duration-*` utility only accepts a bare number, a
+   bracketed value, or the `duration-(--var)` shorthand — so `duration-fast`
+   and `duration-base`, used ~56 times across this codebase, matched
+   nothing and were silently dropped. Unknown utilities are not an error in
+   Tailwind; they simply produce no CSS.
+
+   The visible symptom was every transition in the application running at
+   `--default-transition-duration` (150ms) instead of the 250ms/400ms the
+   design system specifies. Easing was applied correctly the whole time,
+   because `ease-crownline` *is* a real namespace — which is what made it
+   look intentional: motion with the right curve at not far off half the
+   intended speed reads as a snap rather than as a mistake.
+
+   Registering them as real utilities fixes every existing call site at
+   once, and keeps `duration-fast` readable at the point of use rather than
+   pushing `duration-(--duration-fast)` into ~56 class strings.
+
+   Both `--tw-duration` and `transition-duration` are set, matching what
+   Tailwind's own duration utility emits: the `transition-*` utilities
+   resolve `transition-duration: var(--tw-duration, …)`, so setting the
+   variable is what makes this survive regardless of which class the
+   compiler happens to emit last. */
+@utility duration-fast {
+  --tw-duration: var(--duration-fast);
+  transition-duration: var(--duration-fast);
+}
+
+@utility duration-base {
+  --tw-duration: var(--duration-base);
+  transition-duration: var(--duration-base);
+}
+
+@utility duration-slow {
+  --tw-duration: var(--duration-slow);
+  transition-duration: var(--duration-slow);
+}
+
+@utility duration-cinematic {
+  --tw-duration: var(--duration-cinematic);
+  transition-duration: var(--duration-cinematic);
+}
+
 /* Lining, fixed-width figures. For prices, mileage, years, spec tables and
    CLM reference numbers — anywhere digits sit in a column or update in
    place and must not jitter. */
@@ -474,13 +646,91 @@
 
 /* Wraps an image so it can scale on hover without nudging the layout —
    the crop stays fixed and only the picture inside it moves. Pairs with
-   `group-hover:scale-[1.04]` on the <Image> itself. */
+   `group-hover/card:scale-[1.06]` on the <Image> itself.
+
+   The transition lives here rather than on each call site so every framed
+   photograph on the site moves at one speed. It is the slowest step in the
+   scale: a photograph drifting closer should be something a viewer notices
+   having happened, not something they watch happen. */
 @utility media-frame {
   overflow: hidden;
   position: relative;
   background-color: var(--muted);
 
+  /* `scale` and `translate` are named alongside `transform` because
+     Tailwind v4 compiles `scale-[1.08]` to the standalone `scale`
+     property, not to a `transform` function. A transition naming only
+     `transform` therefore animates nothing at all, and the photograph
+     jumps to its zoomed size the instant the pointer arrives — which is
+     what made a 900ms "cinematic" step read as no motion whatsoever. */
   & img {
-    transition: transform var(--duration-base) var(--ease-crownline);
+    transition:
+      transform var(--duration-cinematic) var(--ease-crownline-soft),
+      translate var(--duration-cinematic) var(--ease-crownline-soft),
+      scale var(--duration-cinematic) var(--ease-crownline-soft);
+  }
+}
+
+/* Hides a scroll container's scrollbar without disabling the scrolling.
+
+   Only for a strip that carries its own affordance — the vehicle
+   carousel sizes its cards so the next one always peeks past the edge,
+   and pairs that with arrow buttons above `sm`. Never put this on a
+   region where the scrollbar is the only thing telling a visitor there is
+   more to see. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Reserves the space a pinned mobile action bar occupies, so content above
+   it can still be scrolled fully into view. */
+@utility action-bar-clearance {
+  height: calc(var(--mobile-action-bar-height) + env(safe-area-inset-bottom));
+}
+
+/* ── Pinned mobile action bar ───────────────────────────────────
+   A page that pins a primary action to the bottom of a phone screen marks
+   itself with `data-mobile-action-bar`. Two things elsewhere in the shell
+   then have to move out of its way, and neither is a descendant of the
+   page — the footer and the WhatsApp float are siblings rendered by the
+   public layout. `:has()` on <body> is what lets a page reach them without
+   the layout having to know which route it is rendering.
+
+   Deliberately unlayered, for the same reason as the dark-surface button
+   rules above: the float sets its own `bottom` through a Tailwind utility,
+   and layer order beats specificity, so a rule inside `@layer base` would
+   lose to it however specific it was.
+
+   Only below `lg` — the bar is `lg:hidden`, so above that breakpoint there
+   is nothing to clear. */
+@media (width < 64rem) {
+  body:has([data-mobile-action-bar]) [data-slot="site-footer"] {
+    /* The footer element carries no padding of its own (its Container
+       does), so this is pure clearance rather than an override. */
+    padding-bottom: calc(var(--mobile-action-bar-height) + env(safe-area-inset-bottom));
+  }
+
+  body:has([data-mobile-action-bar]) [data-slot="whatsapp-float"] {
+    bottom: calc(
+      var(--mobile-action-bar-height) + max(1.25rem, env(safe-area-inset-bottom)) + 0.75rem
+    );
+  }
+}
+
+/* Fallback for a browser without :has(). Both rules above silently do
+   nothing there, which would leave the float sitting on top of the bar's
+   right end — so the bar reserves the float's own footprint instead
+   (56px button + 20px inset + clearance). Everything stays reachable; it
+   just costs width that :has() gets back. */
+@supports not selector(:has(*)) {
+  @media (width < 64rem) {
+    [data-mobile-action-bar] {
+      padding-right: 5.25rem;
+    }
   }
 }

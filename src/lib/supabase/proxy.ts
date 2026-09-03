@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
+import { adminPath, isAdminPath } from "@/lib/constants/admin-routes"
 import { SUPABASE_COOKIE_OPTIONS } from "@/lib/supabase/cookie-options"
 
 /**
@@ -15,9 +16,9 @@ import { SUPABASE_COOKIE_OPTIONS } from "@/lib/supabase/cookie-options"
  *      administrators would be signed out roughly hourly mid-task. This part
  *      is essential.
  *
- *   2. **Redirects unauthenticated requests away from /admin.** This is
- *      *not* a security control. It is there so an expired session produces
- *      a sign-in page instead of a flash of dashboard chrome.
+ *   2. **Redirects unauthenticated requests away from the dashboard.** This
+ *      is *not* a security control. It is there so an expired session
+ *      produces a sign-in page instead of a flash of dashboard chrome.
  *
  * Point 2 must never be relied upon. CVE-2025-29927 allowed Next.js
  * middleware to be skipped entirely with a forged `x-middleware-subrequest`
@@ -49,14 +50,22 @@ import { SUPABASE_COOKIE_OPTIONS } from "@/lib/supabase/cookie-options"
  */
 const NO_STORE = "no-store, no-cache, must-revalidate, private"
 
-/** Admin routes reachable without a session. Everything else under /admin is gated. */
+/**
+ * Admin routes reachable without a session. Everything else under the
+ * dashboard's base path is gated.
+ *
+ * Built from `adminPath` rather than written out, so relocating the
+ * dashboard cannot leave this list pointing at the old prefix — which would
+ * lock administrators out of their own login page by redirecting it to
+ * itself.
+ */
 const PUBLIC_ADMIN_PATHS = [
-  "/admin/login",
-  "/admin/forgot-password",
+  adminPath("/login"),
+  adminPath("/forgot-password"),
   // Reached from a one-time recovery link, which establishes the session via
   // /auth/confirm. The page itself gates on that session and the action
   // re-checks the admin profile before writing anything.
-  "/admin/reset-password",
+  adminPath("/reset-password"),
 ]
 
 function isPublicAdminPath(pathname: string): boolean {
@@ -102,7 +111,7 @@ export async function updateSession(request: NextRequest) {
   const hasSession = !error && Boolean(data?.claims?.sub)
 
   const { pathname } = request.nextUrl
-  const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/")
+  const isAdminRoute = isAdminPath(pathname)
   const isAuthRoute = pathname.startsWith("/auth/")
 
   if (isAdminRoute || isAuthRoute) {
@@ -111,7 +120,7 @@ export async function updateSession(request: NextRequest) {
 
   if (isAdminRoute && !isPublicAdminPath(pathname) && !hasSession) {
     const loginUrl = request.nextUrl.clone()
-    loginUrl.pathname = "/admin/login"
+    loginUrl.pathname = adminPath("/login")
     loginUrl.search = ""
     // `pathname` comes from the router, not from user input, so it is a real
     // same-origin path by construction. It is still re-validated by

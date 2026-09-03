@@ -10,7 +10,10 @@ Next.js (App Router) · TypeScript · Tailwind CSS · shadcn/ui · Prisma · Sup
 2. Copy `.env.example` to `.env.local` and fill in values
 3. `npx prisma migrate dev`
 4. `npm run db:seed` — creates the `BusinessSettings` singleton the app needs
-5. `npm run dev`
+5. `npm run storage:setup` — creates the Supabase Storage bucket vehicle
+   photographs are uploaded to. Idempotent; an existing bucket is left alone.
+   Skip it and the first photo upload fails with "Bucket not found".
+6. `npm run dev`
 
 ## Administrators
 
@@ -34,7 +37,21 @@ changes, because no call site names a role.
 
 The invited person receives an email, follows it to `/auth/confirm`, and chooses
 their own password. No password is ever set, transmitted or printed by the
-script. They then sign in at `/admin/login`.
+script. They then sign in at the dashboard's login page.
+
+### Where the dashboard lives
+
+Not at `/admin`. The base path is `ADMIN_BASE_PATH` in
+`src/lib/constants/admin-routes.ts`, and it is mirrored by the folder name
+under `src/app/(admin)/` — `tests/unit/admin-routes.test.ts` fails if the two
+ever disagree. Build every internal link with `adminPath("/…")` rather than
+writing the segment out.
+
+Moving the dashboard off `/admin` removes it from the automated scanner
+traffic that probes that path on every site on the internet. It is **not** an
+access control, and nothing about the real one changed — see below. For the
+same reason the path is deliberately absent from `robots.txt`: publishing it
+there would hand it back to exactly those scanners.
 
 Administrators are **deactivated, never deleted** (`AdminProfile.isActive`), so
 that the payment and tracking records attributed to them keep their author.
@@ -89,11 +106,11 @@ there. See the note in `.env.example`.
 
 ## How authorisation works
 
-Read `src/lib/auth/dal.ts` before touching anything under `/admin`. The short
-version:
+Read `src/lib/auth/dal.ts` before touching anything under the admin base path.
+The short version:
 
 - **`proxy.ts`** refreshes the session and redirects anonymous visitors away
-  from `/admin`. This is convenience, not security.
+  from the dashboard. This is convenience, not security.
 - **`src/lib/auth/dal.ts`** verifies the JWT and resolves it to an *active*
   `AdminProfile`. This is the boundary.
 - **Every admin page** calls `requireAdmin()` / `requirePermission()`.
@@ -112,10 +129,77 @@ version:
 | `npm run db:migrate` | Prisma migrations |
 | `npm run db:seed` | Seed `BusinessSettings` |
 | `npm run admin:create` | Provision an administrator |
+| `npm run storage:setup` | Create the Supabase Storage buckets |
 
 ## Project status
 Wave A (Phase 1 — Vehicle Dealership) — in progress.
-Phases 0–3 complete: foundation, database, design system and public shell,
-authentication and authorisation.
+
+Phases 0–8 complete:
+
+- **0–2** foundation, database schema, design system and public shell
+- **3** authentication and authorisation
+- **4** admin dashboard shell
+- **5** vehicle inventory — create/edit/status, photograph management
+  (upload, main image, ordering, descriptions, removal)
+- **6** public vehicle marketplace — `/cars` and the vehicle detail page
+- **7** search and filtering — make, model and year, each usable alone and
+  all three combinable
+- **8** contextual WhatsApp, with the number configured in the dashboard
+
+`listVehicles` and `getVehicleById` in `src/lib/queries/vehicle.queries.ts`
+deliberately return **every** status, archived included, because the admin
+list needs that. The public side must never reuse them: it has its own
+`PUBLISHED`-only reads in `public-vehicle.queries.ts`, all funnelled through
+`publicVehicleWhere`, and `tests/unit/public-vehicle-visibility.test.ts`
+fails if a customer-facing route imports the admin module.
+
+Next: Phase 10 onward — customers, quotes, orders, payments and tracking.
+`/track-my-order` is still a placeholder rendering a bare `<main />` inside
+the real header/footer shell.
+
+### Search and filtering
+
+The whole search lives in the query string and is re-parsed by
+`vehicleSearchSchema` on every request, so a filtered catalogue is a real
+address that survives a refresh, a bookmark and a WhatsApp forward. Parsing
+is forgiving by design — junk degrades to "unfiltered", never to an error
+page. The dropdown options come from `listVehicleFacets`, which returns the
+distinct published make/model/year combinations, so a customer cannot
+assemble a search that was never going to match anything.
+
+Adding one of the brief's remaining filters (price, mileage, fuel,
+transmission, drive, location) is a field on `vehicleSearchSchema`, a clause
+in `vehicleSearchWhere`, and a control on the filter bar. Nothing else moves.
+
+### WhatsApp
+
+The number is `BusinessSettings.whatsappNumber`, edited in the dashboard
+under Settings — never hard-coded into a page. `getWhatsAppNumber()` reads it
+through a tagged cache so public pages stay statically renderable, and
+`updateBusinessSettingsAction` calls `updateTag` so a change is live
+immediately. `NEXT_PUBLIC_WHATSAPP_NUMBER` is only a fallback for the window
+before an operator first opens Settings; if both are empty every WhatsApp
+call to action renders nothing rather than a broken link.
+
+Messages are contextual: the vehicle page pre-fills the make, model and
+listing reference, and `src/lib/utils/whatsapp.ts` also holds the spare-part,
+order and tracking builders for the pages that will carry them. Everywhere
+else — the floating button, the footer, the mobile drawer — sends the general
+enquiry.
+
+### Sign-in rate limiting
+
+Seven attempts per fifteen minutes, counted per email address **and** per
+client IP, in `src/lib/auth/rate-limit.ts`. Backed by the `LoginAttempt`
+table rather than an in-memory counter, because on Vercel each request may
+be served by a different instance and a `Map` would give an attacker seven
+tries per instance. Identifiers are hashed before they are stored, so the
+table is not a list of staff addresses and the IPs they work from.
+
+Note the shared-IP consequence: administrators behind one office NAT share
+the IP budget. That is the intended trade at this scale — the lockout is
+fifteen minutes, and an address that has produced seven failures in that
+window is worth pausing either way.
+
 See `CLAUDE.md` for the full master development plan and `SECURITY.MD` for the
 production security specification.

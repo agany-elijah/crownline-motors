@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils"
 import { siteConfig } from "@/config/site"
+import { getWhatsAppNumber } from "@/lib/queries/settings.queries"
 import { buildGeneralWhatsAppMessage, buildWhatsAppUrl } from "@/lib/utils/whatsapp"
 
 /** The official WhatsApp glyph. Inlined rather than pulled from an icon
@@ -17,6 +18,22 @@ function WhatsAppGlyph() {
 /**
  * Persistent WhatsApp entry point on every public page (brief §13).
  *
+ * ── The message ───────────────────────────────────────────────────────
+ * A general enquiry, because this button follows the customer everywhere —
+ * the homepage, the catalogue, About, Contact — and on most of those pages
+ * there is no single vehicle it could name. The pages that *do* have a
+ * subject carry their own contextual action instead: the vehicle page's
+ * "WhatsApp about this car" pre-fills the make, model and listing
+ * reference, and the tracking page pre-fills the tracking number. This is
+ * the fallback for everywhere else, not a duplicate of those.
+ *
+ * ── The number ────────────────────────────────────────────────────────
+ * From BusinessSettings, which an operator edits in the dashboard —
+ * `getWhatsAppNumber` reads it through a tagged cache, so a change is live
+ * on every public page as soon as it is saved and costs no query per
+ * request. The brief is explicit that the number must be configurable
+ * rather than hard-coded into individual pages.
+ *
  * A plain anchor with no interactivity beyond CSS hover, so it stays a
  * server component and ships zero client JavaScript.
  *
@@ -25,9 +42,9 @@ function WhatsAppGlyph() {
  * `bottom` respects the iOS safe-area inset so it never sits under the
  * Safari home indicator.
  */
-export function WhatsAppFloatButton() {
+export async function WhatsAppFloatButton() {
   const whatsappUrl = buildWhatsAppUrl({
-    phoneNumber: siteConfig.whatsappNumber,
+    phoneNumber: await getWhatsAppNumber(),
     message: buildGeneralWhatsAppMessage(siteConfig.name),
   })
 
@@ -43,6 +60,13 @@ export function WhatsAppFloatButton() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label={`Chat with ${siteConfig.shortName} on WhatsApp`}
+      /**
+       * The handle globals.css uses to lift this button above a page that
+       * pins its own action bar to the bottom of a phone screen (see the
+       * `data-mobile-action-bar` rules there). Without it the float and
+       * the bar occupy the same corner.
+       */
+      data-slot="whatsapp-float"
       className={cn(
         "group/wa fixed right-5 z-30 flex items-center gap-0 overflow-hidden",
         "bottom-[max(1.25rem,env(safe-area-inset-bottom))]",

@@ -58,7 +58,7 @@ function ErrorState({
       {action && <div className="mt-1 flex flex-wrap justify-center gap-2">{action}</div>}
 
       {reference && (
-        <p className="tabular text-meta text-muted-foreground/80 uppercase">Ref {reference}</p>
+        <p className="tabular text-meta text-muted-foreground uppercase">Ref {reference}</p>
       )}
     </div>
   )

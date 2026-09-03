@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useId } from "react"
+import { useActionState, useId, useState } from "react"
 import { AlertCircle, Loader2, MailCheck } from "lucide-react"
 
 import {
@@ -31,6 +31,17 @@ export function AdminForgotPasswordForm() {
     requestPasswordResetAction,
     INITIAL_STATE
   )
+  /** Keeps a rejected address on screen. See the note in AdminLoginForm —
+   *  React resets the form once the action settles, so without this a
+   *  mistyped address is simply gone. */
+  const [attemptKey, setAttemptKey] = useState(0)
+  const [lastState, setLastState] = useState(state)
+
+  if (state !== lastState) {
+    setLastState(state)
+    setAttemptKey((key) => key + 1)
+  }
+
   const emailId = useId()
 
   if (state.notice) {
@@ -54,9 +65,11 @@ export function AdminForgotPasswordForm() {
       <div className="flex flex-col gap-2">
         <Label htmlFor={emailId}>Email address</Label>
         <Input
+          key={attemptKey}
           id={emailId}
           name="email"
           type="email"
+          defaultValue={state.email}
           autoComplete="username"
           autoFocus
           required
