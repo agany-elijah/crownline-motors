@@ -16,12 +16,10 @@ test("header and footer render on the homepage", async ({ page }) => {
 })
 
 test("every main nav destination resolves", async ({ page }) => {
-  // /spare-parts is absent because it is no longer linked anywhere — the
-  // entry ships marked unavailable until the Wave B catalogue lands (see
-  // the test below). Add it here once the route exists.
   const routes = [
     "/",
     "/cars",
+    "/spare-parts",
     "/how-it-works",
     "/track-my-order",
     "/get-a-quote",
@@ -55,6 +53,16 @@ test("mobile drawer opens, traps the nav, and closes on selection", async ({ pag
 
   await page.goto("/")
 
+  /**
+   * The drawer is a client component and its links route through the App
+   * Router, so both the trigger and the links have to be pressed after the
+   * page is interactive. A click landing before hydration is swallowed — the
+   * anchor's default is prevented and nothing is yet listening to route. It is
+   * a dev-server property rather than an application one; the measurements are
+   * in the note on `waitForInteractive` in vehicle-browsing.spec.ts.
+   */
+  await page.waitForLoadState("networkidle")
+
   const trigger = page.getByRole("button", { name: "Open menu" })
   await expect(trigger).toBeVisible()
   await trigger.click()
@@ -62,9 +70,72 @@ test("mobile drawer opens, traps the nav, and closes on selection", async ({ pag
   const drawer = page.getByRole("dialog")
   await expect(drawer).toBeVisible()
 
-  // Navigating from the drawer must both route and dismiss the overlay —
-  // a drawer left open over the destination is a classic mobile nav bug.
-  await drawer.getByRole("link", { name: "Cars" }).click()
+  /**
+   * Let the entrance finish before clicking into it.
+   *
+   * The panel slides in and its items follow on a stagger (see
+   * `mobile-nav.tsx`), so every link is moving for the first few hundred
+   * milliseconds. Playwright's click waits for the element to be "stable" —
+   * two consecutive frames with the same box — and on a loaded dev server
+   * WebKit could not produce them before the test budget ran out, which
+   * surfaced as `Target page, context or browser has been closed` inside the
+   * click rather than as anything to do with the nav.
+   *
+   * Awaiting the animations directly is deterministic where waiting on frame
+   * timing is not. `.catch()` on each because an animation cancelled mid-flight
+   * rejects, and a cancelled entrance is a finished one for this purpose.
+   */
+  await drawer.evaluate((panel) =>
+    Promise.race([
+      Promise.all(
+        panel
+          .getAnimations({ subtree: true })
+          .map((animation) => animation.finished.catch(() => undefined))
+      ),
+      /**
+       * Capped, because `finished` is not reliably settled.
+       *
+       * WebKit has been seen neither resolving nor rejecting it for an
+       * animation replaced part-way through, and an unbounded wait here
+       * consumed the entire test budget — the same symptom, in a new place, as
+       * the stability wait this replaced. The entrance is bounded by
+       * construction at roughly 700ms (a 305ms maximum stagger plus the
+       * design system's 400ms step), so two seconds is well past it, and the
+       * retry below covers a click that still lands too early.
+       */
+      new Promise((resolve) => setTimeout(resolve, 2_000)),
+    ])
+  )
+
+  /**
+   * Navigating from the drawer must both route and dismiss the overlay — a
+   * drawer left open over the destination is a classic mobile nav bug.
+   *
+   * Two things are deliberate about how this is waited on.
+   *
+   * `page.waitForURL` rather than `expect(page).toHaveURL(...)`: an `expect`
+   * is bounded by `expect.timeout` (15s), while this is bounded by the
+   * `navigationTimeout` the project sets to 45s. The dev webServer compiles
+   * `/cars` on first request, measured here at ~17s, so the assertion on its
+   * own expired while the server was still working and reported a navigation
+   * that did happen as one that did not.
+   *
+   * And the whole thing retries, because a click landing before the App Router
+   * has attached is silently dropped — see `waitForInteractive` in
+   * vehicle-browsing.spec.ts for the measurements. The URL is checked first so
+   * a retry never clicks at a page the previous attempt already left.
+   */
+  await expect(async () => {
+    if (!/^\/cars$/.test(new URL(page.url()).pathname)) {
+      await drawer.getByRole("link", { name: "Cars" }).click({ timeout: 5_000 })
+    }
+
+    await page.waitForURL(/\/cars$/, {
+      waitUntil: "domcontentloaded",
+      timeout: 20_000,
+    })
+  }).toPass({ timeout: 40_000 })
+
   await expect(page).toHaveURL(/\/cars$/)
   await expect(drawer).toBeHidden()
 })
@@ -197,18 +268,25 @@ test.describe("header legibility", () => {
   })
 })
 
-test("unavailable sections are marked, not linked into a 404", async ({ page }) => {
-  // Stage 4 allows navigation entries to ship disabled until their
-  // implementation stage. The requirement this guards is that "disabled"
-  // means *not a link*: an anchor pointing at a route that does not exist
-  // is still tappable and still announced as a link, so it fails the same
-  // way whether or not it looks greyed out.
+test("every section in the navigation is a real link", async ({ page }) => {
+  /**
+   * Stage 4 allows navigation entries to ship disabled until their
+   * implementation stage, and Spare Parts was the one that used it. Now that
+   * its catalogue exists, every entry is a destination.
+   *
+   * The requirement this still guards is the one behind that mechanism:
+   * "disabled" has to mean *not a link*, because an anchor pointing at a
+   * route that does not exist is still tappable and still announced as a
+   * link. So the assertion is that nothing in the navigation is marked
+   * unavailable while also being linked — the failure that would put a
+   * customer on a 404.
+   */
   await page.goto("/")
 
-  const spareParts = page.getByRole("link", { name: /spare parts/i })
-  await expect(spareParts).toHaveCount(0)
+  const spareParts = page.getByRole("link", { name: /spare parts/i }).first()
+  await expect(spareParts).toHaveAttribute("href", "/spare-parts")
 
-  // Still present as wayfinding — the section is coming, and the brief
-  // wants customers to know that — just not as a destination yet.
-  await expect(page.getByText("Spare Parts").first()).toBeAttached()
+  // "Soon" is the marker an unavailable entry carries. Nothing should be
+  // wearing it now, and if a future section does, it must not also be a link.
+  await expect(page.getByText("Soon", { exact: true })).toHaveCount(0)
 })

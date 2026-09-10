@@ -1,5 +1,11 @@
 import { z } from "zod"
 
+import {
+  MAX_SPARE_PART_DELIVERY_STEPS,
+  SPARE_PART_DELIVERY_STEP_DESCRIPTION_MAX,
+  SPARE_PART_DELIVERY_STEP_TITLE_MAX,
+} from "@/lib/constants/spare-part-delivery"
+
 /**
  * Validation for the business settings form.
  *
@@ -60,12 +66,98 @@ const whatsAppNumberField = z
     { message: "Enter a full international number, for example +211900000000." }
   )
 
+/**
+ * One "how this reaches you" step.
+ *
+ * Both fields are required. A step with a title and no sentence is a word
+ * floating under a numeral, and a step with a sentence and no title has
+ * nothing for the eye to land on — either one makes the band on the part page
+ * look broken rather than sparse. An operator who wants fewer steps removes
+ * a row; they do not half-fill one.
+ */
+export const sparePartDeliveryStepSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, "Give this step a short title.")
+    .max(SPARE_PART_DELIVERY_STEP_TITLE_MAX, "That title is too long for the layout."),
+  description: z
+    .string()
+    .trim()
+    .min(10, "Say in a sentence what happens at this step.")
+    .max(
+      SPARE_PART_DELIVERY_STEP_DESCRIPTION_MAX,
+      "Keep this to a sentence — the detail belongs on WhatsApp."
+    ),
+})
+
+/**
+ * The ordered list of steps.
+ *
+ * ── This schema is used on the way *out* as well as on the way in ─────
+ * `sparePartDeliverySteps` is a `Json` column, and Postgres does not check
+ * what is inside one. A row written by an older build, by a restored backup,
+ * or by hand in Studio can hold anything at all, and a page that trusted it
+ * would render `undefined` — or crash — on data the database was perfectly
+ * happy to store. So the read path parses with this too, and falls back to
+ * the built-in steps when it fails. Treat a Json column as untrusted input,
+ * exactly like a request body.
+ *
+ * An **empty array is valid and meaningful**: it is how an operator hides the
+ * section deliberately, which is different from never having configured it
+ * (null, which falls back to the defaults).
+ */
+export const sparePartDeliveryStepsSchema = z
+  .array(sparePartDeliveryStepSchema)
+  .max(
+    MAX_SPARE_PART_DELIVERY_STEPS,
+    `Use at most ${MAX_SPARE_PART_DELIVERY_STEPS} steps — a list longer than that stops being read.`
+  )
+
+export type SparePartDeliveryStepsInput = z.infer<typeof sparePartDeliveryStepsSchema>
+
 export const businessSettingsSchema = z
   .object({
     whatsappNumber: whatsAppNumberField,
     defaultInitialPercentage: percentageField,
     defaultMombasaPercentage: percentageField,
     defaultFinalPercentage: percentageField,
+    /**
+     * Arrives from the form as one JSON string rather than as indexed field
+     * names (`steps[0].title`, …).
+     *
+     * Repeated form fields lose their pairing the moment a row is removed —
+     * `FormData` gives back two flat lists of titles and descriptions, and
+     * re-pairing them by position is a silent mis-association if either list
+     * is short. One string keeps the rows intact through the request, and it
+     * is parsed here rather than trusted: a hand-posted body can put anything
+     * in it, and everything past this point is the validated array.
+     *
+     * ── Three distinct inputs, three distinct meanings ────────────────
+     *   absent (`null` from `FormData.get`) → `undefined`, "leave the stored
+     *     steps alone". This is what makes the field safe to add to a form
+     *     that already existed: a request that does not mention the steps —
+     *     including a crafted one — cannot silently wipe them while editing
+     *     the payment percentages.
+     *   `""` → `[]`, "the operator cleared the list", which hides the section.
+     *   a JSON array → those steps, once every row has been validated.
+     */
+    sparePartDeliverySteps: z
+      .preprocess((value) => {
+        if (value === null || value === undefined) return undefined
+        if (typeof value !== "string") return value
+        if (value.trim() === "") return []
+
+        try {
+          return JSON.parse(value)
+        } catch {
+          // Not JSON at all. Returned unchanged so the array schema below
+          // reports a shape error rather than this preprocessor throwing a
+          // 500.
+          return value
+        }
+      }, sparePartDeliveryStepsSchema.optional())
+      .optional(),
   })
   .refine(
     (values) => {

@@ -103,12 +103,8 @@ export function buildVehicleWhatsAppMessage({
 /**
  * The message a customer sends from a spare part's page.
  *
- * Wave B: there is no spare-parts catalogue yet, and this builder is not
- * called from anywhere. It is here because the brief specifies the wording
- * and because writing it beside its vehicle counterpart is what keeps the
- * two consistent — the part number plays exactly the role the listing
- * reference does above, and a version written from scratch six months from
- * now would drift. It costs one function and no runtime.
+ * Written beside its vehicle counterpart so the two stay consistent — the
+ * part number plays exactly the role the listing reference does above.
  */
 export function buildSparePartWhatsAppMessage({
   siteName,
@@ -138,6 +134,24 @@ export function buildOrderWhatsAppMessage({
   orderNumber: string
 }): string {
   return `Hello ${siteName}, I need assistance with order ${orderNumber}.`
+}
+
+/**
+ * The message a customer sends straight after requesting a quotation.
+ *
+ * Offered on the confirmation screen for the customer who would rather talk
+ * now than wait for the reply. The quote number is the whole point: it lets
+ * whoever answers open the request the customer has just made instead of
+ * asking them to describe it a second time.
+ */
+export function buildQuoteFollowUpWhatsAppMessage({
+  siteName,
+  quoteNumber,
+}: {
+  siteName: string
+  quoteNumber: string
+}): string {
+  return `Hello ${siteName}, I have just sent a quotation request, reference ${quoteNumber}.`
 }
 
 /**

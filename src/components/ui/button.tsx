@@ -83,6 +83,28 @@ const buttonVariants = cva(
         // Text + arrow tertiary action. The arrow shift is wired by the
         // consumer via group-hover/button on the icon.
         link: "h-auto p-0 text-foreground underline-offset-4 hover:text-gold-ink",
+        /**
+         * WhatsApp's green, for the labelled "WhatsApp about …" actions.
+         *
+         * A variant rather than per-page classes because two pages used to
+         * hand-roll it and both painted white text on `#25D366` — 1.98:1,
+         * well under the 4.5:1 WCAG AA requires for a 13px label. `#11823F`
+         * is a deeper green from the same family: still unmistakably
+         * WhatsApp beside the glyph, and 4.90:1 with white. The hover step
+         * darkens (5.43:1) rather than lightening, so contrast only improves
+         * under the pointer.
+         *
+         * Hard-coded rather than tokenised on purpose: this is somebody
+         * else's brand colour, not part of Crownline's palette, and it must
+         * not drift with the theme. The focus ring is the button's own green —
+         * a gold ring around a green button reads as two components.
+         */
+        whatsapp: [
+          "bg-[#11823f] text-white shadow-[0_2px_10px_rgb(17_130_63/0.28)]",
+          "hover:-translate-y-0.5 hover:bg-[#0e7a3d] hover:shadow-[0_6px_18px_rgb(17_130_63/0.36)]",
+          "active:translate-y-0 active:shadow-[0_2px_10px_rgb(17_130_63/0.28)]",
+          "focus-visible:ring-[#11823f]/40",
+        ],
       },
       size: {
         xs: "h-7 gap-1 rounded-md px-2 text-xs [&_svg:not([class*='size-'])]:size-3",

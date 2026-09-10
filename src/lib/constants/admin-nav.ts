@@ -78,19 +78,10 @@ export const adminNavGroups: AdminNavGroup[] = [
         icon: "vehicles",
       },
       {
-        /**
-         * Wave B. Listed now for the same reason the public navigation
-         * lists it: the section is planned, and showing it tells an
-         * operator the platform is going there rather than leaving them to
-         * wonder. It has no route yet, which is safe precisely because
-         * `available: false` renders it as inert text — there is no link to
-         * follow into a 404.
-         */
         label: "Spare Parts",
         href: adminPath("/spare-parts"),
         permission: "sparePart:read",
         icon: "spareParts",
-        available: false,
       },
     ],
   },

@@ -87,6 +87,36 @@ function buildWhere(filters: VehicleListFilters): Prisma.VehicleWhereInput {
   return where
 }
 
+/**
+ * `id` breaks ties. Without it, two vehicles saved in the same second have
+ * no defined order between them, and Postgres is free to return them
+ * differently on each query — so one could appear on both page one and page
+ * two while another appeared on neither. The public catalogue has carried
+ * this tiebreaker from the start; the dashboard needs it for the same
+ * reason.
+ */
+const LIST_ORDER_BY = [
+  { updatedAt: "desc" },
+  { id: "asc" },
+] satisfies Prisma.VehicleOrderByWithRelationInput[]
+
+/** Everything a list row needs, and nothing else. */
+const LIST_SELECT = {
+  id: true,
+  referenceNumber: true,
+  make: true,
+  model: true,
+  year: true,
+  price: true,
+  mileageKm: true,
+  status: true,
+  isFeatured: true,
+  updatedAt: true,
+  // Soft-deleted photos must not be counted, or the list would claim a
+  // vehicle has images the gallery will not show.
+  _count: { select: { photos: { where: { deletedAt: null } } } },
+} as const
+
 export async function listVehicles(
   filters: VehicleListFilters
 ): Promise<VehicleListResult> {
@@ -99,44 +129,78 @@ export async function listVehicles(
     prisma.vehicle.count({ where }),
     prisma.vehicle.findMany({
       where,
-      orderBy: [{ updatedAt: "desc" }],
+      orderBy: LIST_ORDER_BY,
       skip: (page - 1) * VEHICLES_PER_PAGE,
       take: VEHICLES_PER_PAGE,
-      select: {
-        id: true,
-        referenceNumber: true,
-        make: true,
-        model: true,
-        year: true,
-        price: true,
-        mileageKm: true,
-        status: true,
-        isFeatured: true,
-        updatedAt: true,
-        // Soft-deleted photos must not be counted, or the list would claim
-        // a vehicle has images the gallery will not show.
-        _count: { select: { photos: { where: { deletedAt: null } } } },
-      },
+      select: LIST_SELECT,
     }),
   ])
 
+  const pageCount = Math.max(1, Math.ceil(total / VEHICLES_PER_PAGE))
+
+  /**
+   * A page past the end of the list returns the last real page.
+   *
+   * Reachable by archiving the last vehicles on page three while page three
+   * is open, and by any stale bookmark. Without it the operator gets an
+   * empty table under a "No matches" state that blames their filter, and a
+   * footer reading "Page 9 of 2".
+   *
+   * Clamped rather than redirected, matching `listPublishedVehicles` — one
+   * mechanism for the same problem, and one that cannot be broken later by
+   * a Suspense boundary added above the page.
+   */
+  if (page > pageCount) {
+    const lastPage = await prisma.vehicle.findMany({
+      where,
+      orderBy: LIST_ORDER_BY,
+      skip: (pageCount - 1) * VEHICLES_PER_PAGE,
+      take: VEHICLES_PER_PAGE,
+      select: LIST_SELECT,
+    })
+
+    return {
+      vehicles: lastPage.map(toListItem),
+      total,
+      page: pageCount,
+      pageCount,
+    }
+  }
+
   return {
-    vehicles: rows.map((row) => ({
-      id: row.id,
-      referenceNumber: row.referenceNumber,
-      make: row.make,
-      model: row.model,
-      year: row.year,
-      price: row.price.toNumber(),
-      mileageKm: row.mileageKm,
-      status: row.status,
-      isFeatured: row.isFeatured,
-      photoCount: row._count.photos,
-      updatedAt: row.updatedAt,
-    })),
+    vehicles: rows.map(toListItem),
     total,
     page,
-    pageCount: Math.max(1, Math.ceil(total / VEHICLES_PER_PAGE)),
+    pageCount,
+  }
+}
+
+/** The row shape both reads above select, mapped to the list DTO. */
+function toListItem(row: {
+  id: string
+  referenceNumber: string
+  make: string
+  model: string
+  year: number
+  price: Prisma.Decimal
+  mileageKm: number
+  status: VehicleStatus
+  isFeatured: boolean
+  updatedAt: Date
+  _count: { photos: number }
+}): VehicleListItem {
+  return {
+    id: row.id,
+    referenceNumber: row.referenceNumber,
+    make: row.make,
+    model: row.model,
+    year: row.year,
+    price: row.price.toNumber(),
+    mileageKm: row.mileageKm,
+    status: row.status,
+    isFeatured: row.isFeatured,
+    photoCount: row._count.photos,
+    updatedAt: row.updatedAt,
   }
 }
 

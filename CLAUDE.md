@@ -3424,7 +3424,7 @@ Crownline has more underlying functionality than all of them need to expose on t
 
 # Crownline Motors — Database Schema Documentation
 
-**Wave A (Business Phase 1 — Vehicle Dealership)**
+**Wave A (Vehicle Dealership) + the Wave B spare-parts domain**
 **Stack:** PostgreSQL (Supabase) · Prisma 7 with `@prisma/adapter-pg`
 **Status:** Live — migrated to Supabase
 
@@ -3434,7 +3434,9 @@ Crownline has more underlying functionality than all of them need to expose on t
 
 This document describes the production database schema for Crownline Motors' vehicle-import platform. It is written for any developer who needs to write queries, server actions, or migrations against this schema without re-deriving the business rules from scratch.
 
-The schema covers **Wave A only** — the vehicle dealership business. It is deliberately structured so that **Wave B** (spare parts, customer accounts, documents, notifications) can extend it additively, without rebuilding any Wave A table. Anywhere this matters, it's called out explicitly below.
+The schema covers the **Wave A** vehicle dealership business and the **Wave B spare-parts domain** (§6A), which was added additively in `20260904090000_add_spare_parts_domain` — no Wave A table was rebuilt, and no Wave A column changed meaning. The remaining Wave B work (customer accounts, documents, notifications) extends it the same way. Anywhere this matters, it's called out explicitly below.
+
+The governing principle for the two product domains is **shared commerce, separate workflows**: vehicles and spare parts have their own catalogues and their own fulfilment vocabularies, but exactly one `Order`, one `OrderItem`, one `Payment` ledger, one `PaymentMilestone` table and one `Shipment`/`TrackingEvent` pair between them. There is no second payment system and no second tracking system.
 
 **Non-negotiable rules that apply across the entire schema:**
 
@@ -3454,15 +3456,25 @@ AdminProfile ──┬── AuditLog
 
 Vehicle ──┬── VehiclePhoto
           ├── Quote (linkedVehicleId, optional)
+          ├── QuoteItem (vehicleId, optional)
           ├── OrderItem (vehicleId)
           └── Shipment (vehicleId)
+
+SparePartCategory ── SparePart
+
+SparePart ──┬── SparePartPhoto
+            ├── SparePartCompatibility
+            ├── Quote (linkedSparePartId, optional)
+            ├── QuoteItem (sparePartId, optional)
+            └── OrderItem (sparePartId)
 
 Customer ──┬── Quote
            └── Order
 
-Quote ── Order (1:1, created only when a Quote is accepted)
+Quote ──┬── QuoteItem          (the itemised body of the quotation)
+        └── Order              (1:1, created only when a Quote is accepted)
 
-Order ──┬── OrderItem
+Order ──┬── OrderItem          (vehicleId XOR sparePartId)
         ├── PaymentMilestone ──── Payment
         └── Shipment ──── TrackingEvent
 
@@ -3470,27 +3482,32 @@ BusinessSettings (singleton — configurable defaults)
 ReferenceSequence (atomic counters, one row per sequence key)
 ```
 
+`Order.type` (`VEHICLE` | `SPARE_PART`) is the discriminator that lets the shared commerce tables carry two workflows. `Quote.type` and `Shipment.shipmentType` play the same role for enquiries and consignments.
+
 ---
 
 ## 3. Reference Number Strategy
 
-Four independent sequences, each backed by the `ReferenceSequence` counter table, reset per calendar year:
+Five independent sequences, each backed by the `ReferenceSequence` counter table, reset per calendar year:
 
 | Entity | Format | Example |
 |---|---|---|
 | Vehicle listing | `CLM-V-YYYY-######` | `CLM-V-2026-000123` |
+| Spare-part listing | `CLM-SP-YYYY-######` | `CLM-SP-2026-000045` |
 | Quote | `CLM-Q-YYYY-######` | `CLM-Q-2026-000045` |
 | Order | `CLM-O-YYYY-######` | `CLM-O-2026-000012` |
 | Shipment tracking | `CLM-YYYY-######` | `CLM-2026-000125` |
 
-**Why separate sequences:** a vehicle can be listed long before it's ordered, and one listing could theoretically be relisted — coupling listing and order numbers would create ambiguity. The tracking number intentionally has no letter after `CLM-` because it's the one number a customer types into "Track My Order" and should match the brief's literal example format exactly.
+**Why separate sequences:** a vehicle can be listed long before it's ordered, and one listing could theoretically be relisted — coupling listing and order numbers would create ambiguity. Parts get their own counter for the same reason: sharing one with vehicles would leave unexplainable gaps in the vehicle series, which the business reads as a count of what it listed this year.
+
+The tracking number intentionally has no letter after `CLM-` because it's the one number a customer types into "Track My Order" and should match the brief's literal example format exactly. Spare parts take *two* letters rather than one — `CLM-S` beside `CLM-V` is a single character of difference on a reference read aloud over WhatsApp, and the brief's own example message says `CLM-SP-XXXXX`.
 
 **Why a counter table, not `COUNT(*) + 1`:**
 
 ```prisma
 model ReferenceSequence {
   id          Int    @id @default(autoincrement())
-  sequenceKey String @unique // e.g. "VEHICLE-2026", "ORDER-2026", "QUOTE-2026", "TRACKING-2026"
+  sequenceKey String @unique // e.g. "VEHICLE-2026", "SPARE_PART-2026", "ORDER-2026", "QUOTE-2026", "TRACKING-2026"
   lastValue   Int    @default(0)
 }
 ```
@@ -3558,6 +3575,65 @@ The former `category` column (`VehiclePhotoCategory`: `FRONT`, `REAR`, `SIDE`, �
 
 ---
 
+## 6A. Spare-Parts Domain (Wave B)
+
+The second inventory domain. It is its own set of tables rather than a subtype of `Vehicle`, and it shares the commerce layer rather than duplicating it — those two sentences are the whole design.
+
+**Why not one polymorphic `Product` table:** a vehicle and a brake pad share almost no attributes. Mileage, drive type and exterior colour are meaningless on a part; part number, stock quantity and fitment are meaningless on a car. Merging them yields a table where most columns are null most of the time and none can be `NOT NULL` — a table that cannot enforce anything. What the two genuinely share is *commerce*, and that is shared at `OrderItem`.
+
+### `SparePartCategory`
+
+Database-driven taxonomy, so adding a category is an admin action rather than a migration (brief §22). Twelve starting categories are installed by `prisma/seed.ts`, upserted on `slug` so re-running the seed never overwrites an operator's edits or resurrects a category they deactivated.
+
+Flat, not hierarchical. The twelve categories the brief names are siblings; a `parentId` self-relation would cost a recursive query on every catalogue read to model a tree nobody asked for, and adding it later leaves existing rows as roots.
+
+Retired via `isActive`, not deleted. `SparePart.categoryId` is `Restrict`, so a category holding parts cannot be hard-deleted at all.
+
+### `SparePart`
+
+| Field | Notes |
+|---|---|
+| `referenceNumber` | Unique, `CLM-SP-2026-000045`, counter-generated. This is the "part number" in the WhatsApp message — the one identifier guaranteed to name exactly one listing. |
+| `oemPartNumber` | The manufacturer's own number, off the old part or a parts diagram. Deliberately **not unique**: the same OEM number legitimately appears on a genuine listing and a refurbished one, and uniqueness would block the second save. Trigram-indexed, because people type fragments. |
+| `brand` | "Denso", "Genuine Toyota". A column rather than a `specifications` line because genuine-vs-aftermarket is the second question every parts buyer asks, and a filter cannot be built on a bullet point. |
+| `condition` | `NEW` / `USED` / `REFURBISHED`. The third value is not the "nearly new" fudge `VehicleCondition` refuses — a refurbished unit is a fact about provenance, not a position on a scale. |
+| `pricingMode` + `price` | `FIXED` **requires** a price; `QUOTE_ONLY` **forbids** one. Held together by a CHECK constraint, so "not priced yet" and "priced on enquiry" can never be the same row. This is what makes Stage 20's two purchase paths representable. |
+| `stockQuantity` | Non-negative by CHECK. Zero is a normal publishable state ("out of stock"), and the usual state for a `QUOTE_ONLY` part sourced on demand. |
+| ~~`specifications`~~ | **Dropped** in `20260905090000_remove_spare_part_specifications`, at the dealership's instruction. It was a second description an operator had to keep in step with the first, and the listing rendered both — the customer met the same facts twice. The two things a parts buyer sorts on are fitment and the manufacturer's number, and both have their own structure; everything else belongs in `description`. |
+| `status` | `DRAFT → PUBLISHED → ARCHIVED`. Shorter than `VehicleStatus` on purpose: `RESERVED`/`SOLD` describe one physical unit, and a part is a quantity — selling the fourth of five changes `stockQuantity`, not the listing's state. This *is* the soft delete; there is no `deletedAt`. |
+| `supplierName`, `supplierNotes` | **Internal only — never selected by a public query.** Free text rather than a `Supplier` table because supplier management is a Phase 3 item with its own requirements; inventing a thin version now would mean migrating away from a guess. |
+
+⚠️ **Selling a part must use a conditional decrement**, never read-then-write:
+
+```sql
+UPDATE "SparePart" SET "stockQuantity" = "stockQuantity" - $2
+ WHERE id = $1 AND "stockQuantity" >= $2
+```
+
+A zero row count means somebody else took the last one. Read-then-write oversells under concurrency; the `stockQuantity >= 0` CHECK is the backstop that turns that bug into a failed transaction rather than a negative stock level and a customer owed a part nobody has.
+
+### `SparePartPhoto`
+
+A deliberate mirror of `VehiclePhoto`, down to the column names — `storagePath`, `altText`, `isPrimary`, `displayOrder`, `deletedAt`. The duplication is the point: the existing media pipeline (validate, downscale, store, reconcile the primary) is reused by parameterising the bucket and the owner column rather than by writing a second one. A shared polymorphic `Photo` table would cost the foreign key and the cascade that make this table safe.
+
+Part photography lives in its own **private-write, public-read** Supabase Storage bucket, `SPARE_PART_PHOTO_BUCKET` (`spare-part-photos`), provisioned alongside the vehicle bucket by `scripts/create-storage-buckets.ts`. The media pipeline is the vehicle one parameterised on that bucket and this table: `src/lib/storage/spare-part-media.ts` stores the objects, `spare-part-photo-service.ts` writes the rows in one transaction after every object has landed, and `spare-part-photo-gallery.ts` holds the "exactly one primary" invariant (a deliberate mirror of the vehicle version rather than a generic — Prisma's model delegates do not unify without losing the type-checking on the where-clause, and that clause is what decides which rows are touched).
+
+### `SparePartCompatibility`
+
+The most important normalisation decision in this domain, and the intuitive answer is the wrong one.
+
+**Fitment does not point at `Vehicle`.** It is a fact about a model of car *in the world*, not about the dealership's stock. A Harrier brake pad fits every 2020–2023 Harrier whether or not one is on the floor this week. A foreign key would say the opposite: the compatibility list would empty itself as cars were sold and archived, and a customer whose own Harrier was never in our inventory — which is nearly all of them, since these are people who already own the car — would be told the part fits nothing.
+
+So `make` / `model` / `yearFrom` / `yearTo` / `engine` are stored as values, and **nulls widen the rule**: null `model` means every model of that make, an absent year bound means unbounded in that direction, null `engine` means any engine. "Toyota, all models, 2015 onwards" is one row, not two hundred.
+
+The join back to inventory lives in `src/lib/utils/spare-part-compatibility.ts`, which owns both the in-memory predicate and the matching Prisma `where` so the SQL and the UI cannot disagree about what "fits" means. Matching is **exact, case-insensitively**: "toyota" matches "Toyota", `"Landcruiser"` does **not** match `"Land Cruiser"`. That is deliberate — a false positive costs a customer an import of a part that does not fit, and spelling variants are a data-entry problem fixed with a picker, not with fuzzy matching that would also over-reach.
+
+`yearTo >= yearFrom` is enforced by CHECK, because a reversed range is not a loud error: it silently matches nothing, hiding the part from exactly the customers the rule was written for.
+
+**No unique constraint on the natural key.** Four of its six columns are nullable and Postgres treats NULLs as distinct in a unique index, so the constraint would let through exactly the duplicates it was added to stop. `NULLS NOT DISTINCT` would fix that but is not expressible in the Prisma schema, and an index existing only in raw SQL is one Prisma proposes to drop. A duplicated fitment row is a tidiness problem, not an integrity failure — it cannot mis-sell anything.
+
+---
+
 ## 6. Customer & Quote Domain
 
 ### `Customer`
@@ -3578,16 +3654,30 @@ Skipping this check will accumulate duplicate customer rows over time.
 
 ### `Quote`
 
-Represents a vehicle enquiry — always the entry point before any commercial commitment exists. **An `Order` is only ever created when a `Quote` is explicitly accepted; there is no path that skips this**, including "Request This Vehicle" from a listing page.
+Represents an enquiry — always the entry point before any commercial commitment exists. **An `Order` is only ever created when a `Quote` is explicitly accepted; there is no path that skips this**, including "Request This Vehicle" from a listing page.
 
 | Field | Notes |
 |---|---|
-| `type` | Enum, currently only `VEHICLE`. Wave B adds `SPARE_PART` additively — this discriminator exists now specifically so Wave B's spare-parts quotes can reuse this table instead of a parallel one. |
-| `linkedVehicleId` | Nullable FK to `Vehicle`, `onDelete: SetNull`. Populated when the quote came from "Request This Vehicle" on a specific listing; null for a blank "Get a Quote" enquiry. `SetNull` (not `Restrict`) because a Quote is a soft enquiry — it should survive even if the referenced listing is later removed. |
+| `type` | `VEHICLE` \| `SPARE_PART`. Spare-parts quotes reuse this table rather than a parallel one. |
+| `linkedVehicleId` / `linkedSparePartId` | Nullable FKs, `onDelete: SetNull`. **Provenance, not contents**: what the customer was looking at when they raised the enquiry, set once at submission and never edited. Null for a blank "Get a Quote". `SetNull` (not `Restrict`) because a Quote is a soft enquiry — it must survive the removal of the listing that prompted it, and the snapshots that matter live on `QuoteItem`. |
+| `requestedPartName`, `requestedPartNumber` | The parts equivalent of the free-text vehicle request fields. The *car* a part is for is already covered by `requestedMake` / `requestedModel` / `preferredYear`, which is why the parts form reuses those instead of growing a parallel set that would have to be kept in step. |
+| `items` | `QuoteItem[]` — the itemised body of the quotation. Empty for a plain vehicle enquiry, where the subject is the linked listing and the quantity is inescapably one. |
 | `status` | `NEW → CONTACTED → ACCEPTED / REJECTED / EXPIRED`. Accepting a quote is the trigger that creates the corresponding `Order` (see §7). |
 | `order` | Optional 1:1 back-relation — null until acceptance. |
 
 `customerId` is `Restrict` — once a customer has any quote, they cannot be hard-deleted at the DB level.
+
+### `QuoteItem`
+
+One line of a quotation, added with the spare-parts domain.
+
+A vehicle enquiry is inherently one car. A parts enquiry is not: "brake pads, discs and the wear sensor for my Harrier" is one conversation about three products with three quantities, and the brief asks for quotations containing multiple items — including, where commercially sensible, items of both kinds. Without this table that enquiry is a paragraph of free text, and the order it becomes has to be retyped by hand. With it, accepting a quote is mechanical: each `QuoteItem` becomes an `OrderItem`.
+
+**Both product FKs are nullable and the CHECK says *at most* one** — deliberately weaker than the order-line rule. A quote line may legitimately reference nothing in the catalogue ("a rear bumper for a 2018 Prado"), which is the entire reason Get a Quote exists; `description` always carries the human answer. Both FKs are `SetNull` for the same reason `Quote.linkedVehicleId` is.
+
+`quotedUnitPrice` is null until an operator has actually priced the line. It is not copied from the product: a `QUOTE_ONLY` part has no price to copy, and a `FIXED` one may still be quoted differently for quantity or shipping.
+
+Quote lines are the one place a quotation may span both product domains. **Orders may not** — see `Order.type` below.
 
 ---
 
@@ -3601,9 +3691,12 @@ Created exactly once, at the moment a `Quote` is accepted (`quoteId` is `@unique
 
 | Field | Notes |
 |---|---|
+| `type` | `VEHICLE` \| `SPARE_PART`. Set once at creation from the accepted quote and never changed — it decides the milestone structure, the tracking timeline and the customer-facing wording, and an order that changed type mid-flight would be one whose customer agreed to one payment schedule and is held to another. Every `OrderItem` must agree with it; that is an application invariant, not a CHECK, because a constraint cannot see across a parent row to its children. |
 | `customerId` | Denormalized from `quote.customerId` on purpose — lets admin/customer-dashboard queries filter orders by customer directly without joining through `Quote` every time. Set once at creation, never changes. |
 | `shippingCost`, `clearingCost`, `otherCharges`, `totalAmount` | **Locked-in snapshots taken at the moment the quote is accepted.** These are deliberately independent from `Vehicle`'s live estimate fields — if the vehicle listing's shipping estimate changes later (e.g. freight rates move), it must never silently change what a customer already committed to and is paying against. |
-| `status` | `PENDING_DEPOSIT → DEPOSIT_CONFIRMED → AWAITING_MOMBASA_PAYMENT → PROCESSING → AWAITING_FINAL_PAYMENT → COMPLETED` or `→ CANCELLED`. Coarse, list-view-friendly status — the authoritative stage-by-stage detail lives in `PaymentMilestone` (§8). |
+| `status` | Vehicle: `PENDING_DEPOSIT → DEPOSIT_CONFIRMED → PROCESSING → AWAITING_FINAL_PAYMENT → COMPLETED` or `→ CANCELLED`. Parts: `AWAITING_PAYMENT → PROCESSING → COMPLETED` or `→ CANCELLED`. Coarse, list-view-friendly — the authoritative stage-by-stage detail lives in `PaymentMilestone` (what is owed) and `TrackingEvent` (where it is). A parts order opens at `AWAITING_PAYMENT` rather than `PENDING_DEPOSIT` because it is paid in full up front; reusing the vehicle value would tell an operator to chase a deposit that does not exist. |
+
+**There is no `MIXED` order type.** A customer buying a car and a set of filters gets two orders. One order would need a payment schedule neither business rule describes — 50% of a basket whose vehicle half ships in six weeks and whose parts half ships on Thursday is not a rule anybody has written down. Quotations *can* span both, because a quotation commits no money. If mixed baskets ever become a real requirement, `MIXED` is an additive `ALTER TYPE ... ADD VALUE` plus a third milestone strategy — no table changes.
 
 **No `amountPaid` or `balance` field exists on `Order`.** These must always be calculated live:
 
@@ -3622,9 +3715,10 @@ Represents what was ordered. In Wave A, always a vehicle.
 
 ```prisma
 model OrderItem {
-  vehicleId String?
-  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
-  // sparePartId String?  <- Wave B adds this as a sibling nullable FK — no migration surgery needed on this table
+  vehicleId   String?
+  vehicle     Vehicle?   @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  sparePartId String?
+  sparePart   SparePart? @relation(fields: [sparePartId], references: [id], onDelete: Restrict)
   description String   // snapshot, e.g. "2021 Toyota Harrier — CLM-V-2026-000123"
   unitPrice   Decimal  @db.Decimal(12, 2)
   quantity    Int      @default(1)
@@ -3632,11 +3726,21 @@ model OrderItem {
 }
 ```
 
-**Design decision — concrete nullable FK per product type, not a polymorphic `productId + productType` pair.** With exactly two product types ever expected (vehicles, spare parts), real foreign keys preserve referential integrity, cascade behavior, and type-safe Prisma `include`s. A polymorphic string-based pair would lose all of that. In Wave A, `vehicleId` is populated on every row; the DB doesn't enforce this (the column must stay nullable for Wave B), so **Zod validation is responsible for requiring `vehicleId` until `sparePartId` exists.**
+**Design decision — concrete nullable FK per product type, not a polymorphic `productId + productType` pair.** With exactly two product types, real foreign keys preserve referential integrity, cascade behavior, and type-safe Prisma `include`s. A polymorphic string-based pair would lose all of that.
 
-`description`, `unitPrice`, and `lineTotal` are **point-in-time snapshots**, not live references — an order's line items must never change if the underlying vehicle record is later edited.
+Both columns are nullable because neither is always the one in use, which makes three states representable that must not be: neither set, or both. A CHECK constraint requires **exactly one** —
 
-`vehicleId` is `Restrict`: a vehicle that has ever been ordered can never be hard-deleted, only archived.
+```sql
+CHECK (num_nonnulls("vehicleId", "sparePartId") = 1)
+```
+
+— which is the invariant this document previously had to leave to Zod. Zod still validates it, because a constraint violation is a 500 and a validation error is a sentence an operator can act on; the database is the backstop, not the error message. A second CHECK keeps `quantity > 0`: a zero-quantity line contributes nothing to the total while still reserving stock, and a negative one is a refund pretending to be a sale.
+
+`quantity` is always 1 for a vehicle, which is one physical unit. Parts are where the column earns its keep.
+
+`description`, `unitPrice`, and `lineTotal` are **point-in-time snapshots**, not live references — an order's line items must never change if the underlying product record is later edited.
+
+Both FKs are `Restrict`: a product that has ever been ordered can never be hard-deleted, only archived.
 
 ---
 
@@ -3661,7 +3765,7 @@ Admin-configurable defaults for the deposit structure and the central WhatsApp n
 
 ### `PaymentMilestone`
 
-The payment structure is **50% Initial → 25% Mombasa → 25% Final** by default, but fully admin-configurable per the business requirement. Rather than a single `requiredDepositAmount` field (which the schema originally had and has since been removed as superseded), each order gets **three explicit milestone rows**, created at the moment the `Order` itself is created (i.e., at quote acceptance).
+For a **vehicle** order the payment structure is **50% Initial → 25% Mombasa → 25% Final** by default, but fully admin-configurable per the business requirement. A **spare-parts** order gets exactly one milestone at 100%, due before the order is packed — the same table, the same ledger, the same "what is due now" query, and no second payment system for the second product type. That is what "shared payment infrastructure, separate workflows" means in practice. Rather than a single `requiredDepositAmount` field (which the schema originally had and has since been removed as superseded), each order gets **three explicit milestone rows**, created at the moment the `Order` itself is created (i.e., at quote acceptance).
 
 ```prisma
 model PaymentMilestone {
@@ -3716,7 +3820,7 @@ model Shipment {
   trackingNumber  String @unique // CLM-2026-000125 — what the customer types into Track My Order
   orderId         String
   vehicleId       String?
-  shipmentType    ShipmentType   @default(VEHICLE) // Wave B appends SPARE_PART
+  shipmentType    ShipmentType   @default(VEHICLE) // VEHICLE | SPARE_PART
   currentStatus   TrackingStatus @default(PURCHASED)
   currentLocation String?
 }
@@ -3726,7 +3830,11 @@ model Shipment {
 
 `Order.shipments` is modeled as one-to-many even though Wave A only ever creates exactly one per order — this is intentional future-proofing for Wave B, where an order containing both a vehicle and spare parts might need separate shipments per product line. The Wave A server action simply always creates one.
 
-`shipmentType` is the field that lets "Track My Order" identify which timeline/UI to render from the tracking number alone, without the customer ever needing to know there's an internal distinction between vehicle and parts logistics.
+`shipmentType` is the field that lets "Track My Order" identify which timeline/UI to render from the tracking number alone, without the customer ever needing to know there's an internal distinction between vehicle and parts logistics. It also decides which subset of `TrackingStatus` an operator is offered when recording an event.
+
+A parts consignment leaves `vehicleId` null; its contents are its order's items. **There is deliberately no `ShipmentItem` table** — nothing in the brief asks for a partially dispatched order, and the table that would represent one is additive whenever it does.
+
+`currentStatus` defaults to `PURCHASED`, the vehicle opening state. A parts shipment is created at `ORDER_CONFIRMED`, set explicitly by the action that creates it: a column default cannot be conditional on a sibling column, so it names the commoner case rather than trying to be both.
 
 `currentStatus` **is a maintained column, not derived-on-read** — the opposite treatment from money fields, and deliberately so: it's read on every tracking-page lookup and admin list view, and updating it costs nothing extra at write time. `updateTrackingStatus()` must update this field and insert the new `TrackingEvent` inside a single `$transaction`, so the two can never drift apart.
 
@@ -3755,7 +3863,9 @@ Two date fields, two different jobs — **do not conflate them:**
 
 **Corrections use a void mechanism, not deletion.** If an admin creates an erroneous tracking event, the fix is: set `isVoided = true`, `voidedAt`, `voidedByAdminId`, `voidReason`, then insert a *new* correct `TrackingEvent`. The mistake is annotated, never erased — required for the audit-trail guarantee. Any query building the customer-facing timeline **must filter `WHERE isVoided = false`.**
 
-`TrackingStatus` enum currently covers only vehicle logistics (`PURCHASED` through `DELIVERED`). Wave B appends `ORDER_CONFIRMED`, `PROCESSING`, `PACKED`, `DISPATCHED`, `OUT_FOR_DELIVERY` for spare-parts shipments — this is a safe additive `ALTER TYPE ... ADD VALUE` in Postgres and requires no changes to existing rows. `IN_TRANSIT` and `DELIVERED` are intentionally shared vocabulary across both product types.
+`TrackingStatus` covers both logistics chains. `PURCHASED` through `DELIVERED` are the vehicle timeline; `ORDER_CONFIRMED`, `PROCESSING`, `PACKED`, `DISPATCHED`, `OUT_FOR_DELIVERY` were appended for spare-parts shipments. `IN_TRANSIT` and `DELIVERED` are intentionally **shared vocabulary** — a box on a lorry and a car on a ship are both in transit, and a customer reading either word does not need to know which chain produced it.
+
+⚠️ Enum values are **appended, never inserted or reordered**. `ALTER TYPE ... ADD VALUE` places a variant last unless told otherwise, and an enum whose declaration order in `schema.prisma` disagrees with the database's is drift the next `migrate diff` would offer to "fix". `OrderStatus` groups its parts lifecycle by comment rather than by position for the same reason.
 
 ---
 
@@ -3765,6 +3875,11 @@ Two date fields, two different jobs — **do not conflate them:**
 |---|---|
 | `Vehicle` | Status transition to `ARCHIVED`. Never hard-deleted once ordered (`Restrict` from `OrderItem`, `Shipment`). |
 | `VehiclePhoto` | Soft delete via `deletedAt`. |
+| `SparePart` | Status transition to `ARCHIVED`. Never hard-deleted once ordered (`Restrict` from `OrderItem`). No `deletedAt` — the status already answers "is this still listed". |
+| `SparePartPhoto` | Soft delete via `deletedAt`, same as `VehiclePhoto`. |
+| `SparePartCategory` | Retired via `isActive`. Cannot be hard-deleted while it holds parts (`Restrict` from `SparePart`); an unused one created in error still can. |
+| `SparePartCompatibility` | Hard delete is correct — a fitment rule is a statement about the part, nothing references it, and a wrong rule should be removed rather than annotated. Cascades with its part. |
+| `QuoteItem` | Cascades with parent `Quote` only (has no independent meaning). |
 | `Customer` | Soft delete via `deletedAt` + PII scrub in application code. Never hard-deleted (`Restrict` from `Quote`, `Order`). |
 | `Quote` | Status transition (`REJECTED` / `EXPIRED`). No `deletedAt` — status already covers it. |
 | `Order` | Status transition to `CANCELLED`. Never hard-deleted. |
@@ -3786,13 +3901,19 @@ Two date fields, two different jobs — **do not conflate them:**
 |---|---|---|
 | `Vehicle` | `[status, isFeatured]`, `[make, model]`, `[year]`, `[price]` | Marketplace filter/sort |
 | `VehiclePhoto` | `[vehicleId]`, `[deletedAt]` | Gallery load, soft-delete filtering |
+| `SparePart` | `[status, isFeatured]`, `[status, categoryId]`, `[price]` | Catalogue filter/sort; every public read pins `status`, so it leads |
+| `SparePart` | GIN trigram on `name`, `oemPartNumber`, `referenceNumber` | Catalogue and admin search — `contains` + insensitive compiles to `ILIKE '%term%'`, which a B-tree cannot serve |
+| `SparePartCategory` | `[isActive, displayOrder]` | Category rail |
+| `SparePartPhoto` | `[sparePartId]`, `[deletedAt]` | Gallery load, soft-delete filtering |
+| `SparePartCompatibility` | `[sparePartId]`, GIN trigram on `make`, `model` | Fitment list; case-insensitive matching, which is `ILIKE` and cannot use a B-tree |
+| `QuoteItem` | `[quoteId]`, `[vehicleId]`, `[sparePartId]` | Quotation body, join performance |
 | `Customer` | `[phone]`, `[deletedAt]` | Dedup lookup, soft-delete filtering |
-| `Quote` | `[status]`, `[customerId]`, `[createdAt]` | Admin quote queue |
-| `Order` | `[status]`, `[customerId]`, `[createdAt]` | Admin order list |
-| `OrderItem` | `[orderId]`, `[vehicleId]` | Join performance |
+| `Quote` | `[status]`, `[customerId]`, `[createdAt]`, `[type, status]` | Admin quote queue, split by product domain |
+| `Order` | `[status]`, `[customerId]`, `[createdAt]`, `[type, status]` | Admin order list, split by product domain |
+| `OrderItem` | `[orderId]`, `[vehicleId]`, `[sparePartId]` | Join performance |
 | `Payment` | `[orderId]`, `[status]`, `[paymentDate]` | Ledger queries, pending-verification queue |
 | `PaymentMilestone` | `[orderId]`, `[status]` | "Currently due" lookups |
-| `Shipment` | `[orderId]`, `[currentStatus]` | Admin tracking list |
+| `Shipment` | `[orderId]`, `[currentStatus]`, `[shipmentType, currentStatus]` | Admin tracking list, split by consignment type |
 | `TrackingEvent` | `[shipmentId, eventDate]`, `[isVoided]` | Timeline rendering |
 | `AuditLog` | `[entityType, entityId]`, `[actorId]`, `[createdAt]` | Forensic lookup |
 | `AdminProfile` | `[isActive]` | Active-admin filtering |
@@ -3821,8 +3942,28 @@ Connection strings live in two separate places, using two separate Supabase conn
 ## 13. What Is Deliberately Out of Scope for This Schema
 
 - **Row Level Security (RLS):** not used on these Postgres tables. All access goes through Prisma via server actions, so the authorization boundary is the server action checking `AdminProfile`/session state, not RLS policies. RLS becomes relevant separately for Supabase **Storage** bucket policies (vehicle photos, payment receipts).
-- **Amount-positivity / overpayment checks** (`price > 0`, blocking a payment that would exceed a milestone's `amountDue`): these are Zod/server-action validation concerns, not schema-level constraints.
-- **Spare parts, customer accounts, documents, notifications:** Wave B. The schema above is shaped to accept these additively (nullable sibling FKs on `OrderItem`/`Shipment`, additive enum values on `QuoteType`/`ShipmentType`/`TrackingStatus`) without altering any Wave A table's existing columns.
+- **Overpayment checks** (blocking a payment that would exceed a milestone's `amountDue`): a Zod/server-action concern, not a schema-level constraint.
+- **Customer accounts, documents, notifications:** still Wave B. The schema is shaped to accept them additively, the same way the spare-parts domain was added.
+- **The spare-parts basket:** there is no table behind it, and that is deliberate. The catalogue's "add to cart" writes to `localStorage` in the customer's own browser (`src/lib/cart/`), holds no stock, locks no price, and creates nothing. It is a shortlist whose one action is "request a quote", because an `Order` in this system is only ever created when a `Quote` is accepted (§7) — minting one from a browser would be the second commerce path the architecture exists to avoid. A price stored in a basket is a *display* copy: when the list becomes a quotation, the server re-reads every part by slug and prices it itself, so a tampered basket buys a customer nothing but a wrong number on their own screen. When customer accounts arrive, the basket syncs to the account inside `CartProvider` and nothing above it changes.
+- **A `Supplier` entity, multi-warehouse inventory, partial shipments (`ShipmentItem`), and a category hierarchy:** each is a table that becomes additive whenever the requirement is real. `SparePart.supplierName`/`supplierNotes`, `stockQuantity`, whole-order shipments and a flat taxonomy are the deliberate interim answers.
+
+### What *is* enforced at the schema level
+
+Nine CHECK constraints live only in `20260904090000_add_spare_parts_domain/migration.sql`, because Prisma's schema DSL cannot express a cross-column check. This is safe — the migrate engine does not model CHECK constraints and therefore never proposes to drop one (verified: `prisma migrate diff --from-config-datasource` reports no drift with them in place) — but it means they are invisible to the Prisma schema.
+
+`npm run db:check` (`scripts/check-schema-constraints.ts`) exists for exactly that reason: it verifies every one of them, plus the `Restrict`/`Cascade`/`SetNull` behaviours, against a real database. It creates its own fixtures and ends in `ROLLBACK`, so it is safe to run anywhere including production. Run it after restoring a backup or provisioning a new environment.
+
+| Constraint | Rule |
+|---|---|
+| `SparePart_pricing_mode_check` | `FIXED` requires a price; `QUOTE_ONLY` forbids one |
+| `SparePart_price_non_negative_check` | price is null or `>= 0` |
+| `SparePart_stock_non_negative_check` | `stockQuantity >= 0` — the backstop against overselling |
+| `SparePartCompatibility_year_range_check` | `yearTo >= yearFrom` when both are present |
+| `OrderItem_exactly_one_product_check` | `num_nonnulls(vehicleId, sparePartId) = 1` |
+| `OrderItem_quantity_positive_check` | `quantity > 0` |
+| `QuoteItem_at_most_one_product_check` | `num_nonnulls(vehicleId, sparePartId) <= 1` |
+| `QuoteItem_quantity_positive_check` | `quantity > 0` |
+| `QuoteItem_price_non_negative_check` | `quotedUnitPrice` is null or `>= 0` |
 
 <!-- BEGIN:nextjs-agent-rules -->
 

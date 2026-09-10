@@ -59,11 +59,47 @@ const WINDOW_MS = ADMIN_LOGIN_WINDOW_MINUTES * 60 * 1000
  */
 export const ADMIN_LOGIN_RATE_LIMITED_MESSAGE = `429 Too many attempts, try again in ${ADMIN_LOGIN_WINDOW_MINUTES} min`
 
-/** The buckets a sign-in attempt is counted against. */
+/**
+ * The buckets attempts are counted against.
+ *
+ * The LoginAttempt table is keyed by scope, so one limiter serves every
+ * unauthenticated write path without a table each. The model is named for
+ * its first use; renaming it would be a migration that buys nothing.
+ *
+ *   admin-login:*      failed sign-ins (only failures are recorded)
+ *   password-reset:*   reset-email requests — each one sends a real email
+ *                      from our Supabase project, so an unthrottled form is
+ *                      an email-bombing tool aimed at staff inboxes and a
+ *                      way to exhaust the project's hourly email quota
+ *   quote-request:*    public quotation requests — the one form anyone on
+ *                      the internet can write to the database through
+ */
 export const RATE_LIMIT_SCOPES = {
   adminLoginEmail: "admin-login:email",
   adminLoginIp: "admin-login:ip",
+  passwordResetEmail: "password-reset:email",
+  passwordResetIp: "password-reset:ip",
+  quoteRequestIp: "quote-request:ip",
+  quoteRequestPhone: "quote-request:phone",
 } as const
+
+/** Reset emails per address/host inside the window. Three covers "I did not
+ *  get it, let me try again" twice over; a fourth in fifteen minutes is not
+ *  a person waiting for an email. */
+export const PASSWORD_RESET_MAX_ATTEMPTS = 3
+
+/**
+ * Quote requests per host / per phone number inside the window.
+ *
+ * Generous on purpose: a customer may reasonably ask about a car, then a
+ * set of parts, then a second car, in one sitting — and a household or an
+ * office behind one NAT shares the IP budget. Six an hour per host still
+ * turns a spam run into a trickle, and the per-phone bucket stops one number
+ * being used to flood the queue from many hosts.
+ */
+export const QUOTE_REQUEST_MAX_PER_IP = 6
+export const QUOTE_REQUEST_MAX_PER_PHONE = 4
+export const QUOTE_REQUEST_WINDOW_MS = 60 * 60 * 1000
 
 export type RateLimitScope =
   (typeof RATE_LIMIT_SCOPES)[keyof typeof RATE_LIMIT_SCOPES]
@@ -160,6 +196,17 @@ export async function checkRateLimit(
  * decided) authentication error.
  */
 export async function recordFailedAttempt(keys: RateLimitKey[]): Promise<void> {
+  await recordAttempt(keys)
+}
+
+/**
+ * Records one attempt against every key, whatever its outcome.
+ *
+ * For limits that count *uses* rather than failures — a reset email is sent,
+ * a quote request is stored — where success is the very thing being
+ * throttled. Same best-effort contract as `recordFailedAttempt`.
+ */
+export async function recordAttempt(keys: RateLimitKey[]): Promise<void> {
   if (keys.length === 0) return
 
   try {
@@ -208,11 +255,13 @@ export async function clearAttempts(keys: RateLimitKey[]): Promise<void> {
  * failure, where one extra statement on an already-failing request costs
  * nothing a user will notice, and never on the success path.
  *
- * The cutoff is a multiple of the window rather than the window itself, so a
- * row is only removed once it is comfortably irrelevant to any live count.
+ * The cutoff is a multiple of the *longest* window any scope uses rather than
+ * of the sign-in window, so a row is only removed once it is comfortably
+ * irrelevant to every live count — the quote-request window is an hour, and
+ * pruning at four sign-in windows would have cut exactly on its edge.
  */
 export async function pruneExpiredAttempts(): Promise<void> {
-  const cutoff = new Date(Date.now() - WINDOW_MS * 4)
+  const cutoff = new Date(Date.now() - Math.max(WINDOW_MS, QUOTE_REQUEST_WINDOW_MS) * 2)
 
   try {
     await prisma.loginAttempt.deleteMany({ where: { createdAt: { lt: cutoff } } })

@@ -1,0 +1,358 @@
+"use client"
+
+import * as React from "react"
+import { useActionState, useId } from "react"
+import { AlertCircle, CheckCircle2, Loader2, Plus, Trash2 } from "lucide-react"
+
+import {
+  addSparePartCompatibilityAction,
+  removeSparePartCompatibilityAction,
+  type FitmentFormState,
+} from "@/lib/actions/spare-part-compatibility.actions"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils"
+import type { SparePartFitmentRow } from "@/lib/queries/spare-part.queries"
+
+const INITIAL_STATE: FitmentFormState = { status: "idle" }
+
+interface SparePartFitmentBoardProps {
+  sparePartId: string
+  fitment: SparePartFitmentRow[]
+}
+
+/**
+ * What this part fits, as managed by the operator.
+ *
+ * ── Typed, never inferred ─────────────────────────────────────────────
+ * Nothing here looks at the vehicle inventory. What a part fits is a fact
+ * somebody at the dealership knows — off a parts catalogue, an auction sheet,
+ * or the box it came in — and it is a fact about cars *in the world*, not
+ * about what happens to be on the floor this week. A list derived from stock
+ * would empty itself as cars were sold and would never cover the customer
+ * whose own Harrier was never ours, which is nearly every parts customer.
+ *
+ * So every rule is entered by hand, and every field is optional.
+ *
+ * ── Every field empty is a real, useful rule ──────────────────────────
+ * It means "fits any vehicle" — the honest listing for a universal
+ * consumable, and the alternative to entering the same wiper blade once per
+ * make and still missing whatever the customer drives. Each blank widens the
+ * rule one level: no make means every make, no model means every model of
+ * that make, an open year bound means unbounded in that direction.
+ *
+ * The one combination refused is a model without a make, which names nothing.
+ *
+ * ── Why fitment lives here and not in the details form ────────────────
+ * A part has one price and many fitment rules. Folding a variable-length list
+ * into that form would mean an operator could not add a rule without
+ * re-submitting every other field, and a rejected price would take the
+ * fitment down with it. These are added and removed one at a time, against a
+ * part that already exists — which is also why the board only appears on a
+ * saved part.
+ */
+export function SparePartFitmentBoard({
+  sparePartId,
+  fitment,
+}: SparePartFitmentBoardProps) {
+  const [state, formAction, isPending] = useActionState(
+    addSparePartCompatibilityAction,
+    INITIAL_STATE
+  )
+
+  /**
+   * Clears the add form after a rule is accepted.
+   *
+   * Remounting rather than controlling six inputs: the fields are
+   * uncontrolled so typing costs no re-render, and a `key` change is what
+   * gives each one a fresh empty default. On a *rejected* submission it does
+   * not change, so what the operator typed survives the error they are being
+   * asked to fix.
+   */
+  const [formKey, setFormKey] = React.useState(0)
+  const [lastState, setLastState] = React.useState(state)
+
+  if (state !== lastState) {
+    setLastState(state)
+    if (state.status === "success") setFormKey((key) => key + 1)
+  }
+
+  const error = (name: string) => state.fieldErrors?.[name]?.[0]
+
+  const makeId = useId()
+  const modelId = useId()
+  const yearFromId = useId()
+  const yearToId = useId()
+  const engineId = useId()
+  const notesId = useId()
+
+  return (
+    <section className="flex flex-col gap-5 rounded-xl border border-border bg-card p-6">
+      <div className="flex flex-col gap-1">
+        <h2 className="font-heading text-h3 font-semibold">Fits these vehicles</h2>
+        <p className="max-w-2xl text-small text-muted-foreground">
+          Shown on the part&rsquo;s public page and, briefly, on its catalogue
+          card. Leave a field empty to widen the rule — no model means every
+          model of that make, and{" "}
+          <strong className="font-semibold text-foreground">
+            leaving everything empty means the part fits any vehicle
+          </strong>
+          .
+        </p>
+      </div>
+
+      {state.status === "success" && state.message ? (
+        <Alert>
+          <CheckCircle2 aria-hidden="true" className="text-gold-ink" />
+          <AlertDescription>{state.message}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {state.status === "error" && state.message ? (
+        <Alert variant="destructive">
+          <AlertCircle aria-hidden="true" />
+          <AlertDescription>{state.message}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {/* ── What is already listed ─────────────────────────────── */}
+      {fitment.length > 0 ? (
+        <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
+          {fitment.map((rule) => (
+            <li
+              key={rule.id}
+              className="flex items-start justify-between gap-3 px-4 py-3"
+            >
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-small font-medium text-foreground">
+                  {rule.description}
+                </span>
+                {rule.notes ? (
+                  <span className="text-xs text-muted-foreground">{rule.notes}</span>
+                ) : null}
+              </div>
+
+              <RemoveFitmentButton id={rule.id} description={rule.description} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-small text-muted-foreground">
+          No fitment listed. A part with no rules tells customers it fits
+          nothing — which is the honest answer for an unfinished listing, and
+          the wrong one for a published part.
+        </p>
+      )}
+
+      {/* ── Add one ────────────────────────────────────────────── */}
+      <form
+        action={formAction}
+        className="flex flex-col gap-4 rounded-lg border border-dashed border-border bg-secondary/40 p-4"
+        noValidate
+      >
+        <input type="hidden" name="sparePartId" value={sparePartId} />
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <FitmentField
+            id={makeId}
+            label="Make"
+            error={error("make")}
+            hint="Empty = any vehicle"
+          >
+            <Input
+              key={formKey}
+              id={makeId}
+              name="make"
+              defaultValue=""
+              placeholder="Toyota"
+              aria-invalid={error("make") ? true : undefined}
+            />
+          </FitmentField>
+
+          <FitmentField
+            id={modelId}
+            label="Model"
+            error={error("model")}
+            hint="Empty = all models"
+          >
+            <Input
+              key={formKey}
+              id={modelId}
+              name="model"
+              defaultValue=""
+              placeholder="Harrier"
+              aria-invalid={error("model") ? true : undefined}
+            />
+          </FitmentField>
+
+          <FitmentField
+            id={yearFromId}
+            label="From year"
+            error={error("yearFrom")}
+            hint="Empty = any"
+          >
+            <Input
+              key={formKey}
+              id={yearFromId}
+              name="yearFrom"
+              type="number"
+              inputMode="numeric"
+              step={1}
+              defaultValue=""
+              placeholder="2020"
+              aria-invalid={error("yearFrom") ? true : undefined}
+            />
+          </FitmentField>
+
+          <FitmentField
+            id={yearToId}
+            label="To year"
+            error={error("yearTo")}
+            hint="Empty = onwards"
+          >
+            <Input
+              key={formKey}
+              id={yearToId}
+              name="yearTo"
+              type="number"
+              inputMode="numeric"
+              step={1}
+              defaultValue=""
+              placeholder="2023"
+              aria-invalid={error("yearTo") ? true : undefined}
+            />
+          </FitmentField>
+
+          <FitmentField
+            id={engineId}
+            label="Engine"
+            error={error("engine")}
+            hint="Empty = any"
+          >
+            <Input
+              key={formKey}
+              id={engineId}
+              name="engine"
+              defaultValue=""
+              placeholder="2.0L"
+              aria-invalid={error("engine") ? true : undefined}
+            />
+          </FitmentField>
+        </div>
+
+        <FitmentField
+          id={notesId}
+          label="Note"
+          error={error("notes")}
+          hint="Optional qualifier shown to the customer — “front axle only”, “not the hybrid”."
+        >
+          <Input
+            key={formKey}
+            id={notesId}
+            name="notes"
+            defaultValue=""
+            placeholder="Front axle only"
+            aria-invalid={error("notes") ? true : undefined}
+          />
+        </FitmentField>
+
+        <div>
+          <Button type="submit" variant="outline" disabled={isPending}>
+            {isPending ? (
+              <>
+                <Loader2 aria-hidden="true" className="animate-spin" />
+                Adding
+              </>
+            ) : (
+              <>
+                <Plus aria-hidden="true" />
+                Add fitment
+              </>
+            )}
+          </Button>
+        </div>
+      </form>
+    </section>
+  )
+}
+
+/**
+ * One removal, as its own form.
+ *
+ * A form rather than an `onClick` calling the action directly: it keeps the
+ * row id in a submitted field where the server reads every other input from,
+ * and it works without JavaScript. Each row has its own `useActionState` so a
+ * failure on one row cannot clear another row's pending state.
+ *
+ * There is no confirmation dialog. A fitment rule is one line, it is
+ * re-enterable in seconds, and it carries no money — a modal here would be
+ * ceremony over a claim, not protection over a record. The destructive
+ * confirmations in this dashboard are reserved for things that cannot be
+ * retyped.
+ */
+function RemoveFitmentButton({
+  id,
+  description,
+}: {
+  id: string
+  description: string
+}) {
+  const [, formAction, isPending] = useActionState(
+    removeSparePartCompatibilityAction,
+    INITIAL_STATE
+  )
+
+  return (
+    <form action={formAction} className="shrink-0">
+      <input type="hidden" name="id" value={id} />
+      <button
+        type="submit"
+        disabled={isPending}
+        aria-label={`Remove fitment: ${description}`}
+        className={cn(
+          "inline-flex size-8 items-center justify-center rounded-md",
+          "text-muted-foreground transition-colors duration-fast",
+          "hover:bg-destructive/10 hover:text-destructive",
+          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+          "disabled:pointer-events-none disabled:opacity-50"
+        )}
+      >
+        {isPending ? (
+          <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+        ) : (
+          <Trash2 aria-hidden="true" className="size-4" />
+        )}
+      </button>
+    </form>
+  )
+}
+
+/** A labelled cell in the add-fitment grid. The hint doubles as the "what does
+ *  empty mean here" documentation, which is the whole subtlety of this form. */
+function FitmentField({
+  id,
+  label,
+  error,
+  hint,
+  children,
+}: {
+  id: string
+  label: string
+  error?: string
+  hint: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      {children}
+      {error ? (
+        <p className="text-xs text-destructive">{error}</p>
+      ) : (
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      )}
+    </div>
+  )
+}

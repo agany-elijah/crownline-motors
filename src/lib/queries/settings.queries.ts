@@ -4,7 +4,12 @@ import { cache } from "react"
 import { unstable_cache } from "next/cache"
 
 import { siteConfig } from "@/config/site"
+import {
+  DEFAULT_SPARE_PART_DELIVERY_STEPS,
+  type SparePartDeliveryStep,
+} from "@/lib/constants/spare-part-delivery"
 import { prisma } from "@/lib/prisma"
+import { sparePartDeliveryStepsSchema } from "@/lib/validations/settings.schema"
 
 /**
  * Reads for the BusinessSettings singleton.
@@ -30,7 +35,46 @@ export interface BusinessSettingsDTO {
   defaultInitialPercentage: number
   defaultMombasaPercentage: number
   defaultFinalPercentage: number
+  /**
+   * The configured parts fulfilment steps, or null when the operator has
+   * never touched them.
+   *
+   * Null and `[]` are different answers and the form needs to tell them
+   * apart: null means "showing the built-in steps", an empty array means "the
+   * operator deliberately hid the section". Collapsing the two would make it
+   * impossible to clear the section without it springing back to the
+   * defaults.
+   */
+  sparePartDeliverySteps: SparePartDeliveryStep[] | null
   updatedAt: Date
+}
+
+/**
+ * Reads the Json column into a validated array, or null.
+ *
+ * A `Json` column is not checked by Postgres, so whatever is in it is
+ * untrusted — an older build, a restored backup or a hand edit in Studio can
+ * all leave a shape this application never wrote. Parsing on the way out is
+ * what stops that reaching a render.
+ *
+ * A value that fails validation is treated as *unconfigured* rather than as
+ * an error: the page then shows the built-in steps, which are true, instead
+ * of a 500 on a public listing. It is logged, because silently discarding an
+ * operator's configuration is not something to do quietly.
+ */
+function parseStoredDeliverySteps(value: unknown): SparePartDeliveryStep[] | null {
+  if (value === null || value === undefined) return null
+
+  const parsed = sparePartDeliveryStepsSchema.safeParse(value)
+
+  if (!parsed.success) {
+    console.error(
+      "[settings] stored spare-part delivery steps are malformed; falling back to the defaults"
+    )
+    return null
+  }
+
+  return parsed.data
 }
 
 /**
@@ -58,6 +102,9 @@ export const getBusinessSettings = cache(async (): Promise<BusinessSettingsDTO> 
     defaultInitialPercentage: settings.defaultInitialPercentage.toNumber(),
     defaultMombasaPercentage: settings.defaultMombasaPercentage.toNumber(),
     defaultFinalPercentage: settings.defaultFinalPercentage.toNumber(),
+    sparePartDeliverySteps: parseStoredDeliverySteps(
+      settings.sparePartDeliverySteps
+    ),
     updatedAt: settings.updatedAt,
   }
 })
@@ -128,4 +175,47 @@ export async function getWhatsAppNumber(): Promise<string> {
   }
 
   return siteConfig.whatsappNumber
+}
+
+/**
+ * The parts fulfilment steps, for the public spare-part page.
+ *
+ * ── Why this is not `getBusinessSettings` ─────────────────────────────
+ * Same reason as `getWhatsAppNumber` directly above: that function *upserts*,
+ * which is right for the admin screen and wrong on a page anonymous traffic
+ * loads. This one only reads, and it is cached under the same tag, so an
+ * operator's edit appears immediately rather than at the next deploy.
+ *
+ * ── Why a failure returns the defaults rather than nothing ────────────
+ * These four sentences are the reassurance on a page whose entire job is to
+ * convince a customer that money sent abroad comes back as a part. A database
+ * blip should cost the *configurability* of that copy, never the copy itself.
+ * An operator who has deliberately cleared the list still gets an empty one —
+ * that is a stored `[]`, which is a successful read.
+ */
+const readStoredDeliverySteps = unstable_cache(
+  async (): Promise<SparePartDeliveryStep[] | null> => {
+    const settings = await prisma.businessSettings.findUnique({
+      where: { id: 1 },
+      select: { sparePartDeliverySteps: true },
+    })
+
+    if (!settings) return null
+
+    return parseStoredDeliverySteps(settings.sparePartDeliverySteps)
+  },
+  ["business-settings", "spare-part-delivery-steps"],
+  { tags: [BUSINESS_SETTINGS_CACHE_TAG] }
+)
+
+export async function getSparePartDeliverySteps(): Promise<SparePartDeliveryStep[]> {
+  try {
+    const stored = await readStoredDeliverySteps()
+
+    if (stored !== null) return stored
+  } catch (error) {
+    console.error("[settings] failed to read the spare-part delivery steps", error)
+  }
+
+  return [...DEFAULT_SPARE_PART_DELIVERY_STEPS]
 }

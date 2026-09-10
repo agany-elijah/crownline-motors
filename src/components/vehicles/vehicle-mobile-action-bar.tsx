@@ -1,6 +1,4 @@
-import Link from "next/link"
-
-import { Button } from "@/components/ui/button"
+import { VehicleQuoteButton } from "@/components/quotes/quote-request-triggers"
 
 /**
  * The vehicle page's primary action, pinned to the bottom of a phone
@@ -30,15 +28,22 @@ import { Button } from "@/components/ui/button"
  * float, neither of which is a descendant of this page. Renaming or
  * dropping the attribute silently reintroduces both overlaps.
  *
- * A plain anchor and no state, so this stays a server component and ships
- * no client JavaScript.
+ * The bar itself is a server component. Its one button is the same client
+ * `VehicleQuoteButton` the summary band renders, given the same subject, so
+ * the two can never open different panels for the same car.
  */
 interface VehicleMobileActionBarProps {
-  /** Where "Request this vehicle" goes — a quote pre-filled with the car. */
-  requestHref: string
+  /** What the quote panel fills in — see `quoteSubject` on the vehicle page. */
+  vehicleSlug: string
+  label: string
+  imageUrl: string | null
 }
 
-export function VehicleMobileActionBar({ requestHref }: VehicleMobileActionBarProps) {
+export function VehicleMobileActionBar({
+  vehicleSlug,
+  label,
+  imageUrl,
+}: VehicleMobileActionBarProps) {
   return (
     <div
       data-mobile-action-bar=""
@@ -55,13 +60,12 @@ export function VehicleMobileActionBar({ requestHref }: VehicleMobileActionBarPr
       ].join(" ")}
     >
       <div className="flex h-(--mobile-action-bar-height) items-center px-4">
-        <Button
-          render={<Link href={requestHref} />}
-          size="lg"
+        <VehicleQuoteButton
+          vehicleSlug={vehicleSlug}
+          label={label}
+          imageUrl={imageUrl}
           className="w-full"
-        >
-          Request this vehicle
-        </Button>
+        />
       </div>
     </div>
   )

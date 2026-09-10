@@ -6,17 +6,15 @@ export interface NavLink {
   /**
    * False while the section has no page behind it yet.
    *
-   * Stage 4 allows navigation entries to ship "disabled/marked
-   * unavailable until their implementation stage", which is the right
-   * treatment for Spare Parts: the brief wants it visible in the
-   * navigation from launch so customers know it is coming, but the
-   * catalogue itself is Wave B. Rendering it as a live link in the
-   * meantime sends anyone who taps it to a 404 — the one outcome that
-   * makes a new business look broken rather than forthcoming.
+   * Stage 4 allows navigation entries to ship "disabled/marked unavailable
+   * until their implementation stage". Spare Parts carried this flag until
+   * its catalogue was built and no longer does — the route exists, so the
+   * entry is a live link.
    *
-   * Unavailable entries render as non-interactive text with a "Soon"
-   * marker. Flip this to true (or delete the flag) the moment the route
-   * exists; nothing else needs to change.
+   * The mechanism stays for the next section that needs it. Unavailable
+   * entries render as non-interactive text with a "Soon" marker, which is
+   * what keeps a customer from tapping through to a 404 — the one outcome
+   * that makes a new business look broken rather than forthcoming.
    */
   available?: boolean
 }
@@ -24,7 +22,7 @@ export interface NavLink {
 export const mainNavLinks: NavLink[] = [
   { label: "Home", href: "/" },
   { label: "Cars", href: "/cars" },
-  { label: "Spare Parts", href: "/spare-parts", available: false },
+  { label: "Spare Parts", href: "/spare-parts" },
   { label: "How It Works", href: "/how-it-works" },
   { label: "Track My Order", href: "/track-my-order" },
   { label: "Get a Quote", href: "/get-a-quote" },

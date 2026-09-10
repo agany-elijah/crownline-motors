@@ -49,6 +49,7 @@ import {
   MAX_PHOTO_BYTES,
   VEHICLE_PHOTO_BUCKET,
 } from "../src/lib/constants/vehicle-photo-options"
+import { SPARE_PART_PHOTO_BUCKET } from "../src/lib/constants/spare-part-photo-options"
 
 interface BucketSpec {
   id: string
@@ -72,6 +73,16 @@ const BUCKETS: BucketSpec[] = [
     allowedMimeTypes: [...ACCEPTED_PHOTO_MIME_TYPES],
     fileSizeLimit: MAX_PHOTO_BYTES,
     purpose: "Vehicle listing photography (public read, server-only write)",
+  },
+  {
+    id: SPARE_PART_PHOTO_BUCKET,
+    public: true,
+    // The same allowlist and ceiling as vehicle photography, because they are
+    // facts about what this application accepts as an image rather than about
+    // either product domain. See spare-part-photo-options.ts.
+    allowedMimeTypes: [...ACCEPTED_PHOTO_MIME_TYPES],
+    fileSizeLimit: MAX_PHOTO_BYTES,
+    purpose: "Spare-part listing photography (public read, server-only write)",
   },
 ]
 

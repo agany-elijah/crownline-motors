@@ -43,8 +43,54 @@ export type AuditAction =
   | "VEHICLE_PHOTOS_REORDERED"
   | "VEHICLE_PHOTO_DELETED"
   | "VEHICLE_PRIMARY_PHOTO_CHANGED"
+  | "SPARE_PART_CREATED"
+  | "SPARE_PART_UPDATED"
+  | "SPARE_PART_STATUS_CHANGED"
+  // The parts gallery has no alt-text equivalent of VEHICLE_PHOTO_UPDATED:
+  // part descriptions are generated rather than typed (see
+  // spare-part-photo.actions.ts), so there is no per-photograph edit to log.
+  | "SPARE_PART_PHOTOS_UPLOADED"
+  | "SPARE_PART_PHOTOS_REORDERED"
+  | "SPARE_PART_PHOTO_DELETED"
+  | "SPARE_PART_PRIMARY_PHOTO_CHANGED"
+  // Fitment is a public claim about what a part goes on, and the one thing in
+  // this domain that is genuinely hard-deleted (see
+  // spare-part-compatibility.actions.ts). These two entries are therefore the
+  // only record that a claim was ever made or withdrawn, which is exactly the
+  // question asked when a customer says they were told a part would fit.
+  | "SPARE_PART_FITMENT_ADDED"
+  | "SPARE_PART_FITMENT_REMOVED"
+  // ── Quotes ──────────────────────────────────────────────────────────
+  // A quote request itself is created by an anonymous customer and has no
+  // admin actor, so it is never audited here; Quote.createdAt is its record.
+  // Everything an operator then does to it is.
+  | "QUOTE_PRICING_UPDATED"
+  | "QUOTE_NOTES_UPDATED"
+  | "QUOTE_STATUS_CHANGED"
+  | "QUOTE_SENT"
+  // The customer's PDF link is a bearer credential; minting and revoking it
+  // are recorded like any other grant of access.
+  | "QUOTE_LINK_CREATED"
+  | "QUOTE_LINK_REVOKED"
+  | "QUOTE_CONVERTED"
+  // ── Orders and money ────────────────────────────────────────────────
+  | "ORDER_CREATED"
+  | "ORDER_CANCELLED"
+  | "PAYMENT_RECORDED"
+  | "PAYMENT_REVERSED"
+  // Stock taken off the shelf by an order, and put back by a cancellation.
+  | "SPARE_PART_STOCK_RESERVED"
+  | "SPARE_PART_STOCK_RELEASED"
 
-export type AuditEntityType = "AdminProfile" | "BusinessSettings" | "Vehicle"
+export type AuditEntityType =
+  | "AdminProfile"
+  | "BusinessSettings"
+  | "Vehicle"
+  | "SparePart"
+  | "SparePartCompatibility"
+  | "Quote"
+  | "Order"
+  | "Payment"
 
 export interface AuditLogEntry {
   actorId: string

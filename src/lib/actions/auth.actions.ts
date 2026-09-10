@@ -8,10 +8,12 @@ import { getClientIp } from "@/lib/auth/client-ip"
 import { getSessionUser } from "@/lib/auth/dal"
 import {
   ADMIN_LOGIN_RATE_LIMITED_MESSAGE,
+  PASSWORD_RESET_MAX_ATTEMPTS,
   RATE_LIMIT_SCOPES,
   checkRateLimit,
   clearAttempts,
   pruneExpiredAttempts,
+  recordAttempt,
   recordFailedAttempt,
   type RateLimitKey,
 } from "@/lib/auth/rate-limit"
@@ -339,6 +341,43 @@ export async function requestPasswordResetAction(
   const { email } = parsed.data
   const genericNotice =
     "If that address belongs to an administrator account, a password reset link is on its way."
+
+  /**
+   * Throttled per address and per host, and counted on every request.
+   *
+   * Each accepted request makes Supabase send a real email. Unthrottled,
+   * this form is a way to flood a staff inbox from anywhere, and to exhaust
+   * the project's hourly email allowance so that a genuine reset cannot be
+   * sent when it is needed.
+   *
+   * The refusal is the *same* generic notice, not a "too many requests"
+   * message. Unlike sign-in, the person on the other end gains nothing from
+   * knowing — they cannot retry their way to a result — and an identical
+   * response keeps the throttle from becoming a second way to tell staff
+   * addresses from strangers'. Every address is counted, known or not, for
+   * the same reason.
+   */
+  const resetKeys: RateLimitKey[] = [
+    { scope: RATE_LIMIT_SCOPES.passwordResetEmail, identifier: email },
+  ]
+  const resetIp = await getClientIp()
+  if (resetIp) {
+    resetKeys.push({ scope: RATE_LIMIT_SCOPES.passwordResetIp, identifier: resetIp })
+  }
+
+  const resetVerdict = await checkRateLimit(resetKeys, {
+    max: PASSWORD_RESET_MAX_ATTEMPTS,
+  })
+
+  if (!resetVerdict.allowed) {
+    logSecurityEvent("admin_password_reset_rate_limited", {
+      email: redactEmail(email),
+    })
+
+    return { notice: genericNotice }
+  }
+
+  await recordAttempt(resetKeys)
 
   const profile = await prisma.adminProfile.findUnique({
     where: { email },

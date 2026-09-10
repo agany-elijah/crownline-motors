@@ -123,7 +123,20 @@ interface VehicleCardProps {
  * has not engaged yet) with a little headroom, and stops wider screens
  * fetching a source a third larger than the slot it lands in.
  */
-const CARD_IMAGE_SIZES = "(min-width: 1024px) 32vw, (min-width: 640px) 50vw, 100vw"
+/**
+ * What the browser needs to pick a source before layout settles.
+ *
+ * Tracks the catalogue grid: four columns from 1280px (a card is roughly a
+ * quarter of the wide container, so ~24vw and never more than 400px), three
+ * from 1024px, two from 640px, one below that. Overstating these costs real
+ * bandwidth on exactly the connections the brief asks us to protect;
+ * understating them ships a soft photograph to a desktop.
+ *
+ * The related-vehicles strip passes its own value — its cards are a fixed
+ * width, not a fraction of the viewport.
+ */
+const CARD_IMAGE_SIZES =
+  "(min-width: 1280px) min(24vw, 400px), (min-width: 1024px) 32vw, (min-width: 640px) 50vw, 100vw"
 
 export function VehicleCard({
   vehicle,

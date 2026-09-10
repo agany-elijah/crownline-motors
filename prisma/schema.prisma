@@ -109,17 +109,185 @@ enum CountryOfOrigin {
   KOREA
 }
 
-enum QuoteType {
-  VEHICLE
-  // Wave B appends: SPARE_PART
+// ─────────────────────────────────────────────
+// SPARE PARTS (Wave B)
+// ─────────────────────────────────────────────
+
+/// The state of a *part listing*, and its soft delete.
+///
+/// Deliberately shorter than VehicleStatus. RESERVED and SOLD exist there
+/// because a vehicle is one physical unit: once a customer has it, nobody
+/// else can. A part is a quantity — five brake-pad sets are five, and the
+/// fourth being sold changes `stockQuantity`, not the state of the listing.
+/// Encoding "sold" as a status here would mean an operator having to flip it
+/// back the moment a new box arrives, and getting it wrong in the meantime.
+///
+/// Whether a customer can *have* it is a separate question, answered by
+/// `SparePartAvailability` below — the two are deliberately different axes.
+enum SparePartStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
 }
 
+/// What a customer is told about getting hold of this part.
+///
+/// ── Why this is a column and not derived from `stockQuantity` ─────────
+/// It used to be derived, and the derivation could only ever answer "we hold
+/// some" or "we hold none" — which is not what a parts importer needs to say.
+/// A boxed unit on the shelf in Juba, a unit sitting in the Nagoya
+/// consolidation ready to load, and a part that is only ever ordered in when
+/// somebody asks are three different promises about *when*, and all three can
+/// sit at any stock figure. `stockQuantity` still records how many are in
+/// hand, which is an internal counting question; this records what the
+/// listing says out loud, which is a commercial one, and the operator decides
+/// it.
+///
+/// Deliberately an enum rather than free text. The tag is rendered on every
+/// catalogue card, and free text would give twenty listings twenty phrasings
+/// of the same three states — unfilterable, untranslatable, and impossible to
+/// colour meaningfully. The values below are the promises this business
+/// actually makes; adding one is an additive `ALTER TYPE ... ADD VALUE` plus
+/// a label.
+enum SparePartAvailability {
+  /// Held here, ready to hand over.
+  IN_STOCK
+  /// Held, but nearly gone — the nudge that stops a customer deliberating a
+  /// week over the last one.
+  LOW_STOCK
+  /// Not in Juba yet, but bought and in the pipeline: allocated, packed, or
+  /// waiting on the next consolidation.
+  READY_TO_SHIP
+  /// Sourced on demand. The honest label for a part we can get and do not
+  /// hold — better than "out of stock", which reads as "go elsewhere".
+  ON_ORDER
+  /// Nothing in hand and nothing moving. The listing stays up so a customer
+  /// can ask us to source it.
+  OUT_OF_STOCK
+  /// No longer made or no longer obtainable. Kept visible because the search
+  /// traffic is real and the right answer is "ask us about an alternative".
+  DISCONTINUED
+}
+
+/// How the part was supplied.
+///
+/// Three values where VehicleCondition has two, and the extra one is not the
+/// "nearly new" fudge that enum deliberately refuses. REFURBISHED is a fact
+/// about provenance rather than a position on a scale: the unit was stripped
+/// and rebuilt, which is a different thing from a used part in good order and
+/// carries a different conversation about warranty. Reconditioned alternators
+/// and starters are ordinary stock in this trade, and a catalogue that can
+/// only call them "used" is misdescribing them.
+enum SparePartCondition {
+  NEW
+  USED
+  REFURBISHED
+}
+
+/// Whether this part has a price, or has to be quoted.
+///
+/// Stage 20 of the roadmap is explicit that not every part can be sold
+/// straight from a price tag: common stock has one, and an uncommon or
+/// to-be-imported part goes through Get a Quote instead. That is a property
+/// of the part, so it belongs on the part — inferring it from a null price
+/// would make "we have not typed the price in yet" indistinguishable from
+/// "this one is quoted", and the second is a promise to the customer while
+/// the first is an unfinished draft.
+///
+/// The two are held apart by a CHECK constraint rather than by convention:
+/// FIXED requires a price, QUOTE_ONLY forbids one. A quote-only part
+/// carrying an "indicative" figure is exactly the estimated/confirmed
+/// ambiguity the brief warns against on the vehicle side.
+enum SparePartPricingMode {
+  FIXED
+  QUOTE_ONLY
+}
+
+/// Which workflow an order follows.
+///
+/// The commerce tables below are shared — one Order, one OrderItem, one
+/// Payment ledger, one Shipment — but a vehicle import and a box of brake
+/// pads are not operationally the same transaction, and the brief says so
+/// directly. This column is what lets shared tables carry two workflows
+/// without either one having to pretend to be the other: a VEHICLE order
+/// gets 50/25/25 milestones and the Japan-to-Juba tracking timeline, a
+/// SPARE_PART order gets a single payment-in-full milestone and the
+/// processing/packed/dispatched timeline.
+///
+/// There is no MIXED. A customer buying a car and a set of filters gets two
+/// orders, because one order would need a payment schedule neither rule
+/// describes — 50% of a basket whose vehicle half ships in six weeks and
+/// whose parts half ships on Thursday is not a business rule anybody has
+/// written down. Quotations *can* span both (see QuoteItem), because a
+/// quotation makes no commitment about money moving. If mixed baskets ever
+/// become a real requirement, MIXED is an additive `ALTER TYPE ... ADD
+/// VALUE` and a third milestone strategy — no table changes.
+enum OrderType {
+  VEHICLE
+  SPARE_PART
+}
+
+enum QuoteType {
+  VEHICLE
+  SPARE_PART
+}
+
+/// Where an enquiry stands, from the moment it arrives to the moment it
+/// becomes an order or is closed.
+///
+///   NEW       — arrived, nobody has touched it yet
+///   CONTACTED — an operator is working it: calling, sourcing, pricing
+///   SENT      — a priced quotation has been sent to the customer
+///   ACCEPTED  — the customer has said yes; ready to become an order
+///   WON       — converted: the Order exists (`Quote.order` is set)
+///   REJECTED  — closed without a sale. Shown to operators as "Lost"
+///   EXPIRED   — the validity date passed without an answer
+///
+/// SENT and WON are appended rather than slotted into reading order, for the
+/// reason written on OrderStatus below: `ALTER TYPE ... ADD VALUE` puts a
+/// variant last, and a declaration order that disagrees with the database's
+/// is drift. The lifecycle lives in src/lib/constants/quote-status.ts, which
+/// is where display order and the allowed transitions are defined.
 enum QuoteStatus {
   NEW
   CONTACTED
   ACCEPTED
   REJECTED
   EXPIRED
+  SENT
+  WON
+}
+
+/// Which public surface an enquiry was raised from. Recorded once at
+/// submission — it is how "which page generates enquiries" gets answered
+/// later, and it tells an operator at a glance whether the customer picked
+/// something from stock or described something we do not hold.
+enum QuoteSource {
+  VEHICLE_PAGE
+  VEHICLE_CATALOGUE
+  SPARE_PART_CART
+  SPARE_PART_CATALOGUE
+  QUOTE_PAGE
+}
+
+/// What a quotation line is.
+///
+/// ITEM lines are the thing being sold — a vehicle, a part, or (before an
+/// operator has linked it) a description of one. ACCESSORY lines are the
+/// extras priced alongside it: tints, floor mats, a registration fee. The
+/// difference matters at conversion: an ITEM line becomes an OrderItem and
+/// must therefore name exactly one product, while accessories roll into the
+/// order's `otherCharges` — OrderItem's exactly-one-product CHECK is what
+/// keeps a mat from being "sold" as an inventory line.
+enum QuoteLineKind {
+  ITEM
+  ACCESSORY
+}
+
+/// How a quotation was last sent to the customer.
+enum QuoteDispatchChannel {
+  WHATSAPP
+  EMAIL
 }
 
 enum PreferredCountry {
@@ -128,13 +296,29 @@ enum PreferredCountry {
   EITHER
 }
 
+/// The coarse, list-view state of an order. The stage-by-stage detail lives
+/// in PaymentMilestone (what is owed) and TrackingEvent (where it is).
+///
+/// Values are appended, never reordered or inserted: `ALTER TYPE ... ADD
+/// VALUE` puts a new variant at the end unless told otherwise, and an enum
+/// whose declaration order disagrees with the database's is drift Prisma will
+/// offer to "fix". So the parts lifecycle is grouped by comment rather than
+/// by position.
 enum OrderStatus {
+  // Vehicle import lifecycle
   PENDING_DEPOSIT
   DEPOSIT_CONFIRMED
   PROCESSING
   AWAITING_FINAL_PAYMENT
   COMPLETED
   CANCELLED
+
+  // Spare-parts lifecycle (Wave B). PROCESSING, COMPLETED and CANCELLED
+  // above are shared; only the opening state differs, because a parts order
+  // is paid in full up front rather than against a deposit. Reusing
+  // PENDING_DEPOSIT for it would tell an operator to chase a deposit that
+  // does not exist.
+  AWAITING_PAYMENT
 }
 
 enum PaymentMethod {
@@ -155,7 +339,7 @@ enum PaymentStatus {
 
 enum ShipmentType {
   VEHICLE
-  // Wave B appends: SPARE_PART
+  SPARE_PART
 }
 
 enum TrackingStatus {
@@ -171,8 +355,23 @@ enum TrackingStatus {
   TRANSPORT_TO_SOUTH_SUDAN
   READY_FOR_COLLECTION
   DELIVERED
-  // Wave B appends: ORDER_CONFIRMED, PROCESSING, PACKED, DISPATCHED, OUT_FOR_DELIVERY
-  // (IN_TRANSIT and DELIVERED are intentionally shared across both product types)
+
+  // Wave B — spare-parts logistics.
+  //
+  // Appended rather than interleaved, for the reason spelled out on
+  // OrderStatus. IN_TRANSIT and DELIVERED above are deliberately shared
+  // vocabulary: a box on a lorry and a car on a ship are both in transit, and
+  // a customer reading either word understands it without being told which
+  // logistics chain produced it.
+  //
+  // Which subset applies to a given shipment is decided by
+  // Shipment.shipmentType, not by this enum — the customer types one tracking
+  // number into one box and the page renders the timeline that belongs to it.
+  ORDER_CONFIRMED
+  PROCESSING
+  PACKED
+  DISPATCHED
+  OUT_FOR_DELIVERY
 }
 
 enum MilestoneStatus {
@@ -286,6 +485,7 @@ model Vehicle {
 
   photos     VehiclePhoto[]
   quotes     Quote[]
+  quoteItems QuoteItem[]
   orderItems OrderItem[]
   shipments  Shipment[]
 
@@ -342,6 +542,314 @@ model VehiclePhoto {
 }
 
 // ─────────────────────────────────────────────
+// SPARE PARTS (Wave B)
+// ─────────────────────────────────────────────
+
+/// The parts taxonomy, database-driven exactly as Stage 14 requires.
+///
+/// ── Why a table and not an enum ───────────────────────────────────────
+/// The brief names twelve starting categories and then says the operator
+/// manages them. An enum would make "add a category" a code change, a
+/// migration and a deploy — which is precisely the arrangement §22 of the
+/// brief exists to forbid.
+///
+/// ── Why the hierarchy is flat ─────────────────────────────────────────
+/// A `parentId` self-relation is one column and a recursive query on every
+/// catalogue read, and it buys nothing the brief asks for: the twelve
+/// categories it lists are siblings. Adding the column later is additive and
+/// leaves existing rows as roots, so the cost of waiting is zero and the cost
+/// of guessing now is a join nobody needed.
+///
+/// ── Deletion ──────────────────────────────────────────────────────────
+/// `isActive` retires a category from the forms and the public filter while
+/// leaving the parts that reference it intact and browsable by their own
+/// URLs. A category still holding parts cannot be hard-deleted at all —
+/// `SparePart.categoryId` is Restrict — so the only rows a real DELETE can
+/// ever reach are ones created in error and never used.
+model SparePartCategory {
+  id   String @id @default(cuid())
+  /// Public URL segment, e.g. `/spare-parts/brakes`. Stable once published:
+  /// changing it breaks indexed links, so the admin form must treat it the
+  /// way vehicle slugs are treated — generated once, edited deliberately.
+  slug String @unique
+  name String @unique
+
+  description  String? @db.Text
+  /// Curated order for the catalogue's category rail. Ties are broken by
+  /// name, so two categories left at 0 still render in a stable order.
+  displayOrder Int     @default(0)
+  isActive     Boolean @default(true)
+
+  parts SparePart[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, displayOrder])
+}
+
+/// A stocked or sourceable part. The second inventory domain, and
+/// deliberately its own table rather than a subtype of Vehicle.
+///
+/// ── Why not one polymorphic Product table ─────────────────────────────
+/// A vehicle and a brake pad share almost no attributes: mileage, drive type
+/// and exterior colour are meaningless here, and part number, stock quantity
+/// and fitment are meaningless there. Merging them produces a table where
+/// most columns are null most of the time and no column can be NOT NULL —
+/// which is to say a table that cannot enforce anything. What the two
+/// genuinely share is *commerce*, and that is shared, at OrderItem: one
+/// order, one payment ledger, one shipment, two catalogues.
+///
+/// ── Deletion ──────────────────────────────────────────────────────────
+/// `status = ARCHIVED` is the soft delete, exactly as on Vehicle; there is no
+/// `deletedAt`. A part that has ever been ordered cannot be hard-deleted —
+/// `OrderItem.sparePartId` is Restrict — because an order line must keep
+/// resolving to the thing it sold.
+model SparePart {
+  id String @id @default(cuid())
+
+  /// Our own listing reference — CLM-SP-2026-000045 — generated by the
+  /// atomic counter, never typed. This is the "part number" the brief puts in
+  /// the WhatsApp message, because it is the one identifier that is
+  /// guaranteed to name exactly one listing in this catalogue.
+  referenceNumber String @unique
+  slug            String @unique
+
+  name String
+
+  categoryId String
+  category   SparePartCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  /// The manufacturer's own number — "04465-33471", "MK-T2201". Deliberately
+  /// *not* unique and deliberately separate from `referenceNumber`: the same
+  /// OEM number legitimately appears on several listings (a genuine unit and
+  /// a refurbished one, or two arrivals in different condition), and a unique
+  /// constraint would block the second of them at the moment of saving.
+  ///
+  /// It is the number a customer actually has, copied off the old part or out
+  /// of a parts diagram, so it is what the catalogue's search box has to
+  /// match — hence the trigram index below rather than a plain B-tree: people
+  /// type fragments, with and without the dash.
+  oemPartNumber String?
+
+  /// Who made it — "Denso", "Aisin", "Genuine Toyota". Free text rather than
+  /// a table because it is a label on a listing, not an entity anything
+  /// references; a Brand table would buy referential integrity over data with
+  /// no referents. It is a column rather than a `specifications` line because
+  /// genuine-versus-aftermarket is the second question every parts buyer asks
+  /// after fitment, and a filter cannot be built on a bullet point.
+  brand String?
+
+  condition       SparePartCondition @default(USED)
+  countryOfOrigin CountryOfOrigin?
+
+  /// Priced or quoted. See the enum: FIXED requires `price`, QUOTE_ONLY
+  /// forbids it, and a CHECK constraint holds the pair together so no code
+  /// path can publish a contradiction.
+  pricingMode SparePartPricingMode @default(FIXED)
+  price       Decimal?             @db.Decimal(12, 2)
+
+  /// Units in hand. Zero is a normal, publishable state — it is how "Add
+  /// spare part … Mark parts as out of stock" is expressed — and for a
+  /// QUOTE_ONLY part it is the usual one, because those are sourced on
+  /// demand rather than held.
+  ///
+  /// A CHECK keeps it non-negative, which is what makes the only safe way to
+  /// sell one also the obvious way: a conditional decrement
+  /// (`UPDATE … SET "stockQuantity" = "stockQuantity" - n WHERE id = $1 AND
+  /// "stockQuantity" >= n`) inside the order transaction, with a zero row
+  /// count meaning "someone else took the last one". Read-then-write in
+  /// application code oversells under concurrency; the constraint is the
+  /// backstop that turns that bug into a failed transaction instead of a
+  /// negative stock level and a customer owed a part nobody has.
+  stockQuantity Int @default(0)
+
+  /// What the listing tells a customer about getting hold of this part —
+  /// see the enum. Chosen by the operator, not derived from `stockQuantity`:
+  /// the two answer different questions, and only this one is published.
+  ///
+  /// Defaults to ON_ORDER rather than IN_STOCK because a part is created as
+  /// a DRAFT before anyone has counted anything, and the default that leaks
+  /// onto a public page if nobody touches it must be the modest one. A wrong
+  /// "in stock" costs a customer a journey; a wrong "we can order it" costs a
+  /// message.
+  availability SparePartAvailability @default(ON_ORDER)
+
+  description String @db.Text
+
+  /// A spec list used to live here, and was dropped in migration
+  /// `20260905090000_remove_spare_part_specifications` at the dealership's
+  /// instruction. It is worth recording why, because "add it back" is an
+  /// obvious-looking suggestion:
+  ///
+  /// It was a second description an operator had to compile and keep in step
+  /// with the first, and nothing downstream distinguished the two — the
+  /// listing read the bullets straight out and the customer met the same
+  /// facts twice. The two things a parts buyer genuinely sorts on are
+  /// fitment and the manufacturer's number, and both have their own
+  /// structure (`SparePartCompatibility`, `oemPartNumber`). Everything else
+  /// belongs in `description`, where it is written once and read once.
+  status     SparePartStatus @default(DRAFT)
+  isFeatured Boolean         @default(false)
+
+  /// Internal sourcing notes. NEVER selected by a public query — the public
+  /// read layer uses explicit `select` lists for exactly this reason, the way
+  /// public-vehicle.queries.ts already does.
+  ///
+  /// Free text rather than a Supplier table on purpose: supplier management
+  /// is a Phase 3 item with its own requirements (contacts, terms, lead
+  /// times, purchase orders), and inventing a thin version of it now would
+  /// mean migrating away from a guess. What an operator needs today is
+  /// somewhere to write down where the part came from.
+  supplierName  String?
+  supplierNotes String? @db.Text
+
+  photos        SparePartPhoto[]
+  compatibility SparePartCompatibility[]
+  quotes        Quote[]
+  quoteItems    QuoteItem[]
+  orderItems    OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Every public read pins `status = PUBLISHED`, so it leads each composite
+  /// index: the homepage rail (featured), the category browse, and the price
+  /// filter all narrow on it first.
+  @@index([status, isFeatured])
+  @@index([status, categoryId])
+  /// Created by migration 20260906090000 for the availability filter. It
+  /// was missing from this file, and an index the migrations create but the
+  /// schema does not declare is one `prisma migrate diff` proposes to DROP —
+  /// the next generated migration would have removed it silently.
+  @@index([status, availability])
+  @@index([price])
+  /// Trigram indexes for the catalogue and admin search boxes, mirroring the
+  /// Vehicle treatment: `contains` + insensitive compiles to ILIKE '%term%',
+  /// whose leading wildcard leaves a B-tree with no prefix to seek on. The
+  /// three columns are the three things a person types when looking for a
+  /// part — what it is called, the number off the old one, and our reference.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([oemPartNumber(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([referenceNumber(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+/// Part photography. A deliberate mirror of VehiclePhoto, down to the
+/// column names.
+///
+/// The duplication is the point: one media pipeline (validate, downscale,
+/// store, reconcile the primary) already exists for vehicles, and a table
+/// with the same shape lets it be reused for parts by parameterising the
+/// bucket and the owner column rather than by writing a second one. A
+/// cleverer shared `Photo` table with a polymorphic owner would cost the
+/// foreign key and the cascade that make this table safe.
+model SparePartPhoto {
+  id          String    @id @default(cuid())
+  sparePartId String
+  sparePart   SparePart @relation(fields: [sparePartId], references: [id], onDelete: Cascade)
+
+  storagePath String
+  altText     String?
+
+  /// A part with at least one live photograph has exactly one primary —
+  /// the image on the catalogue card and first in the gallery. Maintained at
+  /// write time, never derived on read.
+  isPrimary    Boolean @default(false)
+  displayOrder Int     @default(0)
+
+  /// Soft delete, for the same reason it exists on VehiclePhoto: sourced
+  /// photography is expensive to reobtain and an accidental click should not
+  /// be the end of it.
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([sparePartId])
+  @@index([deletedAt])
+}
+
+/// What a part fits. One row per fitment rule; a part may have many.
+///
+/// ── Why this does not point at Vehicle ────────────────────────────────
+/// This is the single most important normalisation decision in the parts
+/// domain, and the intuitive answer is the wrong one.
+///
+/// Fitment is a fact about a *model of car in the world*, not about the
+/// dealership's current stock. A Harrier brake pad fits every 2020–2023
+/// Harrier whether or not Crownline has one on the floor this week, and a
+/// foreign key to `Vehicle` would say the opposite: the compatibility list
+/// would empty itself as cars were sold and archived, and a customer whose
+/// own Harrier was never in our inventory — which is nearly all of them,
+/// since these are people who already own the car — would be told the part
+/// does not fit anything.
+///
+/// So make/model/year live here as values. The join back to inventory, when
+/// a vehicle page wants to show "parts that fit this car", is a match on
+/// those values (see src/lib/utils/spare-part-compatibility.ts, which owns
+/// the predicate so the SQL and the UI cannot disagree about what "fits"
+/// means).
+///
+/// ── Why nulls are meaningful ──────────────────────────────────────────
+/// Each optional column widens the rule rather than leaving it unknown: a
+/// null `model` means every model of that make, a null `yearFrom`/`yearTo`
+/// means unbounded in that direction, a null `engine` means any engine. That
+/// is how fitment is actually written in a parts catalogue — "Toyota, all
+/// models, 2015 onwards" is one row, not two hundred.
+///
+/// ── Why there is no unique constraint ─────────────────────────────────
+/// The natural key is (part, make, model, yearFrom, yearTo, engine), four of
+/// whose columns are nullable, and Postgres treats NULLs as distinct in a
+/// unique index — so the constraint would let through exactly the duplicates
+/// it was added to stop while blocking nothing else. `NULLS NOT DISTINCT`
+/// would fix that but is not expressible in the Prisma schema, and an index
+/// that exists only in raw SQL is one Prisma proposes to drop. A duplicated
+/// fitment row is a tidiness problem the admin form dedupes, not an integrity
+/// failure: it cannot mis-sell anything, it can only be listed twice.
+model SparePartCompatibility {
+  id          String    @id @default(cuid())
+  sparePartId String
+  sparePart   SparePart @relation(fields: [sparePartId], references: [id], onDelete: Cascade)
+
+  /// Null means **every make** — the "fits any vehicle" rule an operator
+  /// needs for a universal consumable (a wiper blade, a bulb, a tyre valve).
+  /// It is the same "null widens the rule" reading every other column here
+  /// already has, extended to the top of the hierarchy rather than being the
+  /// one level that could not express "all".
+  ///
+  /// Without it a universal part had to be listed once per make, which is
+  /// both a data-entry burden and a list that is wrong the moment a customer
+  /// arrives with a make nobody thought to type.
+  make  String?
+  model String?
+
+  /// Inclusive range. A CHECK enforces `yearTo >= yearFrom` when both are
+  /// present, because a reversed pair silently matches nothing — a fitment
+  /// rule that quietly hides the part from the customers it was written for.
+  yearFrom Int?
+  yearTo   Int?
+
+  /// Free text, matching `Vehicle.engineSize` — "2.0L", "1.5L Turbo". Kept
+  /// as text for the same reason it is text there: real listings say things a
+  /// decimal cannot.
+  engine String?
+
+  /// Fitment caveats a buyer must read — "front axle only", "not for
+  /// hybrid variants". Public, unlike supplier notes.
+  notes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sparePartId])
+  /// Matching is case-insensitive (an operator types "toyota", the vehicle
+  /// record says "Toyota"), which compiles to ILIKE and cannot use a B-tree.
+  /// Trigram indexes serve it, and serve the "does this fit my car?" search
+  /// box in the same pass.
+  @@index([make(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([model(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+// ─────────────────────────────────────────────
 // CUSTOMER
 // ─────────────────────────────────────────────
 
@@ -379,11 +887,28 @@ model Quote {
 
   type QuoteType @default(VEHICLE)
 
-  // Populated when the quote originated from "REQUEST THIS VEHICLE" on a listing;
-  // null for a blank "GET A QUOTE" enquiry. SetNull on delete — a quote is a soft
-  // enquiry and should survive even if the referenced listing is later removed.
+  /// ── Provenance, not contents ─────────────────────────────────────────
+  /// These record *what the customer was looking at* when they raised the
+  /// enquiry — "REQUEST THIS VEHICLE" on a listing, "REQUEST THIS PART" on a
+  /// product page — and are set once at submission and never edited. Null for
+  /// a blank "GET A QUOTE" form, which is an enquiry about nothing in the
+  /// catalogue yet.
+  ///
+  /// What is actually being quoted, with quantities and prices, lives in
+  /// `items` below and is edited freely during the negotiation. Keeping the
+  /// two apart is what lets an operator replace a line ("that one is gone,
+  /// here is the equivalent") without losing the record of what first brought
+  /// the customer in — which is the only thing that can answer "which page
+  /// generates enquiries" later.
+  ///
+  /// SetNull on delete: a quote is a soft enquiry and must survive the
+  /// removal of the listing that prompted it. Both snapshots that matter — the
+  /// description and the price — are held on QuoteItem, so nothing is lost.
   linkedVehicleId String?
   linkedVehicle   Vehicle? @relation(fields: [linkedVehicleId], references: [id], onDelete: SetNull)
+
+  linkedSparePartId String?
+  linkedSparePart   SparePart? @relation(fields: [linkedSparePartId], references: [id], onDelete: SetNull)
 
   requestedMake          String?
   requestedModel         String?
@@ -394,8 +919,86 @@ model Quote {
   transmission           TransmissionType?
   additionalRequirements String?           @db.Text
 
+  /// ── Spare-part enquiry fields ────────────────────────────────────────
+  /// A parts enquiry describes two things: the part, and the car it is for.
+  /// The car is already covered — `requestedMake`, `requestedModel` and
+  /// `preferredYear` mean exactly the right thing for "it is for my 2019
+  /// Harrier", which is why the parts form reuses them instead of growing a
+  /// parallel set that would have to be kept in step.
+  ///
+  /// These two are what the vehicle form has no equivalent of: what the
+  /// customer calls the part, and whatever number they read off the old one.
+  /// Free text on purpose — a customer who could pick the part from our
+  /// catalogue would not be raising a quote.
+  requestedPartName   String?
+  requestedPartNumber String?
+
+  /// Which public surface raised it. Null only for rows written before the
+  /// column existed.
+  source QuoteSource?
+
+  /// ── The contact details as submitted, on this enquiry ─────────────────
+  /// A snapshot, deliberately separate from `customer`.
+  ///
+  /// The Customer row is the deduplicated identity (matched on email, then
+  /// normalised phone — see the Customer model), and an anonymous public
+  /// form must never be able to overwrite it: anyone can type anyone's email
+  /// address. So a returning customer who gives a new number, or a stranger
+  /// who types someone else's address, changes nothing on the shared record —
+  /// what they typed lands here, on the one enquiry it belongs to, and that is
+  /// where the operator replies to. It is the same point-in-time principle
+  /// OrderItem applies to prices.
+  contactName     String?
+  contactPhone    String?
+  contactWhatsapp String?
+  contactEmail    String?
+  contactCity     String?
+
+  /// ── The quotation an operator builds ─────────────────────────────────
+  /// Fees are per quote rather than per line: shipping a car and clearing it
+  /// is one freight booking and one customs entry, whatever else rides with
+  /// it. Null means "not quoted", never zero — the distinction the brief
+  /// draws between an estimate and a confirmed figure starts here.
+  ///
+  /// None of the totals is stored. A quotation's total is derived from its
+  /// lines and these fees on every read, exactly as an order's balance is
+  /// derived from its payments; it is only frozen when the quote is
+  /// converted, into Order.totalAmount.
+  shippingCost Decimal? @db.Decimal(12, 2)
+  clearingCost Decimal? @db.Decimal(12, 2)
+  importDuty   Decimal? @db.Decimal(12, 2)
+
+  /// The last day these figures are honoured. Freight rates and auction
+  /// stock move, and a quotation without an end date is a price the
+  /// dealership has promised indefinitely.
+  validUntil DateTime?
+
+  /// Copied from BusinessSettings when the operator first prices the quote,
+  /// then edited per quote. A snapshot for the same reason the milestone
+  /// percentages are: the account details on a quotation a customer is
+  /// paying against must not change underneath them when Settings is edited.
+  paymentInstructions String? @db.Text
+  terms               String? @db.Text
+
+  /// When the quotation was last sent, and how. The history of every send is
+  /// in the audit log; these are what the list view needs without a join.
+  sentAt      DateTime?
+  lastSentVia QuoteDispatchChannel?
+
+  /// The secret in the customer's link to the PDF (/quotation/<token>).
+  ///
+  /// 256 random bits, created the first time an operator sends a quotation
+  /// with its link, and cleared to revoke it. It is a bearer credential for
+  /// one document and nothing else: it cannot reach any other quote, the
+  /// customer record, or the dashboard.
+  shareToken String? @unique
+
   status     QuoteStatus @default(NEW)
   adminNotes String?     @db.Text
+
+  /// The body of the quotation. Empty for a plain vehicle enquiry, where the
+  /// subject is the linked listing and the quantity is inescapably one.
+  items QuoteItem[]
 
   order Order? // set only once this quote is accepted
 
@@ -405,6 +1008,71 @@ model Quote {
   @@index([status])
   @@index([customerId])
   @@index([createdAt])
+  @@index([type, status])
+}
+
+/// One line of a quotation.
+///
+/// ── Why quotes are itemised at all ────────────────────────────────────
+/// A vehicle enquiry is inherently one car, and Wave A models it as such. A
+/// parts enquiry is not: "brake pads, discs and the wear sensor for my
+/// Harrier" is a single conversation about three products with three
+/// quantities, and the brief asks for quotations containing multiple items —
+/// including, where it makes commercial sense, items of both kinds. Without
+/// this table that enquiry is a paragraph of free text, and the order it
+/// eventually becomes has to be retyped from it by hand.
+///
+/// With it, accepting a quote is mechanical: each QuoteItem becomes an
+/// OrderItem, carrying its snapshot and its agreed price across.
+///
+/// ── Why both product columns are nullable ─────────────────────────────
+/// Unlike OrderItem, which sells something and must therefore point at
+/// exactly one thing, a quote line may legitimately point at nothing in the
+/// catalogue — "a rear bumper for a 2018 Prado", which is the whole reason
+/// Get a Quote exists. `description` always carries the human answer, so a
+/// line is meaningful with or without a foreign key. The CHECK constraint
+/// says *at most* one, not exactly one.
+model QuoteItem {
+  id      String @id @default(cuid())
+  quoteId String
+  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  vehicleId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  sparePartId String?
+  sparePart   SparePart? @relation(fields: [sparePartId], references: [id], onDelete: SetNull)
+
+  /// ITEM or ACCESSORY — see the enum. A CHECK keeps accessories free of a
+  /// product link, so the only lines that can become order items are the
+  /// ones that are actually inventory.
+  kind QuoteLineKind @default(ITEM)
+
+  /// The order the operator arranged the lines in, which is the order the
+  /// customer reads them in on the PDF.
+  displayOrder Int @default(0)
+
+  /// What is being quoted, in words, snapshotted at the time. Present even
+  /// when a foreign key is, so the line still reads correctly after the
+  /// listing behind it is archived or its name is corrected.
+  description String
+  quantity    Int    @default(1)
+
+  /// The figure the dealership is offering, per unit. Null until an operator
+  /// has actually priced the line — which is the state a quote request starts
+  /// in, and is why this is not simply copied from the part. A QUOTE_ONLY
+  /// part has no price to copy; a FIXED one may still be quoted at a
+  /// different figure for quantity or for shipping.
+  quotedUnitPrice Decimal? @db.Decimal(12, 2)
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([quoteId])
+  @@index([vehicleId])
+  @@index([sparePartId])
 }
 
 // ─────────────────────────────────────────────
@@ -424,6 +1092,18 @@ model Order {
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
+  /// Which workflow this order follows — see `enum OrderType`. Set once at
+  /// creation from the accepted quote and never changed: it decides the
+  /// milestone structure, the tracking timeline and the wording the customer
+  /// sees, and an order that changed type mid-flight would be an order whose
+  /// customer agreed to one payment schedule and is being held to another.
+  ///
+  /// Every OrderItem must agree with it. That is an application invariant
+  /// rather than a CHECK, because a constraint cannot see across the parent
+  /// row to its children — the order-creation action builds both in one
+  /// transaction and is the only thing that writes either.
+  type OrderType @default(VEHICLE)
+
   status OrderStatus @default(PENDING_DEPOSIT)
 
   // Locked in at the moment the quote is accepted — deliberately independent
@@ -431,6 +1111,13 @@ model Order {
   // never silently changes what a customer already committed to.
   shippingCost          Decimal?           @db.Decimal(12, 2)
   clearingCost          Decimal?           @db.Decimal(12, 2)
+  /// Import duty, locked in from the quotation. Its own column rather than
+  /// folded into clearing: duty is set by the customs authority and clearing
+  /// by the agent, and a customer disputing one needs to see it separately.
+  importDuty            Decimal?           @db.Decimal(12, 2)
+  /// The quotation's ACCESSORY lines, summed. They cannot be OrderItems —
+  /// those must each sell exactly one product — so the itemisation stays on
+  /// the converted quote (1:1, frozen once WON) and the money lands here.
   otherCharges          Decimal?           @db.Decimal(12, 2)
   totalAmount           Decimal            @db.Decimal(12, 2)
   requiredDepositAmount Decimal?           @db.Decimal(12, 2)
@@ -448,6 +1135,7 @@ model Order {
   @@index([status])
   @@index([customerId])
   @@index([createdAt])
+  @@index([type, status])
 }
 
 model OrderItem {
@@ -455,21 +1143,51 @@ model OrderItem {
   orderId String
   order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
+  /// ── Two concrete foreign keys, not a polymorphic pair ────────────────
+  /// With exactly two product types, real foreign keys keep referential
+  /// integrity, cascade behaviour and type-safe `include`s that a
+  /// `productId + productType` pair would throw away for the sake of a column.
+  ///
+  /// Both are nullable because neither is always the one in use, and a CHECK
+  /// constraint requires exactly one to be set — the invariant the schema
+  /// documentation previously had to leave to Zod, now enforced where no code
+  /// path can route around it. Zod still checks it, because a constraint
+  /// violation is a 500 and a validation error is a sentence the operator can
+  /// act on; the database is the backstop, not the error message.
+  ///
+  /// Restrict on both: a product that has ever been sold can never be
+  /// hard-deleted, only archived, because an order line must keep resolving to
+  /// the thing it sold.
   vehicleId String?
   vehicle   Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
-  // sparePartId String?  <- Wave B adds this as a sibling nullable FK, same pattern.
-  // In Wave A, vehicleId is required in practice — enforced via Zod, not the DB,
-  // since the column must stay nullable for Wave B.
 
-  description String // snapshot at order time, e.g. "2021 Toyota Harrier — CLM-V-2026-000123"
+  sparePartId String?
+  sparePart   SparePart? @relation(fields: [sparePartId], references: [id], onDelete: Restrict)
+
+  /// Point-in-time snapshots, never live references. An order's lines must
+  /// not change when the catalogue behind them is edited — the customer
+  /// agreed to this description at this price.
+  description String // e.g. "2021 Toyota Harrier — CLM-V-2026-000123"
   unitPrice   Decimal @db.Decimal(12, 2)
+  /// Always 1 for a vehicle, which is one physical unit. Parts are where the
+  /// column earns its keep. A CHECK keeps it positive: a zero-quantity line
+  /// contributes nothing to the total but still reserves stock, and a negative
+  /// one is a refund pretending to be a sale.
   quantity    Int     @default(1)
   lineTotal   Decimal @db.Decimal(12, 2)
+
+  /// How many of `quantity` were taken off the shelf when the order was
+  /// created — the rest are sourced to order. Recorded so that cancelling
+  /// the order puts back exactly what it took and no more: releasing
+  /// `quantity` instead would conjure stock for a part that was only ever on
+  /// order. Zero for vehicles, which are reserved by status, not by count.
+  stockReserved Int @default(0)
 
   createdAt DateTime @default(now())
 
   @@index([orderId])
   @@index([vehicleId])
+  @@index([sparePartId])
 }
 
 // ─────────────────────────────────────────────
@@ -524,7 +1242,26 @@ model Shipment {
   vehicle   Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
   // sparePartOrderId String? <- Wave B extension point
 
-  shipmentType    ShipmentType   @default(VEHICLE)
+  /// What the customer's tracking page renders from a tracking number alone,
+  /// without them ever learning that vehicle and parts logistics are
+  /// different internally. Also decides which subset of TrackingStatus is
+  /// offered to the operator recording an event.
+  ///
+  /// A parts consignment leaves `vehicleId` null: its contents are its
+  /// order's items. There is deliberately no ShipmentItem table — nothing in
+  /// the brief asks for a partially dispatched order, and the table that
+  /// would represent one is additive whenever it does.
+  shipmentType ShipmentType @default(VEHICLE)
+
+  /// PURCHASED is the vehicle default; a parts consignment is created at
+  /// ORDER_CONFIRMED, set explicitly by the action that creates it. A column
+  /// default cannot be conditional on a sibling column, so this one names the
+  /// commoner case rather than trying to be both.
+  ///
+  /// Maintained, not derived — the opposite treatment from money, and
+  /// deliberately: it is read on every tracking lookup, and it costs nothing
+  /// to keep correct because `updateTrackingStatus()` writes it and the new
+  /// TrackingEvent in the same transaction.
   currentStatus   TrackingStatus @default(PURCHASED)
   currentLocation String?
 
@@ -535,6 +1272,7 @@ model Shipment {
 
   @@index([orderId])
   @@index([currentStatus])
+  @@index([shipmentType, currentStatus])
 }
 
 model TrackingEvent {
@@ -569,12 +1307,47 @@ model TrackingEvent {
 }
 
 model BusinessSettings {
-  id                       Int      @id @default(1) // always exactly one row, id=1 — enforced by app logic, not a DB constraint
+  id                       Int     @id @default(1) // always exactly one row, id=1 — enforced by app logic, not a DB constraint
   whatsappNumber           String
-  defaultInitialPercentage Decimal  @default(50.00) @db.Decimal(5, 2)
-  defaultMombasaPercentage Decimal  @default(25.00) @db.Decimal(5, 2)
-  defaultFinalPercentage   Decimal  @default(25.00) @db.Decimal(5, 2)
-  updatedAt                DateTime @updatedAt
+  defaultInitialPercentage Decimal @default(50.00) @db.Decimal(5, 2)
+  defaultMombasaPercentage Decimal @default(25.00) @db.Decimal(5, 2)
+  defaultFinalPercentage   Decimal @default(25.00) @db.Decimal(5, 2)
+
+  /// The "how this reaches you" steps shown on every spare-part page, as an
+  /// ordered array of `{ title, description }`.
+  ///
+  /// ── Why Json and not a table ──────────────────────────────────────────
+  /// This is a single ordered list belonging to the one settings row, edited
+  /// as a whole in one form and read as a whole on one page. A table would
+  /// buy referential integrity over rows nothing references, and would cost
+  /// a join plus an ordering column to reproduce what an array already is.
+  /// The vehicle import timeline is the counter-example and stays in code:
+  /// it mirrors `TrackingStatus`, which the shipment records actually key on.
+  ///
+  /// ── Why nullable ──────────────────────────────────────────────────────
+  /// Null means "never configured", which is different from an operator
+  /// deliberately clearing it to an empty list — the first falls back to the
+  /// built-in steps so a fresh install shows something true, the second hides
+  /// the section. Every read validates the shape with Zod before rendering
+  /// it: a Json column is unvalidated by the database, so it is untrusted
+  /// input the same way a request body is.
+  sparePartDeliverySteps Json?
+
+  /// ── Quotation defaults ──────────────────────────────────────────────
+  /// What a new quotation starts from. Each is copied onto the quote when an
+  /// operator first prices it and edited there, so changing these never
+  /// alters a quotation already in a customer's hands.
+  ///
+  /// Validity is bounded 1–365 days by a CHECK: zero would issue quotations
+  /// that are expired on arrival, and an unbounded figure is a price promised
+  /// indefinitely on a business whose costs move with freight rates.
+  quoteValidityDays        Int     @default(14)
+  /// Bank and mobile-money details, and how to pay. Printed on every PDF.
+  quotePaymentInstructions String? @db.Text
+  /// The standard terms printed under every quotation.
+  quoteTerms               String? @db.Text
+
+  updatedAt DateTime @updatedAt
 }
 
 model PaymentMilestone {
@@ -582,6 +1355,12 @@ model PaymentMilestone {
   orderId String
   order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
+  /// Three rows for a vehicle order (50/25/25 by default, locked in from
+  /// BusinessSettings at creation). Exactly one row at 100% for a spare-parts
+  /// order, which is paid in full before it is packed — the same table, the
+  /// same ledger, the same "what is due now" query, and no second payment
+  /// system for the second product type. That is what "shared payment
+  /// infrastructure, separate workflows" means in practice.
   sequence   Int // 1, 2, 3 — processing/display order
   label      String // e.g. "Initial Payment (50%)", "Mombasa Payment (25%)", "Final Payment (25%)"
   percentage Decimal @db.Decimal(5, 2) // locked in from BusinessSettings at order-creation time

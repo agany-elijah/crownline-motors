@@ -5,6 +5,7 @@ import { Reveal } from "@/components/shared/reveal"
 import { EmptyState } from "@/components/shared/empty-state"
 import { Button } from "@/components/ui/button"
 import { VehicleCard } from "@/components/vehicles/vehicle-card"
+import { VehicleCatalogueQuoteButton } from "@/components/quotes/quote-request-triggers"
 import type { PublicVehicleCard } from "@/lib/queries/public-vehicle.queries"
 
 /**
@@ -28,7 +29,7 @@ interface VehicleGridProps {
   vehicles: PublicVehicleCard[]
   /**
    * How many cards sit above the fold and should load their photograph
-   * eagerly. Three matches the widest grid — one full row on a desktop.
+   * eagerly. Four matches the widest grid — one full row on a desktop.
    */
   priorityCount?: number
   /**
@@ -39,8 +40,11 @@ interface VehicleGridProps {
   filtered?: boolean
 }
 
-/** Cards per row at the widest breakpoint. Also the stagger's wrap point. */
-const COLUMNS = 3
+/** Cards per row at the widest breakpoint. Also the stagger's wrap point.
+ *  Kept in step with the `xl:grid-cols-4` below — they are the same number
+ *  said twice, and a stagger that wraps at the wrong count reveals a row in
+ *  two halves. */
+const COLUMNS = 4
 
 export function VehicleGrid({
   vehicles,
@@ -69,7 +73,7 @@ export function VehicleGrid({
             <Button render={<Link href="/cars" />} variant="outline">
               Clear filters
             </Button>
-            <Button render={<Link href="/get-a-quote" />}>Request a vehicle</Button>
+            <VehicleCatalogueQuoteButton size="default">Request a vehicle</VehicleCatalogueQuoteButton>
           </div>
         }
       />
@@ -79,16 +83,27 @@ export function VehicleGrid({
         title="No vehicles listed yet"
         description="New arrivals from Japan and Korea are added as they are sourced. Tell us what you are looking for and we will find it for you."
         action={
-          <Button render={<Link href="/get-a-quote" />} variant="outline">
+          <VehicleCatalogueQuoteButton variant="outline" size="default">
             Request a vehicle
-          </Button>
+          </VehicleCatalogueQuoteButton>
         }
       />
     )
   }
 
   return (
-    <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    /*
+      One, two, three, four.
+
+      The fourth column arrives at `xl` (1280px) rather than at `lg`: between
+      1024px and 1280px four cards would each be under 240px of content box,
+      which is below the width the card's specification matrix needs (see the
+      container queries in vehicle-card.tsx) and would push every Explore cue
+      onto its own line. The catalogue block runs to the wide container so the
+      cards keep a usable measure as the screen grows — around 385px each on a
+      1920px display, which is about what three columns gave before.
+    */
+    <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {vehicles.map((vehicle, index) => (
         <li key={vehicle.slug} className="flex">
           <Reveal delay={(index % COLUMNS) * 70} className="flex w-full">

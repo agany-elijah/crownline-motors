@@ -3,6 +3,7 @@
 import { useActionState, useId, useState } from "react"
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
 
+import { SparePartDeliveryStepsEditor } from "@/components/admin/spare-part-delivery-steps-editor"
 import {
   updateBusinessSettingsAction,
   type SettingsFormState,
@@ -202,6 +203,31 @@ export function BusinessSettingsForm({ settings }: BusinessSettingsFormProps) {
             {balances ? "" : " — must be 100%"}
           </span>
         </div>
+      </section>
+
+      {/* ── How a spare part reaches the customer ───────────── */}
+      <section className="flex flex-col gap-5 rounded-xl border border-border bg-card p-6">
+        <div className="flex flex-col gap-1">
+          <h2 className="font-heading text-h3 font-semibold">
+            How a spare part reaches the customer
+          </h2>
+          <p className="max-w-2xl text-small text-muted-foreground">
+            Shown on{" "}
+            <strong className="font-semibold text-foreground">
+              every spare-part page
+            </strong>
+            , under the part&rsquo;s details. It is what reassures someone in
+            Juba that a part ordered from Japan actually arrives, so keep each
+            step to something the business can honour. These are parts only —
+            the vehicle import timeline is separate and lives on{" "}
+            <em>How It Works</em>.
+          </p>
+        </div>
+
+        <SparePartDeliveryStepsEditor
+          steps={settings.sparePartDeliverySteps}
+          error={fieldError("sparePartDeliverySteps")}
+        />
       </section>
 
       <div className="flex items-center gap-3">

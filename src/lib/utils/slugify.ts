@@ -55,3 +55,32 @@ export function buildVehicleSlug(input: {
     .filter(Boolean)
     .join("-")
 }
+
+/**
+ * Builds the canonical slug for a spare part.
+ *
+ * The same shape as the vehicle builder above, and for the same two reasons.
+ *
+ * Uniqueness: two listings genuinely can share a name. "Front Brake Pads" is
+ * what a genuine set and a refurbished one are both called, and `slug` is
+ * unique in the database, so a name-only slug would fail the second save.
+ * Suffixing the reference guarantees uniqueness without a retry loop.
+ *
+ * Stability: `/spare-parts/toyota-harrier-front-brake-pads-clm-sp-2026-000045`
+ * is a public, indexable URL, so the caller must set it once at creation and
+ * never regenerate it on edit — a corrected product name must not break every
+ * link already shared over WhatsApp.
+ *
+ * The category is deliberately not part of the slug. A part can be
+ * recategorised (an operator splits "Filters" out of "Engine"), and a slug
+ * that encoded the category would either go stale or force a URL change on a
+ * purely administrative tidy-up.
+ */
+export function buildSparePartSlug(input: {
+  name: string
+  referenceNumber: string
+}): string {
+  return [slugifyFragment(input.name), slugifyFragment(input.referenceNumber)]
+    .filter(Boolean)
+    .join("-")
+}

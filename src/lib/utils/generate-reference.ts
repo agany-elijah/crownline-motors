@@ -34,7 +34,12 @@ import type { Prisma } from "@/generated/prisma/client"
  */
 
 /** The sequences in use. Each resets per calendar year. */
-export type ReferenceKind = "VEHICLE" | "QUOTE" | "ORDER" | "TRACKING"
+export type ReferenceKind =
+  | "VEHICLE"
+  | "SPARE_PART"
+  | "QUOTE"
+  | "ORDER"
+  | "TRACKING"
 
 /**
  * Formats differ by design.
@@ -43,9 +48,22 @@ export type ReferenceKind = "VEHICLE" | "QUOTE" | "ORDER" | "TRACKING"
  * customer types into "Track My Order", and the brief's example is literally
  * `CLM-2026-000125`. The others carry a letter so an administrator reading
  * a reference out of context knows immediately what kind of record it is.
+ *
+ * Spare parts take two letters rather than one, because the brief's own
+ * example message says `CLM-SP-XXXXX` — and because `CLM-S` beside `CLM-V`
+ * is a single character of difference on a reference somebody reads aloud
+ * over WhatsApp.
+ *
+ * ── Why parts get their own sequence ──────────────────────────────────
+ * For the same reason vehicles and orders do: each sequence is a count of
+ * one kind of thing, and sharing one would make "how many parts did we list
+ * this year" unanswerable from the numbers the business actually sees. It
+ * also means listing a part can never consume a vehicle's reference, which
+ * would leave a visible gap in the vehicle series that nobody could explain.
  */
 const PREFIXES: Record<ReferenceKind, string> = {
   VEHICLE: "CLM-V",
+  SPARE_PART: "CLM-SP",
   QUOTE: "CLM-Q",
   ORDER: "CLM-O",
   TRACKING: "CLM",

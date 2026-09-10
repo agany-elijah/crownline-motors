@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type Locator, type Page } from "@playwright/test"
 
 /**
  * The public vehicle marketplace, as a customer meets it.
@@ -21,10 +21,116 @@ import { expect, test, type Page } from "@playwright/test"
  * signed-in session for a page that is supposed to work without one.
  */
 
-/** The catalogue shows a grid of cards or a stated empty state — never neither. */
+/**
+ * Opens a catalogue card and waits for the vehicle page to actually arrive.
+ *
+ * ── Why this is `waitForURL` and not `expect(page).toHaveURL(...)` ────
+ * The distinction is the whole reason this helper exists. An `expect` is
+ * bounded by `expect.timeout` — 15s here — while `page.waitForURL` is bounded
+ * by `navigationTimeout`, which this project deliberately sets to 45s.
+ *
+ * The webServer runs `next dev`, which compiles a route on its first request;
+ * `playwright.config.ts` records that being measured at 17s on this
+ * filesystem. So the first test in a worker to open `/cars/[slug]` can spend
+ * longer inside the navigation than an assertion is allowed to wait, and any
+ * assertion written straight after the click inherits that wait: Playwright
+ * blocks a locator query while a navigation is in flight. The failure then
+ * reads as "element(s) not found" against a page that was never served —
+ * which is exactly how it presented, intermittently and only in whichever
+ * project happened to hit the cold route.
+ *
+ * Waiting for the navigation explicitly separates the two budgets: the cold
+ * compile gets the 45s it was given, and the assertion after it gets a full
+ * 15s to find something on a page that has definitely arrived.
+ *
+ * ── And why it stops at `domcontentloaded` ────────────────────────────
+ * `waitForURL` defaults to waiting for `load`, which on a vehicle page means
+ * every photograph in the gallery — a wait on the images rather than on the
+ * navigation, and one that has exceeded even the 45s budget on WebKit. The
+ * markup is what the assertions need, and that is complete at
+ * `domcontentloaded`; anything still streaming after it is auto-waited by the
+ * locators themselves.
+ */
+async function openVehicle(page: Page, card: Locator) {
+  await waitForInteractive(page)
+
+  /**
+   * Retried, because a swallowed click leaves no trace to assert on.
+   *
+   * `waitForInteractive` closes the window in practice, but it is a heuristic
+   * about someone else's dev server and not a guarantee. If a click is
+   * dropped, nothing throws — the page simply stays where it was — so without
+   * a retry the failure surfaces 45s later as a navigation that never
+   * started, which is the least informative shape it could take.
+   *
+   * The URL is checked first so a retry never fires a second click at a page
+   * the first one already left; on the destination the card does not exist and
+   * the retry would fail on the click rather than notice it had succeeded.
+   */
+  await expect(async () => {
+    if (!/^\/cars\/[^/]+$/.test(new URL(page.url()).pathname)) {
+      await card.click({ timeout: 5_000 })
+    }
+
+    // 20s covers the dev server compiling `/cars/[slug]` on first request,
+    // measured at ~17s in this project. See playwright.config.ts.
+    await page.waitForURL(/\/cars\/[^/]+$/, {
+      waitUntil: "domcontentloaded",
+      timeout: 20_000,
+    })
+  }).toPass({ timeout: 40_000 })
+}
+
+/**
+ * Waits for the page to be interactive before dispatching a click at it.
+ *
+ * ── What this guards, and why it is not an application bug ────────────
+ * A click dispatched after `domcontentloaded` but before the App Router has
+ * attached is swallowed: the anchor's default is prevented by React's
+ * delegated handler, and the router is not yet listening to do anything with
+ * it. Nothing navigates, no error is raised, and the assertion that follows
+ * describes a page the test never left.
+ *
+ * Measured on the vehicle catalogue, first card, eight runs each:
+ *
+ *     next dev     · click immediately        7/8 failed
+ *     next dev     · click after `load`       6/8 failed
+ *     next dev     · click after networkidle  0/8 failed
+ *     next start   · click immediately        0/8 failed
+ *
+ * The last row is the one that matters: against a production build the race
+ * does not exist, because the bundle is a fraction of the size and hydration
+ * lands with the document. This is the dev webServer's unminified bundle plus
+ * its HMR runtime, and it is a property of the harness rather than of what
+ * ships. It also failed identically on a non-touch viewport, which rules out
+ * tap handling.
+ *
+ * `networkidle` distinguishes the two states where `load` demonstrably does
+ * not, and on this page it resolves in about 2.5s.
+ *
+ * It is only a proxy, though — it means "no request for 500ms", which a gap
+ * between two dev-server compiles also satisfies. So it is a fast path, not a
+ * guarantee, and the callers pair it with a retry that does not depend on
+ * guessing when hydration landed.
+ */
+async function waitForInteractive(page: Page) {
+  await page.waitForLoadState("networkidle")
+}
+
+/**
+ * The catalogue shows a grid of cards or a stated empty state — never neither.
+ *
+ * Scoped to `<main>` for the reason set out at length in
+ * spare-part-browsing.spec.ts: the catalogue sits under a Suspense boundary,
+ * so React streams its HTML into a hidden staging div at the end of `<body>`
+ * and relocates it a moment later. In between, every element in the segment
+ * exists twice, which doubles a `count()` and trips strict mode on any
+ * page-wide locator.
+ */
 async function catalogueCards(page: Page) {
-  const cards = page.getByRole("link", { name: /^\d{4} .+ — \$/ })
-  await expect(cards.first().or(page.getByText(/no vehicles listed yet/i))).toBeVisible()
+  const main = page.getByRole("main")
+  const cards = main.getByRole("link", { name: /^\d{4} .+ — \$/ })
+  await expect(cards.first().or(main.getByText(/no vehicles listed yet/i))).toBeVisible()
 
   return cards
 }
@@ -33,7 +139,11 @@ test.describe("vehicle catalogue", () => {
   test("lists live vehicles with the details a card is meant to carry", async ({ page }) => {
     await page.goto("/cars")
 
-    await expect(page.getByRole("heading", { level: 1, name: "Cars" })).toBeVisible()
+    // The catalogue's h1 is its positioning line, not the word "Cars" —
+    // see CatalogueMasthead for why.
+    await expect(
+      page.getByRole("heading", { level: 1, name: /quality vehicles/i })
+    ).toBeVisible()
 
     const cards = await catalogueCards(page)
 
@@ -84,7 +194,7 @@ test.describe("vehicle catalogue", () => {
     // "2021 Toyota Harrier — $22,500" → "Toyota Harrier"
     const model = name.replace(/^\d{4}\s+/, "").replace(/\s+—.*$/, "")
 
-    await card.click()
+    await openVehicle(page, card)
 
     await expect(page).toHaveURL(/\/cars\/[^/]+$/)
     await expect(page.getByRole("heading", { level: 1 })).toContainText(model)
@@ -121,7 +231,7 @@ test.describe("vehicle page", () => {
       return
     }
 
-    await cards.first().click()
+    await openVehicle(page, cards.first())
 
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible()
 
@@ -194,7 +304,7 @@ test.describe("vehicle page", () => {
       return
     }
 
-    await cards.first().click()
+    await openVehicle(page, cards.first())
 
     const specifications = page.getByRole("tab", { name: "Specifications" })
     const features = page.getByRole("tab", { name: "Features" })
@@ -237,7 +347,7 @@ test.describe("vehicle page", () => {
       return
     }
 
-    await cards.first().click()
+    await openVehicle(page, cards.first())
 
     /**
      * The dealership cannot stand behind shipping and clearing figures on
@@ -281,7 +391,7 @@ test.describe("vehicle page", () => {
       return
     }
 
-    await cards.first().click()
+    await openVehicle(page, cards.first())
     await expect(page).toHaveURL(/\/cars\/[^/]+$/)
 
     const bar = page.locator("[data-mobile-action-bar]")
@@ -314,7 +424,7 @@ test.describe("vehicle page", () => {
       return
     }
 
-    await cards.first().click()
+    await openVehicle(page, cards.first())
     await expect(page).toHaveURL(/\/cars\/[^/]+$/)
 
     const slug = new URL(page.url()).pathname
@@ -349,7 +459,7 @@ test.describe("vehicle page", () => {
       return
     }
 
-    await cards.first().click()
+    await openVehicle(page, cards.first())
 
     /**
      * Gated on the URL, not on a heading. `locator.count()` is one of the

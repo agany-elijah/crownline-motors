@@ -2,10 +2,12 @@ import type { Metadata } from "next"
 import Link from "next/link"
 
 import { Container } from "@/components/layout/container"
-import { PageHeader } from "@/components/layout/page-header"
+import { Pagination } from "@/components/shared/pagination"
 import { Section } from "@/components/layout/section"
 import { Button } from "@/components/ui/button"
-import { VehicleFilters } from "@/components/vehicles/vehicle-filters"
+import { VehicleCatalogueQuoteButton } from "@/components/quotes/quote-request-triggers"
+import { CatalogueMasthead } from "@/components/vehicles/catalogue-masthead"
+import { VehicleSearch } from "@/components/vehicles/vehicle-search"
 import { VehicleGrid } from "@/components/vehicles/vehicle-grid"
 import { siteConfig } from "@/config/site"
 import {
@@ -18,7 +20,6 @@ import {
   catalogueHref,
   hasActiveSearch,
   parseVehicleSearchParams,
-  type VehicleSearchCriteria,
 } from "@/lib/validations/vehicle-search.schema"
 
 /**
@@ -33,12 +34,13 @@ import {
  * Nothing on this page is hard-coded: an operator publishes a listing and
  * it appears, which is the brief's central technical requirement.
  *
- * ── Filtering (Stage 12) ──────────────────────────────────────────────
- * Make, model and year, each usable alone and all three combinable. The
- * whole search lives in the query string: it is parsed by
+ * ── Searching and filtering (Stage 12) ────────────────────────────────
+ * A free-text box matched against make, model and year at once, above
+ * dropdowns for the same three fields. The two combine rather than compete.
+ * The whole search lives in the query string: it is parsed by
  * `vehicleSearchSchema` on every request, so a filtered catalogue is a real
  * address a customer can bookmark or send over WhatsApp, and the back button
- * works. Nothing about the filter state is held in a component.
+ * works. Nothing about the search state is held in a component.
  *
  * The brief's wider list — price, mileage, fuel, transmission, drive,
  * location — is scoped out of Wave A at the client's request. It is not
@@ -74,6 +76,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { page: _page, ...criteria } = parseVehicleSearchParams(await searchParams)
 
+  // The dropdown selections describe the page more reliably than the
+  // free-text box does — they are whole values drawn from the inventory,
+  // where `q` may be a fragment, a misspelling, or something with no
+  // matches at all. A title is a promise about the page, so it is built
+  // from the former and falls back to the catalogue's own name.
   const described = [criteria.make, criteria.model, criteria.year]
     .filter(Boolean)
     .join(" ")
@@ -106,7 +113,7 @@ export default async function CarsPage({
    * page. A query string is user-editable, and a malformed one is an
    * ordinary event — see vehicle-search.schema.ts.
    */
-  const { page, ...criteria } = parseVehicleSearchParams(params)
+  const { page: requestedPage, ...criteria } = parseVehicleSearchParams(params)
   const isFiltered = hasActiveSearch(criteria)
 
   /**
@@ -116,57 +123,72 @@ export default async function CarsPage({
    * in sequence: they are independent, and on a mobile connection the
    * round trip is the expensive part, not the query.
    */
-  const [{ vehicles, total, pageCount }, facets] = await Promise.all([
-    listPublishedVehicles({ page, criteria }),
+  const [{ vehicles, total, page, pageCount }, facets] = await Promise.all([
+    listPublishedVehicles({ page: requestedPage, criteria }),
     listVehicleFacets(),
   ])
 
+  /**
+   * `page` is what the query actually served, not what the URL asked for.
+   *
+   * `listPublishedVehicles` clamps a request past the end of the result set
+   * back to the last real page — see the note there for why that is done in
+   * the query rather than with a redirect here. Reading the clamped value
+   * back is what keeps the range line ("Showing 1,177–36" on a page holding
+   * twelve vehicles) and the pager honest.
+   */
   const first = (page - 1) * PUBLIC_VEHICLES_PER_PAGE + 1
   const last = Math.min(page * PUBLIC_VEHICLES_PER_PAGE, total)
 
   return (
     <>
-      <PageHeader
-        eyebrow="Inventory"
-        title="Cars"
-        description="Sourced from Japan and South Korea, inspected before export, and tracked to your door in South Sudan."
-        // No href on the final item — this is the page the visitor is on,
-        // and Breadcrumbs renders the last entry as plain text.
-        breadcrumbs={[{ label: "Cars" }]}
-      />
+      <CatalogueMasthead />
 
-      <Section spacing="default">
+      {/*
+        Compact at the top, standard at the bottom.
+
+        The masthead above is deliberately short, and the search bar is the
+        next thing a customer needs — a full `py-16` between them would put
+        the control they came to use below the fold on a phone for no
+        reason. The closing padding stays at the standard step so the grid
+        does not run into the section beneath it.
+      */}
+      <Section spacing="compact" containerSize="wide" className="pb-16 md:pb-24">
         {/*
-          The catalogue runs to a narrower measure than the page container.
+          The catalogue runs to the wide measure, and the grid is four
+          columns from `xl`.
 
-          `Container size="default"` is 80rem, which at three columns gives
-          cards around 380px wide — big enough that a row of them reads as
-          three posters rather than as a set of listings. Capping the
-          column brings that down without touching the responsive grid or
-          introducing a fourth column that would halve them instead.
+          It used to be three columns inside a 72rem cap, which gave a 371px
+          card — the width the card's specification band was measured
+          against. Four columns at that cap would be 273px each, well under
+          the 328px at which the band gives up and drops the Explore cue onto
+          its own line, so the width has to come from somewhere. `Container
+          size="wide"` is 100rem, which at four columns and a 20px gutter
+          gives roughly 385px on a 1920px display and 361px at 1600px — the
+          same measure the three-column layout had, at one more car per row.
 
-          72rem, not the 64rem this started at. 64rem produced a 328px
-          card, and the card's specification band — a 2×2 matrix beside the
-          Explore cue — needs about 350px before a long transmission label
-          and a six-figure mileage stop competing for the same row and one
-          of them truncates. 72rem gives roughly 371px, which clears that
-          with room to spare and still sits under the 380px that read as
-          posters. Do not narrow it again without re-measuring the widest
-          values the inventory can actually produce.
+          The floor is the `xl` breakpoint itself: 1280px yields a 281px
+          card, which is the tightest arrangement here and still a supported
+          one (the card's container queries close its gaps up and, below
+          328px, stack the cue — the same thing the "You may also like" strip
+          does at phone widths, so a row of them stays uniform). Do not move
+          the fourth column below `xl` without re-measuring: at `lg` the
+          cards fall under 240px and the band has nowhere left to go.
 
-          The cap sits on the whole block — count, grid and pagination —
-          rather than on the grid alone, so the three stay aligned with
-          each other instead of the grid floating inside a wider header.
+          The container sits on the whole block — count, grid and pagination
+          — rather than on the grid alone, so the three stay aligned with
+          each other instead of the grid floating inside a narrower header.
+          The masthead above is centred text, so it needs no matching change.
         */}
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
+        <div className="mx-auto flex w-full flex-col gap-6 sm:gap-8">
           {/*
-            Rendered only when there is something to filter. An empty
-            dealership would otherwise show three dropdowns offering "Any
-            make / Any model / Any year" above an empty grid, which looks
-            broken rather than new.
+            Rendered only when there is something to search. An empty
+            dealership would otherwise show a search box and three dropdowns
+            offering "Any make / Any model / Any year" above an empty grid,
+            which looks broken rather than new.
           */}
           {facets.length > 0 ? (
-            <VehicleFilters facets={facets} criteria={criteria} />
+            <VehicleSearch facets={facets} criteria={criteria} />
           ) : null}
 
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -205,36 +227,48 @@ export default async function CarsPage({
               ) : null}
             </p>
 
-            <Button render={<Link href="/get-a-quote" />} variant="outline" size="sm">
-              Can&rsquo;t find it? Request a vehicle
-            </Button>
+            {/* Opens the request panel in place, so a customer who has
+                scrolled a long way down the results does not lose them. */}
+            <VehicleCatalogueQuoteButton variant="outline" size="sm">
+              Can&rsquo;t find it? Get a quote
+            </VehicleCatalogueQuoteButton>
           </div>
 
           <VehicleGrid vehicles={vehicles} filtered={isFiltered} />
 
-          {pageCount > 1 ? (
-            <CataloguePagination
-              page={page}
-              pageCount={pageCount}
-              criteria={criteria}
-            />
-          ) : null}
+          {/*
+            `criteria` is carried into every page link. Without it, stepping
+            to page two would silently drop the customer's search and show
+            them the whole floor — the classic paginated-search bug, and one
+            that is invisible until someone has enough inventory for a
+            second page.
+          */}
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            hrefFor={(target) => catalogueHref(criteria, target)}
+            label="Catalogue pages"
+          />
         </div>
       </Section>
 
-      {/* ── Closing prompt ───────────────────────────────────────── */}
+      {/*
+        ── Closing prompt ─────────────────────────────────────────
+        Reached by everyone who scrolled the whole catalogue without finding
+        their car — exactly the customer worth asking. The button opens the
+        request panel here rather than sending them to another page: all it
+        needs is a message, and the catalogue they were reading stays put.
+      */}
       <Section variant="dark" spacing="default" reveal>
         <Container size="narrow" className="flex flex-col items-center gap-6 px-0 text-center">
-          <h2 className="text-h2">Looking for something specific?</h2>
+          <h2 className="text-h2">Haven&rsquo;t found what you&rsquo;re looking for?</h2>
           <p className="max-w-xl text-body text-background/75">
             Tell us the make, model and budget you have in mind. We source to
             order from auction houses in Japan and Korea, and confirm the
             delivered price before you commit to anything.
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Button render={<Link href="/get-a-quote" />} size="lg">
-              Get a quote
-            </Button>
+            <VehicleCatalogueQuoteButton />
             <Button render={<Link href="/how-it-works" />} variant="outline" size="lg">
               How it works
             </Button>
@@ -242,58 +276,5 @@ export default async function CarsPage({
         </Container>
       </Section>
     </>
-  )
-}
-
-/**
- * Previous/next only, with the position stated in words beside it.
- *
- * Not a numbered page list: that is a lot of small tap targets on a phone,
- * and with twelve vehicles to a page the number of pages here is small
- * enough that stepping through them is no hardship. Both controls are real
- * links, so they work without JavaScript and can be opened in a new tab.
- */
-function CataloguePagination({
-  page,
-  pageCount,
-  criteria,
-}: {
-  page: number
-  pageCount: number
-  /**
-   * Carried into every page link. Without it, stepping to page two would
-   * silently drop the customer's filters and show them the whole floor —
-   * the classic paginated-search bug, and one that is invisible until
-   * someone has enough inventory for a second page.
-   */
-  criteria: VehicleSearchCriteria
-}) {
-  const hrefFor = (target: number) => catalogueHref(criteria, target)
-
-  return (
-    <nav
-      aria-label="Catalogue pages"
-      className="flex items-center justify-between gap-4 border-t border-border pt-6"
-    >
-      <div className="flex-1">
-        {page > 1 ? (
-          <Button render={<Link href={hrefFor(page - 1)} />} variant="outline" size="sm">
-            Previous
-          </Button>
-        ) : null}
-      </div>
-
-      <p className="tabular text-small text-muted-foreground">
-        Page {page} of {pageCount}
-      </p>
-
-      <div className="flex flex-1 justify-end">
-        {page < pageCount ? (
-          <Button render={<Link href={hrefFor(page + 1)} />} variant="outline" size="sm">
-            Next
-          </Button>
-        ) : null}
-      </div>
-    </nav>
   )
 }

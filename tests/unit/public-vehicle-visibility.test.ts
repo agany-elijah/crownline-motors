@@ -24,6 +24,17 @@ import { VehicleStatus } from "@/generated/prisma/enums"
 /** Every `where` handed to Prisma during a test, in call order. */
 let queries: { method: string; where: unknown }[] = []
 
+/**
+ * Narrows a recorded `where` for assertions about its shape.
+ *
+ * The recorder deliberately stores `unknown` — it must accept whatever any
+ * query passes it — so reading a key off one needs a cast at the point of
+ * use rather than a looser type at the point of capture.
+ */
+function recordedWhere(where: unknown) {
+  return where as { status?: unknown; AND?: unknown[] }
+}
+
 function record(method: string) {
   return async (args: { where?: unknown }) => {
     queries.push({ method, where: args?.where })
@@ -117,10 +128,26 @@ describe("listPublishedVehicles", () => {
     await listPublishedVehicles({ filters: { make: "Toyota" }, page: 3 })
 
     for (const query of queries) {
-      expect(query.where).toMatchObject({
-        make: "Toyota",
-        status: VehicleStatus.PUBLISHED,
-      })
+      // The caller's filters are nested under `AND` rather than spread into
+      // the same object as the status. That is what stops two fragments —
+      // a caller's filters and the customer's own search — from sharing a
+      // key space and silently overwriting each other. The status stays on
+      // the outside, where no caller can reach it.
+      expect(query.where).toMatchObject({ status: VehicleStatus.PUBLISHED })
+      expect(recordedWhere(query.where).AND).toContainEqual({ make: "Toyota" })
+    }
+  })
+
+  it("ANDs a customer's search with the caller's own filters", async () => {
+    await listPublishedVehicles({
+      filters: { make: "Toyota" },
+      criteria: { q: "harrier" },
+    })
+
+    for (const query of queries) {
+      expect(recordedWhere(query.where).status).toBe(VehicleStatus.PUBLISHED)
+      expect(recordedWhere(query.where).AND).toContainEqual({ make: "Toyota" })
+      expect(JSON.stringify(query.where)).toContain("harrier")
     }
   })
 })

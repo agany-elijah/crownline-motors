@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { MenuIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { CartSummary } from "@/components/cart/cart-summary"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Container } from "@/components/layout/container"
 import { BrandMark } from "@/components/layout/brand-mark"
@@ -161,13 +162,43 @@ export function SiteHeader({ whatsappUrl }: SiteHeaderProps) {
           aria-label="Main"
           className="flex h-16 items-center justify-between gap-6 md:h-20"
         >
-          <Link
-            href="/"
-            aria-label={`${siteConfig.name} — home`}
-            className="shrink-0 transition-opacity duration-fast hover:opacity-80"
-          >
-            <BrandMark />
-          </Link>
+          {/*
+            The left-hand cluster: the menu trigger, then the brand.
+
+            The hamburger sits at the *start* of the row on every surface that
+            has one — which is below `xl`, i.e. every phone and most tablets.
+            That is where a drawer anchored to the left edge should be opened
+            from: the panel slides out from under its own trigger rather than
+            travelling the full width of the screen away from the thumb that
+            asked for it. It also leaves the right-hand side to the basket,
+            which is the one control on this header whose position customers
+            already expect from every other shop they use.
+
+            `-ml-2` pulls the icon button's own padding back so the glyph
+            optically aligns with the container gutter instead of sitting an
+            extra 8px inside it.
+          */}
+          <div className="flex min-w-0 shrink-0 items-center gap-1.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="-ml-2 xl:hidden"
+              aria-label="Open menu"
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-nav-panel"
+              onClick={() => setMobileOpen(true)}
+            >
+              <MenuIcon className="size-5" />
+            </Button>
+
+            <Link
+              href="/"
+              aria-label={`${siteConfig.name} — home`}
+              className="shrink-0 transition-opacity duration-fast hover:opacity-80"
+            >
+              <BrandMark />
+            </Link>
+          </div>
 
           {/* Inline nav starts at xl, not lg: eight items plus a CTA
               measure past 1100px, so at lg they would crush together.
@@ -214,17 +245,34 @@ export function SiteHeader({ whatsappUrl }: SiteHeaderProps) {
             </Link>
           </div>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="xl:hidden"
-            aria-label="Open menu"
-            aria-expanded={mobileOpen}
-            aria-controls="mobile-nav-panel"
-            onClick={() => setMobileOpen(true)}
-          >
-            <MenuIcon className="size-5" />
-          </Button>
+          {/*
+            The right-hand cluster: the basket.
+
+            ── Why the basket is in the header at all ──────────────────
+            It used to sit in the spare-parts section's own utility bar, which
+            meant it existed on two routes and vanished the moment a customer
+            wandered onto How It Works. A basket is persistent state, not a
+            property of one page, and top-right of the header is where every
+            shop a customer has ever used puts it.
+
+            The obvious objection — that a cart glyph on a page about cars
+            implies cars go in one — is answered by `CartSummary` itself: it
+            renders nothing at all until the basket holds something. A visitor
+            who has not added a part never sees it, and one who has is being
+            shown their own list on whatever page they wandered to.
+
+            ── Why it sits alone on the right ──────────────────────────
+            The menu trigger used to share this cluster, which put navigation
+            and the basket in the same corner and left the top-left of a phone
+            screen — the corner every drawer-based site puts its menu in —
+            empty. The trigger has moved to the start of the row, beside the
+            brand and above the edge its panel slides out from, so the basket
+            now owns the end of the row on its own. `shrink-0` keeps it there
+            whatever the rest of the row is carrying.
+          */}
+          <div className="flex shrink-0 items-center gap-1 xl:gap-2">
+            <CartSummary tone={isTransparent ? "dark" : "light"} />
+          </div>
         </nav>
       </Container>
 

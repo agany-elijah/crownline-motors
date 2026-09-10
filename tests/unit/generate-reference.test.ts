@@ -79,6 +79,7 @@ describe("generateReference", () => {
     // Independent counters: listing a vehicle must not consume an order
     // number, or the sequences stop being a count of anything.
     expect(await generateReference(tx, "VEHICLE", 2026)).toBe("CLM-V-2026-000001")
+    expect(await generateReference(tx, "SPARE_PART", 2026)).toBe("CLM-SP-2026-000001")
     expect(await generateReference(tx, "QUOTE", 2026)).toBe("CLM-Q-2026-000001")
     expect(await generateReference(tx, "ORDER", 2026)).toBe("CLM-O-2026-000001")
 
@@ -86,6 +87,35 @@ describe("generateReference", () => {
     // into "Track My Order", and the brief's example is literally
     // CLM-2026-000125.
     expect(await generateReference(tx, "TRACKING", 2026)).toBe("CLM-2026-000001")
+  })
+
+  it("keeps the parts sequence separate from the vehicle sequence", async () => {
+    const tx = fakeSequenceTx()
+
+    // The two inventories are counted independently. If they shared a
+    // counter, listing a part would leave a gap in the vehicle series that
+    // nobody could account for — and the reference numbers are what the
+    // business reads as "how many did we list this year".
+    await generateReference(tx, "VEHICLE", 2026)
+    await generateReference(tx, "VEHICLE", 2026)
+
+    expect(await generateReference(tx, "SPARE_PART", 2026)).toBe("CLM-SP-2026-000001")
+    expect(await generateReference(tx, "VEHICLE", 2026)).toBe("CLM-V-2026-000003")
+
+    expect([...tx._rows.keys()].sort()).toEqual(["SPARE_PART-2026", "VEHICLE-2026"])
+  })
+
+  it("prefixes spare parts unambiguously against vehicles", () => {
+    // Two letters, not one: CLM-S beside CLM-V differs by a single character
+    // on a reference somebody reads aloud over WhatsApp, and the brief's own
+    // example message says CLM-SP-XXXXX.
+    const vehicle = formatReference("VEHICLE", 2026, 45)
+    const part = formatReference("SPARE_PART", 2026, 45)
+
+    expect(part).toBe("CLM-SP-2026-000045")
+    expect(vehicle).toBe("CLM-V-2026-000045")
+    expect(part).not.toBe(vehicle)
+    expect(part.startsWith(vehicle.slice(0, 6))).toBe(false)
   })
 
   it("resets numbering per calendar year", async () => {

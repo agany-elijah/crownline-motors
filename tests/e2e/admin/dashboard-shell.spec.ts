@@ -51,16 +51,25 @@ test.describe("dashboard shell", () => {
 
     const nav = page.getByRole("navigation", { name: "Dashboard" })
 
-    // Spare Parts has no route until Wave B, so it must render as inert
-    // text — a link would be a 404. Vehicles shipped in Phase 5 and is a
-    // live link, asserted alongside so this test keeps proving the
-    // distinction rather than just the disabled case.
-    await expect(nav.getByRole("link", { name: "Spare Parts" })).toHaveCount(0)
-    await expect(nav.getByText("Spare Parts")).toBeVisible()
+    // Quotes has no route until Phase 10, so it must render as inert text —
+    // a link would be a 404. Both inventory sections shipped (Phase 5 and
+    // Phase 9) and are live links, asserted alongside so this test keeps
+    // proving the distinction rather than just the disabled case.
+    //
+    // Spare Parts used to be the disabled example here. When a section is
+    // built, move this assertion to the next unbuilt one rather than
+    // deleting it — the inert rendering is the behaviour under test, and it
+    // has to keep having a subject.
+    await expect(nav.getByRole("link", { name: "Quotes" })).toHaveCount(0)
+    await expect(nav.getByText("Quotes")).toBeVisible()
 
     await expect(nav.getByRole("link", { name: "Vehicles" })).toHaveAttribute(
       "href",
       adminPath("/vehicles")
+    )
+    await expect(nav.getByRole("link", { name: "Spare Parts" })).toHaveAttribute(
+      "href",
+      adminPath("/spare-parts")
     )
   })
 

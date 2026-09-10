@@ -17,12 +17,22 @@ import { VEHICLE_YEAR_MIN, vehicleYearMax } from "@/lib/constants/vehicle-option
  * layer parameterises it — so a make containing a quote is a value that
  * matches nothing, never syntax.
  *
- * ── Why only make, model and year ─────────────────────────────────────
- * The client scoped Wave A's search to these three. The brief's wider list
- * (price, mileage, fuel, transmission, drive, location) is not gone: the
- * query layer's `PublicVehicleFilters` already accepts any of them, so each
- * is a field added here plus a control added to the filter bar, not a
- * redesign. Deliberately not built ahead of being asked for.
+ * ── The two ways a customer narrows the catalogue ─────────────────────
+ * `q` is the free-text box above the filter bar: one field, matched against
+ * make, model and year at once, so "harrier 2021" and "toyota" both work
+ * without the customer having to say which field they mean.
+ *
+ * `make` / `model` / `year` are the dropdowns beneath it, each drawn from
+ * the published inventory. They narrow rather than replace — a text search
+ * and a dropdown selection are ANDed, so a customer can type "harrier" and
+ * then still restrict the year.
+ *
+ * ── Why only these ────────────────────────────────────────────────────
+ * The client scoped Wave A's search to make, model and year. The brief's
+ * wider list (price, mileage, fuel, transmission, drive, location) is not
+ * gone: the query layer's `PublicVehicleFilters` already accepts any of
+ * them, so each is a field added here plus a control added to the filter
+ * bar, not a redesign. Deliberately not built ahead of being asked for.
  */
 
 /**
@@ -47,6 +57,34 @@ const textFilter = z
   .string()
   .trim()
   .max(TEXT_FILTER_MAX_LENGTH)
+  .transform((value) => (value.length === 0 ? undefined : value))
+  .optional()
+  .catch(undefined)
+
+/**
+ * Upper bound on the free-text search box.
+ *
+ * Longer than a dropdown value because this one is typed rather than
+ * chosen, and a customer may reasonably enter "toyota land cruiser prado
+ * 2019" — but still short enough that a pasted paragraph never reaches the
+ * database. Over the limit the term is dropped entirely (`.catch`), which
+ * shows the unfiltered catalogue rather than an error page.
+ */
+const SEARCH_TERM_MAX_LENGTH = 80
+
+/**
+ * The free-text query.
+ *
+ * Whitespace is trimmed *and* collapsed, so "toyota   harrier" and "toyota
+ * harrier" are one URL rather than two addresses for one result set — the
+ * same canonicalisation rule the query builder below applies for the
+ * dropdowns.
+ */
+const searchTerm = z
+  .string()
+  .trim()
+  .max(SEARCH_TERM_MAX_LENGTH)
+  .transform((value) => value.replace(/\s+/g, " "))
   .transform((value) => (value.length === 0 ? undefined : value))
   .optional()
   .catch(undefined)
@@ -102,6 +140,7 @@ const pageFilter = z
   .default(1)
 
 export const vehicleSearchSchema = z.object({
+  q: searchTerm,
   make: textFilter,
   model: textFilter,
   year: yearFilter,
@@ -128,6 +167,7 @@ export function parseVehicleSearchParams(
     Array.isArray(value) ? value[0] : value
 
   return vehicleSearchSchema.parse({
+    q: first(params.q),
     make: first(params.make),
     model: first(params.model),
     year: first(params.year),
@@ -137,7 +177,7 @@ export function parseVehicleSearchParams(
 
 /** True when at least one narrowing filter is active. */
 export function hasActiveSearch(criteria: VehicleSearchCriteria): boolean {
-  return Boolean(criteria.make || criteria.model || criteria.year)
+  return Boolean(criteria.q || criteria.make || criteria.model || criteria.year)
 }
 
 /**
@@ -156,6 +196,9 @@ export function buildCatalogueQuery(
 ): string {
   const params = new URLSearchParams()
 
+  // `q` first: it is the control the customer typed into, so it is the one
+  // they will recognise when the address bar is truncated on a phone.
+  if (criteria.q) params.set("q", criteria.q)
   if (criteria.make) params.set("make", criteria.make)
   if (criteria.model) params.set("model", criteria.model)
   if (criteria.year) params.set("year", String(criteria.year))

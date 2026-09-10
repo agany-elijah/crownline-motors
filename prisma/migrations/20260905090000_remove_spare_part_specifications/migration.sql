@@ -1,0 +1,22 @@
+-- Drops SparePart.specifications.
+--
+-- ── Why this is a drop and not a deprecation ──────────────────────────
+-- The column was a second description: a bulleted list an operator had to
+-- compile alongside the prose one and keep in step with it, which the public
+-- listing then rendered directly above the description saying the same
+-- things. The dealership asked for it to go, and leaving a nullable column
+-- behind "just in case" would keep it in every DTO, every form allowlist and
+-- every echoed-values list — the cost the removal is meant to save.
+--
+-- ── Data loss ─────────────────────────────────────────────────────────
+-- Real. Anything typed into it is gone with the column, which is acceptable
+-- here and only here: at the time of writing the parts catalogue has not
+-- launched, so the values are the operator's own trial listings rather than
+-- anything a customer has been shown or an order references. Nothing joins to
+-- it and no order line snapshots it — `OrderItem.description` is its own
+-- string, taken at sale time.
+--
+-- IF a production catalogue already holds parts when this runs, take the
+-- usual backup first; the statement is otherwise unremarkable, a metadata-only
+-- DROP COLUMN that does not rewrite the table.
+ALTER TABLE "SparePart" DROP COLUMN "specifications";

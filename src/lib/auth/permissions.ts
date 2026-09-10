@@ -48,14 +48,20 @@ export const ADMIN_PERMISSIONS = [
   "vehicle:archive",
 
   /**
-   * Spare parts (Wave B).
+   * Spare parts (Phase 9).
    *
-   * Only `sparePart:read` exists so far, because only the navigation needs
-   * one. The write/publish/archive permissions arrive with the feature that
-   * uses them — inventing Wave B's full permission model now would be
-   * guessing at decisions that phase has not made yet.
+   * Deliberately mirrors the vehicle set rather than collapsing to a single
+   * `sparePart:write`. Listing a part and publishing one are different
+   * decisions — the second puts a price in front of customers — and the
+   * natural first split when a second person joins is to leave publishing
+   * and archiving with whoever is accountable for the catalogue. Splitting
+   * later is a change to ROLE_PERMISSIONS; retrofitting the distinction
+   * across every call site is not.
    */
   "sparePart:read",
+  "sparePart:write",
+  "sparePart:publish",
+  "sparePart:archive",
 
   // Quotes (Phase 10)
   "quote:read",

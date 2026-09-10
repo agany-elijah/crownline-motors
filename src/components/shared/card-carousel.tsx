@@ -6,7 +6,12 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 /**
- * A horizontally scrolling strip of vehicle cards.
+ * A horizontally scrolling strip of cards — vehicles or spare parts.
+ *
+ * Product-agnostic by construction: the cards arrive as `children`, already
+ * rendered on the server, and the heading arrives as a prop. Nothing here
+ * knows what is inside a card, which is why both catalogues use it rather
+ * than each growing a scroller of its own.
  *
  * ── Why a scroller rather than a grid ─────────────────────────────────
  * A grid of related vehicles has to decide, at build time, how many
@@ -40,7 +45,7 @@ import { cn } from "@/lib/utils"
  * length rather than as loose links. `aria-live` is deliberately absent:
  * nothing here announces, it just scrolls.
  */
-interface VehicleCarouselProps {
+interface CardCarouselProps {
   /** The section heading, rendered on the server and laid out beside the arrows. */
   heading: React.ReactNode
   /** Accessible name for the scrolling region. */
@@ -49,7 +54,7 @@ interface VehicleCarouselProps {
   children: React.ReactNode
 }
 
-export function VehicleCarousel({ heading, label, children }: VehicleCarouselProps) {
+export function CardCarousel({ heading, label, children }: CardCarouselProps) {
   const scrollerRef = React.useRef<HTMLUListElement>(null)
 
   /**

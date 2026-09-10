@@ -3,6 +3,7 @@ import Link from "next/link"
 
 import { cn } from "@/lib/utils"
 import { siteConfig } from "@/config/site"
+import { serializeJsonLd } from "@/lib/utils/json-ld"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -80,11 +81,14 @@ function Breadcrumbs({ items, className, ...props }: BreadcrumbsProps) {
         </BreadcrumbList>
       </Breadcrumb>
 
-      {/* Safe to inject: every value is site-authored (route labels), never
-          user input, and JSON.stringify escapes the payload. */}
+      {/*
+        Labels are not all site-authored: the part page passes the part's
+        name, which an operator types. `JSON.stringify` does not escape
+        `</script>`, so it goes through `serializeJsonLd`, which does.
+      */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
     </>
   )

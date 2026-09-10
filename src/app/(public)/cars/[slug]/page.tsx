@@ -1,10 +1,12 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeftIcon, MessageCircle } from "lucide-react"
+import { ArrowLeftIcon } from "lucide-react"
 
 import { Section } from "@/components/layout/section"
+import { VehicleQuoteButton } from "@/components/quotes/quote-request-triggers"
 import { Reveal } from "@/components/shared/reveal"
+import { WhatsAppGlyph } from "@/components/shared/whatsapp-glyph"
 import { Button } from "@/components/ui/button"
 import { RelatedVehicles } from "@/components/vehicles/related-vehicles"
 import { VehicleConditionTag } from "@/components/vehicles/vehicle-condition-tag"
@@ -24,7 +26,9 @@ import {
   listRelatedVehicles,
   type PublicVehicleDetail,
 } from "@/lib/queries/public-vehicle.queries"
+import { vehicleSubjectLabel } from "@/lib/quotes/quote-subjects"
 import { formatCurrency, formatMileage } from "@/lib/utils/format-currency"
+import { serializeJsonLd } from "@/lib/utils/json-ld"
 import { buildVehicleWhatsAppMessage, buildWhatsAppUrl } from "@/lib/utils/whatsapp"
 
 /**
@@ -98,8 +102,8 @@ import { buildVehicleWhatsAppMessage, buildWhatsAppUrl } from "@/lib/utils/whats
  * third copy of the two actions that already sit in the summary band and
  * in the pinned mobile bar. See RelatedVehicles for why.
  *
- * On a phone the request action is additionally pinned to the bottom of
- * the screen for the whole page. See VehicleMobileActionBar.
+ * On a phone the quote action is additionally pinned to the bottom of the
+ * screen for the whole page. See VehicleMobileActionBar.
  */
 
 interface PageProps {
@@ -205,10 +209,17 @@ export default async function VehiclePage({ params }: PageProps) {
     }),
   })
 
-  /** A quote pre-filled with this vehicle. Built once — two surfaces link
-   *  to it (the summary band and the pinned mobile bar) and they must not
-   *  drift apart. */
-  const requestHref = `/get-a-quote?vehicle=${vehicle.slug}`
+  /**
+   * What the quote panel fills in for the customer — "Toyota Harrier XGL
+   * 2024 Automatic" and the main photograph. Built once, because two
+   * surfaces open the panel (the summary band and the pinned mobile bar) and
+   * they must not describe the car differently.
+   */
+  const quoteSubject = {
+    vehicleSlug: vehicle.slug,
+    label: vehicleSubjectLabel(vehicle),
+    imageUrl: vehicle.photos[0]?.url ?? null,
+  }
 
   const specifications = [
     { label: "Year", value: String(vehicle.year) },
@@ -330,23 +341,19 @@ export default async function VehiclePage({ params }: PageProps) {
 
                 One gold CTA, per the design system's "one primary action
                 per surface" rule — the palette enforces it, since
-                `default` is the only filled-gold variant.
+                `default` is the only filled-gold variant. WhatsApp beside it
+                is green, WhatsApp's own colour, so the two read as two
+                different ways to act rather than a primary and an
+                afterthought.
 
-                Requesting lands on /get-a-quote with the vehicle named in
-                the query string. There is no separate "request" route: a
-                request for a specific vehicle *is* a quote whose
-                `linkedVehicleId` is set, which is exactly how the Quote
-                model represents it, and inventing a second path would mean
-                two ways of creating the same record.
+                "Get a quote" opens the request panel over this page with the
+                car already filled in. There is no separate "request" route:
+                a request for a specific vehicle *is* a quote whose
+                `linkedVehicleId` is set, which is exactly how the Quote model
+                represents it.
               */}
               <div className="flex shrink-0 flex-col gap-3 md:flex-row">
-                <Button
-                  render={<Link href={requestHref} />}
-                  size="lg"
-                  className="w-full md:w-auto"
-                >
-                  Request this vehicle
-                </Button>
+                <VehicleQuoteButton {...quoteSubject} className="w-full md:w-auto" />
 
                 {whatsappUrl ? (
                   <Button
@@ -360,11 +367,11 @@ export default async function VehiclePage({ params }: PageProps) {
                         rel="noopener noreferrer"
                       />
                     }
-                    variant="outline"
+                    variant="whatsapp"
                     size="lg"
                     className="w-full md:w-auto"
                   >
-                    <MessageCircle aria-hidden="true" />
+                    <WhatsAppGlyph />
                     WhatsApp about this car
                   </Button>
                 ) : null}
@@ -425,7 +432,7 @@ export default async function VehiclePage({ params }: PageProps) {
           cannot. */}
       <div aria-hidden="true" className="action-bar-clearance lg:hidden" />
 
-      <VehicleMobileActionBar requestHref={requestHref} />
+      <VehicleMobileActionBar {...quoteSubject} />
       <VehicleStructuredData vehicle={vehicle} name={fullName} />
     </>
   )
@@ -499,7 +506,7 @@ function VehicleStructuredData({
     <script
       type="application/ld+json"
       dangerouslySetInnerHTML={{
-        __html: JSON.stringify(data).replace(/</g, "\\u003c"),
+        __html: serializeJsonLd(data),
       }}
     />
   )

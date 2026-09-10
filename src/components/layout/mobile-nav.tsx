@@ -68,13 +68,31 @@ export function MobileNav({ open, onOpenChange, whatsappUrl }: MobileNavProps) {
           id="mobile-nav-panel"
           data-tone="dark"
           className={cn(
-            // Anchored to the left edge, under the brand mark, and it
-            // enters from there. The trigger stays at the right of the
-            // header — the drawer is a full-height panel that takes over
-            // the screen, not a popover hanging off its button, so it is
-            // read as the site's navigation arriving rather than as that
-            // control unfolding.
-            "fixed inset-y-0 left-0 z-50 flex h-full w-full max-w-sm flex-col",
+            // Anchored to the left edge, directly under the menu trigger,
+            // and it enters from there.
+            //
+            // ── Why it no longer fills the screen ──────────────────────
+            // It was `w-full max-w-sm`, which on any phone narrower than
+            // 384px — most of them — meant a panel covering the display
+            // edge to edge. A drawer that takes the whole screen is
+            // indistinguishable from a page navigation: the page the
+            // customer was reading disappears, so opening the menu to check
+            // something and closing it again feels like a round trip rather
+            // than a glance.
+            //
+            // Leaving roughly a third of the page visible behind the
+            // backdrop keeps it legible as a panel *over* the page, and
+            // gives a thumb somewhere to press to dismiss it that is not the
+            // close button.
+            //
+            // The floor matters as much as the ceiling: `min-w-64` (256px)
+            // is what the longest entry needs — "Track My Order" at the
+            // drawer's type size, plus the left rail, the trailing arrow and
+            // the "Soon" marker an unavailable link can carry. Below that
+            // the labels start wrapping. 70% of a 360px phone is 252px, so
+            // without the floor the smallest phones would be exactly the
+            // ones that broke.
+            "fixed inset-y-0 left-0 z-50 flex h-full w-[70%] min-w-64 max-w-xs flex-col",
             "bg-foreground text-background outline-none",
             "shadow-[0_0_60px_oklch(0_0_0/0.4)]",
             "duration-base ease-crownline",

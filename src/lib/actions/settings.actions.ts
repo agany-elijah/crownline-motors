@@ -43,6 +43,7 @@ export async function updateBusinessSettingsAction(
     defaultInitialPercentage: formData.get("defaultInitialPercentage"),
     defaultMombasaPercentage: formData.get("defaultMombasaPercentage"),
     defaultFinalPercentage: formData.get("defaultFinalPercentage"),
+    sparePartDeliverySteps: formData.get("sparePartDeliverySteps"),
   })
 
   if (!parsed.success) {
@@ -82,6 +83,23 @@ export async function updateBusinessSettingsAction(
           defaultInitialPercentage: input.defaultInitialPercentage,
           defaultMombasaPercentage: input.defaultMombasaPercentage,
           defaultFinalPercentage: input.defaultFinalPercentage,
+          /**
+           * Written as the validated array, never as the raw submitted
+           * string. Everything stored in this Json column therefore has the
+           * shape the read path expects — which matters because Postgres
+           * checks nothing inside a jsonb value, so this write is the only
+           * place the shape can be guaranteed.
+           *
+           * An empty array is stored as an empty array, not as NULL: the two
+           * mean different things (see the DTO), and collapsing them would
+           * make it impossible for an operator to hide the section.
+           *
+           * `undefined` — a request that did not mention the steps at all —
+           * reaches Prisma as "leave this column alone", which is precisely
+           * the intended reading. It is why a crafted POST carrying only the
+           * percentages cannot clear an operator's configured steps.
+           */
+          sparePartDeliverySteps: input.sparePartDeliverySteps,
         },
         create: {
           id: 1,
@@ -89,6 +107,7 @@ export async function updateBusinessSettingsAction(
           defaultInitialPercentage: input.defaultInitialPercentage,
           defaultMombasaPercentage: input.defaultMombasaPercentage,
           defaultFinalPercentage: input.defaultFinalPercentage,
+          sparePartDeliverySteps: input.sparePartDeliverySteps,
         },
       })
 
@@ -113,6 +132,17 @@ export async function updateBusinessSettingsAction(
               mombasa: String(input.defaultMombasaPercentage),
               final: String(input.defaultFinalPercentage),
             },
+            /**
+             * The steps are recorded as a *count*, not verbatim.
+             *
+             * An audit entry answers "who changed what, and when". Two copies
+             * of six paragraphs of marketing copy in every settings audit row
+             * would bury the financial change sitting beside it — which is
+             * the change this log exists for. The copy itself is public on
+             * every part page and recoverable from a database backup.
+             */
+            sparePartDeliveryStepCount:
+              input.sparePartDeliverySteps?.length ?? "unchanged",
           },
         },
         tx

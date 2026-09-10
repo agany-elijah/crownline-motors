@@ -4,6 +4,7 @@ import { Car, Plus } from "lucide-react"
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header"
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table"
+import { Pagination } from "@/components/shared/pagination"
 import { VehicleListFilters } from "@/components/admin/vehicle-list-filters"
 import { VehicleStatusBadge } from "@/components/admin/vehicle-status-badge"
 import { Button } from "@/components/ui/button"
@@ -165,12 +166,18 @@ export default async function AdminVehiclesPage(
       />
 
       {result.pageCount > 1 ? (
-        <Pagination
-          page={result.page}
-          pageCount={result.pageCount}
-          total={result.total}
-          searchParams={searchParams}
-        />
+        <div className="flex flex-col gap-3">
+          <p className="text-small text-muted-foreground">
+            <span className="tabular">{result.total}</span> vehicles
+          </p>
+          <Pagination
+            page={result.page}
+            pageCount={result.pageCount}
+            hrefFor={(target) => paginationHref(searchParams, target)}
+            label="Vehicle list pages"
+            className="border-t-0 pt-0"
+          />
+        </div>
       ) : null}
     </div>
   )
@@ -224,49 +231,34 @@ function EmptyVehicles({ hasFilters }: { hasFilters: boolean }) {
   )
 }
 
-function Pagination({
-  page,
-  pageCount,
-  total,
-  searchParams,
-}: {
-  page: number
-  pageCount: number
-  total: number
-  searchParams: Record<string, string | string[] | undefined>
-}) {
-  function hrefFor(target: number) {
-    const params = new URLSearchParams()
-    for (const [key, value] of Object.entries(searchParams)) {
-      if (typeof value === "string" && key !== "page") params.set(key, value)
+/**
+ * A list URL with the current search and status filters preserved.
+ *
+ * Built from the raw `searchParams` rather than from the parsed filters so
+ * that a key added to the list later is carried through pagination without
+ * anyone having to remember to add it here. Array values are dropped: a
+ * repeated key is not a filter this list can satisfy, and the parser takes
+ * the first occurrence anyway.
+ */
+function paginationHref(
+  searchParams: Record<string, string | string[] | undefined>,
+  target: number
+): string {
+  const params = new URLSearchParams()
+
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (typeof value === "string" && value !== "" && key !== "page") {
+      params.set(key, value)
     }
-    params.set("page", String(target))
-    return `${ADMIN_BASE_PATH}/vehicles?${params.toString()}`
   }
 
-  return (
-    <nav
-      aria-label="Vehicle list pages"
-      className="flex items-center justify-between gap-4"
-    >
-      <p className="text-small text-muted-foreground">
-        Page <span className="tabular-nums">{page}</span> of{" "}
-        <span className="tabular-nums">{pageCount}</span> ·{" "}
-        <span className="tabular-nums">{total}</span> vehicles
-      </p>
+  // Page one is the default and is left out, so the list has one address
+  // rather than two.
+  if (target > 1) params.set("page", String(target))
 
-      <div className="flex items-center gap-2">
-        {page > 1 ? (
-          <Button render={<Link href={hrefFor(page - 1)} />} variant="outline" size="sm">
-            Previous
-          </Button>
-        ) : null}
-        {page < pageCount ? (
-          <Button render={<Link href={hrefFor(page + 1)} />} variant="outline" size="sm">
-            Next
-          </Button>
-        ) : null}
-      </div>
-    </nav>
-  )
+  const query = params.toString()
+
+  return query
+    ? `${ADMIN_BASE_PATH}/vehicles?${query}`
+    : `${ADMIN_BASE_PATH}/vehicles`
 }

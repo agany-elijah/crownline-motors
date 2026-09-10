@@ -497,6 +497,41 @@
     }
   }
 
+  /* ── Page entrance ────────────────────────────────────────────
+     For content that is *already on screen* when a page opens, which the
+     scroll reveal above deliberately cannot serve: `[data-reveal]` waits
+     for an IntersectionObserver, and an element that starts in view has no
+     intersection to wait for — it simply appears with the page.
+
+     A CSS animation rather than a React state flip, so it costs no client
+     JavaScript, runs on the very first paint, and cannot leave content
+     stranded at `opacity: 0` if a bundle never arrives. `both` fill means
+     the element holds its final state once the animation has run, so this
+     plays exactly once per page load and never again.
+
+     Scoped to `prefers-reduced-motion: no-preference`. Unlike the reveal
+     block this needs no `(scripting: enabled)` guard — with the rule
+     inactive the element is simply visible, which is the correct
+     degradation rather than a trap.
+
+     `--entrance-delay` staggers siblings. Keep the offsets short: the
+     brief's rule is that a visitor should think "this feels smooth", not
+     "that page has an intro". */
+  @media (prefers-reduced-motion: no-preference) {
+    [data-entrance] {
+      animation: crownline-entrance var(--duration-base) var(--ease-crownline)
+        both;
+      animation-delay: var(--entrance-delay, 0ms);
+    }
+
+    /* The hairline under a masthead heading — it draws itself outward from
+       the centre rather than fading, which is what makes the group read as
+       one composed movement instead of three things fading at once. */
+    [data-entrance="rule"] {
+      animation-name: crownline-entrance-rule;
+    }
+  }
+
   /* Global reduced-motion honouring. Animation in this design is
      decorative throughout — nothing communicates state through motion
      alone — so collapsing it to near-zero is safe and complete. */
@@ -509,6 +544,33 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+  }
+}
+
+/* ── Entrance keyframes ─────────────────────────────────────────
+   Consumed by the `[data-entrance]` rules in the base layer above. Defined
+   outside the layer because @keyframes is not affected by cascade layers
+   and keeping them here makes them easy to find alongside the other
+   motion primitives. */
+@keyframes crownline-entrance {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes crownline-entrance-rule {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
   }
 }
 

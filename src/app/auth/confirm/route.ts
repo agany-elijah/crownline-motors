@@ -49,11 +49,38 @@ function redirectToPath(path: string): NextResponse {
   })
 }
 
+/**
+ * The token types this application issues: a password recovery, and the
+ * invitation that provisions an administrator.
+ *
+ * The value arrives in a query string, so it is untrusted, and it used to be
+ * cast straight to `EmailOtpType`. Supabase would reject nonsense, but
+ * "signup", "magiclink" and "email_change" are real types for flows this
+ * project never runs, and the route should not complete them.
+ *
+ * "email" is accepted alongside "invite" because it is Supabase's unified
+ * type for invitation token hashes — which of the two an invite template
+ * uses depends on how the template in the dashboard was written, and
+ * refusing one would lock a new administrator out of their invitation. This
+ * is defence in depth, not the gate: a session obtained here reaches nothing
+ * until the DAL finds an active AdminProfile for it.
+ */
+const ACCEPTED_OTP_TYPES: ReadonlySet<EmailOtpType> = new Set<EmailOtpType>([
+  "recovery",
+  "invite",
+  "email",
+])
+
+function parseOtpType(value: string | null): EmailOtpType | null {
+  if (!value) return null
+  return ACCEPTED_OTP_TYPES.has(value as EmailOtpType) ? (value as EmailOtpType) : null
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
 
   const tokenHash = searchParams.get("token_hash")
-  const type = searchParams.get("type") as EmailOtpType | null
+  const type = parseOtpType(searchParams.get("type"))
   const next = searchParams.get("next")
 
   // Where to land after a successful exchange. Re-validated rather than

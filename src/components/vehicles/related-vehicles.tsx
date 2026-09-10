@@ -1,7 +1,7 @@
 import { Reveal } from "@/components/shared/reveal"
 import { Section, SectionHeading } from "@/components/layout/section"
 import { VehicleCard } from "@/components/vehicles/vehicle-card"
-import { VehicleCarousel } from "@/components/vehicles/vehicle-carousel"
+import { CardCarousel } from "@/components/shared/card-carousel"
 import type { PublicVehicleCard } from "@/lib/queries/public-vehicle.queries"
 
 /**
@@ -22,7 +22,7 @@ import type { PublicVehicleCard } from "@/lib/queries/public-vehicle.queries"
  *
  * ── A strip, not a grid ───────────────────────────────────────────────
  * The cards scroll horizontally on every screen, phone and desktop alike.
- * See VehicleCarousel for why that is native scrolling rather than a
+ * See CardCarousel for why that is native scrolling rather than a
  * carousel library, and why these cards and this heading are rendered
  * here, on the server, and handed to the client island rather than built
  * inside it.
@@ -88,7 +88,7 @@ export function RelatedVehicles({ vehicles, make }: RelatedVehiclesProps) {
       */}
       <div className="mx-auto w-full max-w-6xl">
         <Reveal>
-          <VehicleCarousel
+          <CardCarousel
             label={`More ${make} vehicles`}
             heading={
               <SectionHeading
@@ -109,7 +109,7 @@ export function RelatedVehicles({ vehicles, make }: RelatedVehiclesProps) {
                 <VehicleCard vehicle={vehicle} sizes={CARD_IMAGE_SIZES} />
               </li>
             ))}
-          </VehicleCarousel>
+          </CardCarousel>
         </Reveal>
       </div>
     </Section>

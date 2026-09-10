@@ -28,7 +28,9 @@ import { VEHICLE_YEAR_MIN, vehicleYearMax } from "@/lib/constants/vehicle-option
 
 vi.mock("@/lib/prisma", () => ({ prisma: {} }))
 
-const { vehicleSearchWhere } = await import("@/lib/queries/public-vehicle.queries")
+const { vehicleSearchTerms, vehicleSearchWhere } = await import(
+  "@/lib/queries/public-vehicle.queries"
+)
 
 describe("parseVehicleSearchParams", () => {
   it("returns the full published set when nothing is filtered", () => {
@@ -112,6 +114,83 @@ describe("parseVehicleSearchParams", () => {
   })
 })
 
+describe("parseVehicleSearchParams — the free-text box", () => {
+  it("keeps a typed query", () => {
+    expect(parseVehicleSearchParams({ q: "Toyota Harrier" }).q).toBe("Toyota Harrier")
+  })
+
+  it("collapses whitespace so one search has one address", () => {
+    // "toyota   harrier" and "toyota harrier" are the same search. Left
+    // alone they would be two URLs over one result set, which splits
+    // caching and search-engine signal for no reason.
+    expect(parseVehicleSearchParams({ q: "  toyota   harrier " }).q).toBe(
+      "toyota harrier"
+    )
+  })
+
+  it("treats an empty box as no search", () => {
+    // A GET form submits every field, so an untouched bar posts "?q=".
+    expect(parseVehicleSearchParams({ q: "" }).q).toBeUndefined()
+    expect(parseVehicleSearchParams({ q: "   " }).q).toBeUndefined()
+    expect(hasActiveSearch(parseVehicleSearchParams({ q: " " }))).toBe(false)
+  })
+
+  it("counts a text search as an active search", () => {
+    // The empty state and the result-count wording both branch on this: a
+    // fruitless text search must say "no vehicles match", not "no vehicles
+    // listed yet".
+    expect(hasActiveSearch(parseVehicleSearchParams({ q: "harrier" }))).toBe(true)
+  })
+
+  it("drops a pasted paragraph rather than sending it to the database", () => {
+    expect(parseVehicleSearchParams({ q: "x".repeat(500) }).q).toBeUndefined()
+  })
+})
+
+describe("vehicleSearchTerms", () => {
+  it("splits a query into words", () => {
+    expect(vehicleSearchTerms("toyota harrier")).toEqual([
+      { pattern: "toyota", year: null },
+      { pattern: "harrier", year: null },
+    ])
+  })
+
+  it("recognises a four-digit word as a year", () => {
+    expect(vehicleSearchTerms("harrier 2021")).toEqual([
+      { pattern: "harrier", year: null },
+      { pattern: "2021", year: 2021 },
+    ])
+  })
+
+  it("treats a four-digit number no listing could hold as text", () => {
+    // "1234" is not a model year, and matching it as one would silently
+    // widen the search to every vehicle in a year that cannot exist.
+    expect(vehicleSearchTerms("1234")).toEqual([{ pattern: "1234", year: null }])
+  })
+
+  it("escapes the wildcards LIKE would otherwise read", () => {
+    // Not an injection defence — Prisma binds the value — but a customer
+    // typing "%" must not match the entire floor, and "_" must not match
+    // any single character.
+    expect(vehicleSearchTerms("100%")).toEqual([
+      { pattern: "100\\%", year: null },
+    ])
+    expect(vehicleSearchTerms("a_b")).toEqual([{ pattern: "a\\_b", year: null }])
+    expect(vehicleSearchTerms("a\\b")).toEqual([
+      { pattern: "a\\\\b", year: null },
+    ])
+  })
+
+  it("caps how many words reach the database", () => {
+    // A hand-edited URL must not turn one page load into eighty scans.
+    expect(vehicleSearchTerms("a b c d e f g h i j")).toHaveLength(6)
+  })
+
+  it("returns nothing for an absent query", () => {
+    expect(vehicleSearchTerms(undefined)).toEqual([])
+  })
+})
+
 describe("vehicleSearchWhere", () => {
   it("produces no constraints when nothing is filtered", () => {
     expect(vehicleSearchWhere({})).toEqual({})
@@ -151,6 +230,68 @@ describe("vehicleSearchWhere", () => {
       year: 2021,
     })
     expect(where).not.toHaveProperty("OR")
+  })
+
+  it("matches each word against make, model or year", () => {
+    // One box standing in for three fields: the customer should not have to
+    // decide which one they are searching.
+    const where = vehicleSearchWhere({ q: "harrier" })
+
+    expect(where.AND).toEqual([
+      {
+        OR: [
+          { make: { contains: "harrier", mode: "insensitive" } },
+          { model: { contains: "harrier", mode: "insensitive" } },
+        ],
+      },
+    ])
+  })
+
+  it("ANDs the words and ORs the fields within each", () => {
+    // "harrier 2021" means "a Harrier, from 2021". The other reading —
+    // anything Harrier-ish OR anything from 2021 — returns the whole 2021
+    // floor and looks like a search that ignored half the query.
+    const where = vehicleSearchWhere({ q: "harrier 2021" })
+
+    expect(where.AND).toHaveLength(2)
+    expect(where.AND).toEqual([
+      {
+        OR: [
+          { make: { contains: "harrier", mode: "insensitive" } },
+          { model: { contains: "harrier", mode: "insensitive" } },
+        ],
+      },
+      {
+        OR: [
+          { make: { contains: "2021", mode: "insensitive" } },
+          { model: { contains: "2021", mode: "insensitive" } },
+          { year: 2021 },
+        ],
+      },
+    ])
+  })
+
+  it("matches text case-insensitively and partially", () => {
+    // A customer typing into a box works from memory: half a name is a
+    // legitimate query, and nobody capitalises in a hurry.
+    const where = vehicleSearchWhere({ q: "HARRIER" }) as {
+      AND?: { OR: { make?: Record<string, unknown> }[] }[]
+    }
+
+    expect(where.AND?.[0].OR[0].make).toEqual({
+      contains: "HARRIER",
+      mode: "insensitive",
+    })
+  })
+
+  it("narrows with the dropdowns rather than replacing them", () => {
+    // Typing "harrier" and then choosing 2021 must return vehicles matching
+    // both. A flat object is an AND in Prisma.
+    const where = vehicleSearchWhere({ q: "harrier", make: "Toyota", year: 2021 })
+
+    expect(where.make).toEqual({ equals: "Toyota", mode: "insensitive" })
+    expect(where.year).toBe(2021)
+    expect(where.AND).toHaveLength(1)
   })
 
   it("cannot smuggle a status past the visibility rule", async () => {

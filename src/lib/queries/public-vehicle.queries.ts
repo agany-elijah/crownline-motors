@@ -5,7 +5,9 @@ import { cache } from "react"
 import type { Prisma } from "@/generated/prisma/client"
 import type { VehicleCondition } from "@/generated/prisma/enums"
 import { VehicleStatus } from "@/generated/prisma/enums"
+import { VEHICLE_YEAR_MIN, vehicleYearMax } from "@/lib/constants/vehicle-options"
 import { prisma } from "@/lib/prisma"
+import { escapeLikePattern } from "@/lib/utils/like-pattern"
 import { vehiclePhotoPublicUrl } from "@/lib/storage/vehicle-media"
 import type { VehicleSearchCriteria } from "@/lib/validations/vehicle-search.schema"
 
@@ -151,9 +153,53 @@ const CARD_ORDER_BY = [
 ] satisfies Prisma.VehicleOrderByWithRelationInput[]
 
 /**
+ * How many words of a free-text query are actually used.
+ *
+ * Each word becomes its own `ILIKE` pair, so the cost of a query is linear
+ * in the number of words. Six is past anything a real search needs
+ * ("toyota land cruiser prado 2019" is four) and stops a hand-edited URL
+ * turning one page load into eighty sequential scans.
+ */
+const SEARCH_TERM_LIMIT = 6
+
+/** A four-digit word, which is the only thing that can be a model year. */
+const YEAR_LIKE = /^\d{4}$/
+
+/**
+ * Splits a free-text query into the words that will be matched.
+ *
+ * Exported for the unit tests: the tokenising rules (word limit, year
+ * detection, wildcard escaping) are the part of the search most likely to
+ * be changed later by someone who cannot see the query it produces.
+ */
+export function vehicleSearchTerms(
+  query: string | undefined
+): { pattern: string; year: number | null }[] {
+  if (!query) return []
+
+  return query
+    .split(/\s+/)
+    .filter((word) => word.length > 0)
+    .slice(0, SEARCH_TERM_LIMIT)
+    .map((word) => {
+      const year = YEAR_LIKE.test(word) ? Number(word) : null
+
+      return {
+        pattern: escapeLikePattern(word),
+        // Bounded by the same range a listing can actually hold, so "1234"
+        // is treated as text rather than as a year no vehicle has.
+        year:
+          year !== null && year >= VEHICLE_YEAR_MIN && year <= vehicleYearMax()
+            ? year
+            : null,
+      }
+    })
+}
+
+/**
  * Turns the parsed search criteria into a `where` fragment (Stage 12).
  *
- * ── Why case-insensitive equality, not `contains` ─────────────────────
+ * ── The dropdowns: case-insensitive equality, not `contains` ──────────
  * The filter bar is a set of dropdowns whose options are the makes, models
  * and years that actually exist in the published inventory, so the value is
  * a whole make or a whole model — never a fragment. `contains` would make
@@ -163,22 +209,50 @@ const CARD_ORDER_BY = [
  * Insensitive because the URL is hand-editable and shared: `?make=toyota`
  * typed into a phone must find the same cars as the dropdown's "Toyota".
  *
- * ── A note for when the inventory grows ───────────────────────────────
- * `mode: "insensitive"` compiles to `ILIKE` with no wildcards, which neither
- * the `[make, model]` B-tree nor the trigram GIN indexes can serve, so this
- * is a sequential scan. On a single dealership's inventory — hundreds of
- * rows, not millions — that is microseconds and not worth an index. If this
- * ever holds tens of thousands of vehicles, the fix is a functional index on
- * `lower("make")` / `lower("model")`, not a change to this logic.
+ * ── The search box: every word must match something ───────────────────
+ * `q` is one field standing in for three, so each word is matched against
+ * make, model *or* year (an OR), and the words are then ANDed together.
+ * That is what makes "harrier 2021" mean "a Harrier, from 2021" rather than
+ * "anything Harrier-ish or anything from 2021" — the second reading returns
+ * the whole 2021 floor and reads as a search that ignored half the query.
  *
- * Filters are ANDed: choosing a make, a model and a year returns the
- * vehicles matching all three, which is the "Toyota → Harrier → 2021"
- * journey from the brief.
+ * Here `contains` is right where `equals` was right above: a customer
+ * typing into a box is working from memory and half a name ("cruis") is a
+ * legitimate query, whereas a dropdown hands back a whole value.
+ *
+ * Case is handled by `mode: "insensitive"` rather than by lower-casing the
+ * input, so "HARRIER", "Harrier" and "harrier" are one search.
+ *
+ * ── A note for when the inventory grows ───────────────────────────────
+ * `mode: "insensitive"` compiles to `ILIKE`, which neither the
+ * `[make, model]` B-tree nor a plain index can serve — and with `contains`
+ * the pattern is leading-wildcard, so no B-tree ever could. Both are
+ * sequential scans. On a single dealership's inventory — hundreds of rows,
+ * not millions — that is microseconds, and the page reads only one bounded
+ * page of results at a time. If this ever holds tens of thousands of
+ * vehicles, the fix is a `pg_trgm` GIN index on `make` and `model` (which
+ * *does* serve a leading-wildcard `ILIKE`), not a change to this logic.
+ *
+ * Filters are ANDed with each other and with the search box: typing
+ * "harrier" and then choosing 2021 returns the vehicles matching both,
+ * which is the "Toyota → Harrier → 2021" journey from the brief.
  */
 export function vehicleSearchWhere(
   criteria: VehicleSearchCriteria
 ): PublicVehicleFilters {
   const where: PublicVehicleFilters = {}
+
+  const terms = vehicleSearchTerms(criteria.q)
+
+  if (terms.length > 0) {
+    where.AND = terms.map(({ pattern, year }) => ({
+      OR: [
+        { make: { contains: pattern, mode: "insensitive" } },
+        { model: { contains: pattern, mode: "insensitive" } },
+        ...(year === null ? [] : [{ year }]),
+      ],
+    }))
+  }
 
   if (criteria.make) {
     where.make = { equals: criteria.make, mode: "insensitive" }
@@ -207,9 +281,22 @@ export async function listPublishedVehicles(options?: {
   criteria?: VehicleSearchCriteria
 }): Promise<PublicVehicleListResult> {
   const page = Math.max(1, options?.page ?? 1)
+
+  /**
+   * Composed through `AND` rather than by spreading both objects into one.
+   *
+   * A spread makes the two fragments share a key space, and the search
+   * fragment now owns `AND` — so a caller-supplied filter using the same
+   * key would be silently dropped by whichever object was spread second.
+   * Nesting them keeps each fragment intact whatever either one contains,
+   * and `publicVehicleWhere` still pins the status on the outside where no
+   * caller can reach it.
+   */
   const where = publicVehicleWhere({
-    ...options?.filters,
-    ...(options?.criteria ? vehicleSearchWhere(options.criteria) : {}),
+    AND: [
+      options?.filters ?? {},
+      options?.criteria ? vehicleSearchWhere(options.criteria) : {},
+    ],
   })
 
   const [total, rows] = await prisma.$transaction([
@@ -223,11 +310,52 @@ export async function listPublishedVehicles(options?: {
     }),
   ])
 
+  const pageCount = Math.max(1, Math.ceil(total / PUBLIC_VEHICLES_PER_PAGE))
+
+  /**
+   * A page past the end of the result set returns the last real page.
+   *
+   * `?page=99` on a three-page catalogue otherwise returns nothing, and the
+   * catalogue renders "No vehicles match those filters" over an empty grid
+   * — telling a customer their search failed when it matched three pages of
+   * vehicles. It is reachable from a stale bookmark, from a crawler
+   * following an old link, and from anyone who edits the address.
+   *
+   * ── Why clamped here rather than redirected by the page ───────────────
+   * A `redirect()` in the catalogue page cannot work: `loading.tsx` opens a
+   * Suspense boundary over that segment, so the response is already
+   * committed by the time this query resolves, and the redirect surfaces as
+   * a caught error inside a 200 rather than as a 3xx. Clamping depends on
+   * no streaming behaviour at all, and cannot be broken by a boundary
+   * someone adds later.
+   *
+   * The extra read costs one query, and only on the out-of-range request
+   * that would otherwise have rendered nothing at all. Duplicate addresses
+   * are not an SEO problem here: every catalogue view already declares
+   * `/cars` as its canonical.
+   */
+  if (page > pageCount) {
+    const lastPage = await prisma.vehicle.findMany({
+      where,
+      orderBy: CARD_ORDER_BY,
+      skip: (pageCount - 1) * PUBLIC_VEHICLES_PER_PAGE,
+      take: PUBLIC_VEHICLES_PER_PAGE,
+      select: CARD_SELECT,
+    })
+
+    return {
+      vehicles: lastPage.map(toCard),
+      total,
+      page: pageCount,
+      pageCount,
+    }
+  }
+
   return {
     vehicles: rows.map(toCard),
     total,
     page,
-    pageCount: Math.max(1, Math.ceil(total / PUBLIC_VEHICLES_PER_PAGE)),
+    pageCount,
   }
 }
 
