@@ -1,4 +1,46 @@
 {
+  // ⚠️ The exclusion blocks below are duplicated in
+  // .devcontainer/devcontainer.json, under customizations.vscode.settings.
+  // That is deliberate: a Codespace applies the container's settings
+  // before the workspace folder is resolved, so the container copy is what
+  // protects the first minute of a session and this copy is what protects
+  // a local checkout. Change one, change the other.
+  //
+  // Why they exist at all: this workspace is ~49,000 files, ~48,700 of
+  // them in node_modules. VS Code takes an inotify watch per directory,
+  // and `fs.inotify.max_user_instances` is 128 per user — shared between
+  // the file watcher, the TypeScript server, ESLint, Tailwind IntelliSense,
+  // the Prisma language server and the Next.js dev server. Left
+  // unexcluded, they starve each other and the editor and terminal stall
+  // for seconds at a time.
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/src/generated/**": true,
+    "**/test-results/**": true,
+    "**/playwright-report/**": true,
+    "**/coverage/**": true
+  },
+
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.next": true,
+    "**/src/generated": true,
+    "**/coverage": true,
+    "**/test-results": true,
+    "**/playwright-report": true,
+    "**/package-lock.json": true
+  },
+
+  "typescript.tsserver.watchOptions": {
+    "watchFile": "useFsEventsOnParentDirectory",
+    "watchDirectory": "useFsEvents",
+    "fallbackPolling": "dynamicPriority"
+  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "tailwindCSS.experimental.classRegex": [["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"]]
