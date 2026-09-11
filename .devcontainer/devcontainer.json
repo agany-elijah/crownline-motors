@@ -1,6 +1,20 @@
 {
+  // ─────────────────────────────────────────────────────────────────
+  // Crownline Motors — Codespaces / dev container
+  //
+  // ⚠️ Read this before changing the lifecycle commands below. The way
+  // they are split across onCreate / updateContent / postCreate is not
+  // stylistic — it is what makes a Codespace start in a minute instead
+  // of the best part of an hour, and what keeps the editor responsive
+  // once it has.
+  //
+  // The workspace is heavy: ~1.2 GB and ~49,000 files, of which ~48,700
+  // are node_modules. Everything below exists to keep that weight off
+  // the critical path and out of the file watchers.
+  // ─────────────────────────────────────────────────────────────────
   "name": "Crownline Motors",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+
   "customizations": {
     "vscode": {
       "extensions": [
@@ -8,11 +22,109 @@
         "bradlc.vscode-tailwindcss",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode"
-      ]
+      ],
+      // ── Why these settings live here as well as in .vscode/settings.json
+      // A Codespace applies the container's settings before the workspace
+      // folder is fully resolved, so putting the watcher exclusions here
+      // means they are in force from the first second rather than from
+      // whenever the workspace settings are read. The duplication is
+      // deliberate; keep the two files in step.
+      "settings": {
+        // The single most important block in this file.
+        //
+        // VS Code's file watcher registers an inotify watch per directory.
+        // node_modules alone is ~4,700 directories, and `.next` is rewritten
+        // continuously by the dev server. Without these exclusions the
+        // watcher, the TypeScript server, ESLint, Tailwind IntelliSense and
+        // the Prisma language server all compete for a per-process inotify
+        // budget (`fs.inotify.max_user_instances` is 128), and the editor
+        // and terminal stall for seconds at a time. Excluding them costs
+        // nothing: nobody edits a dependency or a build artifact by hand.
+        "files.watcherExclude": {
+          "**/node_modules/**": true,
+          "**/.next/**": true,
+          "**/.git/objects/**": true,
+          "**/.git/subtree-cache/**": true,
+          "**/src/generated/**": true,
+          "**/test-results/**": true,
+          "**/playwright-report/**": true,
+          "**/coverage/**": true
+        },
+        // Keeps full-text search off 48,000 dependency files. Without it,
+        // a single Ctrl+Shift+F pins the CPU long enough to drop the tunnel.
+        "search.exclude": {
+          "**/node_modules": true,
+          "**/.next": true,
+          "**/src/generated": true,
+          "**/coverage": true,
+          "**/test-results": true,
+          "**/playwright-report": true,
+          "**/package-lock.json": true
+        },
+        // The Prisma client is regenerated from schema.prisma and is not
+        // edited by hand. Indexing its 2 MB of declarations on every
+        // regeneration is pure cost.
+        "typescript.tsserver.watchOptions": {
+          "watchFile": "useFsEventsOnParentDirectory",
+          "watchDirectory": "useFsEvents",
+          "fallbackPolling": "dynamicPriority"
+        },
+        // Node's own resolution already finds the workspace TypeScript;
+        // this stops the editor prompting on every attach.
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+      }
     }
   },
-  "forwardPorts": [3000, 3001],
-  "postCreateCommand": "npm install",
-  "postAttachCommand": "npx prisma generate"
-}
 
+  "forwardPorts": [3000, 3001],
+
+  // ── Lifecycle ────────────────────────────────────────────────────
+  //
+  // onCreateCommand      runs once, and is the ONLY stage a prebuild can
+  //                      bake. Dependency installation belongs here, so a
+  //                      prebuilt Codespace starts with node_modules
+  //                      already on disk instead of downloading 800
+  //                      packages while you wait.
+  //
+  // updateContentCommand runs on create AND whenever a prebuild is
+  //                      refreshed. `npm ci` against an unchanged lockfile
+  //                      is close to a no-op, so this keeps a prebuild
+  //                      current without repeating the full install.
+  //
+  // postCreateCommand    runs once after the source is in place. The
+  //                      Prisma client is generated here, not on attach.
+  //
+  // There is deliberately NO postAttachCommand. The previous configuration
+  // ran `npx prisma generate` on every attach — every reconnect, every
+  // wake from idle, every browser refresh. That rewrote 28 files into
+  // src/generated, which the TypeScript server then re-indexed, which is
+  // precisely the "laggy for a while after reconnecting" symptom. It also
+  // fails outright when DIRECT_URL is absent, because prisma.config.ts
+  // resolves that variable eagerly — so an attach could end on a red error
+  // for a step that did not need to run at all.
+  //
+  // `npm ci` rather than `npm install`: it is faster from a clean state,
+  // and it refuses to silently rewrite package-lock.json, which matters
+  // when CI validates against that lockfile.
+  "onCreateCommand": "npm ci",
+  "updateContentCommand": "npm ci",
+  "postCreateCommand": "npx prisma generate",
+
+  // Lets the editor attach as soon as the container exists rather than
+  // blocking the UI behind the install. You may briefly see missing
+  // types while onCreate finishes; that is a far better experience than
+  // a blank screen.
+  "waitFor": "onCreateCommand",
+
+  // Next.js dev, the TypeScript server, ESLint, Tailwind IntelliSense and
+  // the Prisma LSP run concurrently. Two cores is where that starts to
+  // thrash; asking for four makes Codespaces refuse to start on an
+  // undersized machine rather than giving you a slow one.
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+  }
+}
