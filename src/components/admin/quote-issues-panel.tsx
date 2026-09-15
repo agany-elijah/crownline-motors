@@ -59,10 +59,7 @@ export function QuoteIssuesPanel({ hasEmail, hasWhatsapp, isWon }: QuoteIssuesPa
     return (
       <section className="flex items-start gap-2.5 rounded-xl bg-success/5 p-5 ring-1 ring-success/25">
         <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-success" />
-        <div className="flex flex-col gap-0.5">
-          <p className="text-small font-medium text-foreground">Ready to send</p>
-          <p className="text-small text-muted-foreground">No outstanding issues on this quote.</p>
-        </div>
+        <p className="text-small font-medium text-foreground">Ready to send</p>
       </section>
     )
   }

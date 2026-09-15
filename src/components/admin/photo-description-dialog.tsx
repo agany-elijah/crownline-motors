@@ -7,7 +7,6 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -76,11 +75,6 @@ export function PhotoDescriptionDialog({
       <DialogContent showCloseButton={false} className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Describe this photograph</DialogTitle>
-          <DialogDescription>
-            Read aloud to visitors using a screen reader, and read by search
-            engines. Optional — leave it empty and the website describes the
-            photograph automatically.
-          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-2">
@@ -93,21 +87,14 @@ export function PhotoDescriptionDialog({
             maxLength={MAX_PHOTO_ALT_TEXT_LENGTH}
             onChange={(event) => setDraft(event.target.value)}
             placeholder={fallback}
-            aria-describedby="photo-alt-text-hint"
+            aria-describedby={tooLong ? "photo-alt-text-hint" : undefined}
           />
 
-          <p id="photo-alt-text-hint" className="text-small text-muted-foreground">
-            {draft.trim().length === 0 ? (
-              <>
-                Currently described as{" "}
-                <span className="text-foreground">“{fallback}”</span>.
-              </>
-            ) : (
-              <span className={tooLong ? "text-destructive" : undefined}>
-                {remaining} character{remaining === 1 ? "" : "s"} left.
-              </span>
-            )}
-          </p>
+          {tooLong ? (
+            <p id="photo-alt-text-hint" className="text-small text-destructive">
+              {Math.abs(remaining)} characters too long.
+            </p>
+          ) : null}
         </div>
 
         <DialogFooter>

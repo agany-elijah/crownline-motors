@@ -151,7 +151,7 @@ export function VehicleForm({ vehicle }: VehicleFormProps) {
         </Alert>
       ) : null}
 
-      <FormSection title="Identity" description="Make, model and year set the permanent web address.">
+      <FormSection title="Identity">
         <Field label="Make" name="make" error={error("make")} className="sm:col-span-2"
           controlKey={controlKey}>
           {(control) => (
@@ -238,10 +238,7 @@ export function VehicleForm({ vehicle }: VehicleFormProps) {
         </Field>
       </FormSection>
 
-      <FormSection
-        title="Pricing"
-        description="Leave an estimate blank if not yet quoted — it shows as unquoted, not zero."
-      >
+      <FormSection title="Pricing">
         <Field label="Price (USD)" name="price" error={error("price")}
           controlKey={controlKey}>
           {(control) => (
@@ -476,7 +473,6 @@ export function VehicleForm({ vehicle }: VehicleFormProps) {
           )}
         </Field>
 
-        <p className="text-small text-muted-foreground">One feature per line.</p>
       </FormSection>
 
       <FormSection title="Description" columns={1}>
@@ -507,12 +503,7 @@ export function VehicleForm({ vehicle }: VehicleFormProps) {
             }
             className="mt-0.5 size-4 accent-[var(--gold)]"
           />
-          <span className="flex flex-col gap-0.5">
-            <span className="text-small font-semibold">Feature on the homepage</span>
-            <span className="text-small text-muted-foreground">
-              Shows first on the website once published.
-            </span>
-          </span>
+          <span className="text-small font-semibold">Feature on the homepage</span>
         </label>
       </FormSection>
 
@@ -539,13 +530,7 @@ export function VehicleForm({ vehicle }: VehicleFormProps) {
         gallery below.
       */}
       <div className="sticky bottom-0 z-20 -mx-4 mt-2 border-t border-border bg-card/95 px-4 py-4 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-small text-muted-foreground">
-            {isEdit
-              ? "Photographs are managed below and save on their own."
-              : "Saved as a draft — nothing appears on the website until you publish it."}
-          </p>
-
+        <div className="flex justify-end">
           <Button
             type="submit"
             size="lg"
@@ -573,23 +558,16 @@ export function VehicleForm({ vehicle }: VehicleFormProps) {
 
 function FormSection({
   title,
-  description,
   columns = 2,
   children,
 }: {
   title: string
-  description?: string
   columns?: 1 | 2
   children: React.ReactNode
 }) {
   return (
     <section className="flex flex-col gap-5 rounded-xl border border-border bg-card p-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="font-heading text-h3 font-semibold">{title}</h2>
-        {description ? (
-          <p className="max-w-2xl text-small text-muted-foreground">{description}</p>
-        ) : null}
-      </div>
+      <h2 className="font-heading text-h3 font-semibold">{title}</h2>
 
       <div
         className={cn(

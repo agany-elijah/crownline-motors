@@ -12,8 +12,8 @@ import {
   RATE_LIMIT_SCOPES,
   checkRateLimit,
   clearAttempts,
+  consumeRateLimit,
   pruneExpiredAttempts,
-  recordAttempt,
   recordFailedAttempt,
   type RateLimitKey,
 } from "@/lib/auth/rate-limit"
@@ -365,9 +365,9 @@ export async function requestPasswordResetAction(
     resetKeys.push({ scope: RATE_LIMIT_SCOPES.passwordResetIp, identifier: resetIp })
   }
 
-  const resetVerdict = await checkRateLimit(resetKeys, {
-    max: PASSWORD_RESET_MAX_ATTEMPTS,
-  })
+  const resetVerdict = await consumeRateLimit(
+    resetKeys.map((key) => ({ key, max: PASSWORD_RESET_MAX_ATTEMPTS }))
+  )
 
   if (!resetVerdict.allowed) {
     logSecurityEvent("admin_password_reset_rate_limited", {
@@ -376,8 +376,6 @@ export async function requestPasswordResetAction(
 
     return { notice: genericNotice }
   }
-
-  await recordAttempt(resetKeys)
 
   const profile = await prisma.adminProfile.findUnique({
     where: { email },

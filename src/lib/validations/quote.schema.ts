@@ -518,11 +518,26 @@ export const quoteStatusSchema = z.object({
 
 export const quoteDispatchSchema = z.object({
   quoteId: quoteIdField,
-  channel: z.enum(QuoteDispatchChannel, { error: "Choose WhatsApp or email." }),
+  channel: z.enum(QuoteDispatchChannel, { error: "Choose WhatsApp, email, or both." }),
   includeLink: checkboxField,
   /** The operator's editable opening line. Blank falls back to
    *  `defaultQuoteNote` server-side — see `sendQuoteDispatchAction`. */
   note: optionalText("Message", 2000),
+  /** Optional notes or instructions printed under the figures. */
+  instructions: optionalText("Additional notes", 2000),
+  /**
+   * Minted by the dialog each time it opens, so a double-click or a retried
+   * request cannot email the same quotation twice. A malformed value only
+   * loses that protection; it never blocks a send.
+   */
+  dispatchId: z.preprocess(
+    blankToUndefined,
+    z
+      .string()
+      .regex(/^[A-Za-z0-9-]{8,64}$/)
+      .optional()
+      .catch(undefined)
+  ),
 })
 
 export const quoteRefSchema = z.object({ quoteId: quoteIdField })

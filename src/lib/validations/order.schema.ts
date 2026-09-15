@@ -50,3 +50,16 @@ export const orderDeliveryDateSchema = z.object({
 })
 
 export type OrderDeliveryDateInput = z.infer<typeof orderDeliveryDateSchema>
+
+export const cancelOrderSchema = z.object({
+  orderId: orderIdField,
+  /** Required: cancelling a sale is exactly the action an audit is asked about. */
+  reason: z.preprocess(
+    blankToUndefined,
+    z
+      .string({ error: "Say why this order is being cancelled." })
+      .trim()
+      .min(3, "Say why this order is being cancelled.")
+      .max(500, "Reason is too long.")
+  ),
+})

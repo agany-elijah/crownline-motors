@@ -92,7 +92,6 @@ export function SparePartDeliveryStepsEditor({
   error,
 }: SparePartDeliveryStepsEditorProps) {
   /** True while the page is showing the built-in steps rather than stored ones. */
-  const isUsingDefaults = steps === null
 
   /**
    * Prefix for every field id on this form.
@@ -168,14 +167,6 @@ export function SparePartDeliveryStepsEditor({
         )}
       />
 
-      {isUsingDefaults ? (
-        <p className="rounded-lg border border-dashed border-border bg-secondary/40 px-4 py-3 text-small text-muted-foreground">
-          These are the built-in steps, shown until you save your own. Edit them
-          to match how the business actually works — saving stores them, and
-          every spare-part page updates immediately.
-        </p>
-      ) : null}
-
       <ol className="flex flex-col gap-3">
         {rows.map((row, index) => (
           <li
@@ -217,7 +208,7 @@ export function SparePartDeliveryStepsEditor({
                   rows={2}
                   value={row.description}
                   maxLength={SPARE_PART_DELIVERY_STEP_DESCRIPTION_MAX}
-                  placeholder="One sentence. What we do, and what the customer needs to do."
+                  placeholder="We confirm availability and send a quote."
                   onChange={(event) =>
                     update(index, { description: event.target.value })
                   }
@@ -262,8 +253,7 @@ export function SparePartDeliveryStepsEditor({
 
       {rows.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border px-4 py-3 text-small text-muted-foreground">
-          No steps. Saving with the list empty hides the &ldquo;How your part
-          reaches you&rdquo; section from every spare-part page.
+          No steps.
         </p>
       ) : null}
 
@@ -280,10 +270,8 @@ export function SparePartDeliveryStepsEditor({
           Add step
         </Button>
 
-        <p className="text-small text-muted-foreground">
-          {atCeiling
-            ? `${MAX_SPARE_PART_DELIVERY_STEPS} steps is the maximum — a longer list stops being read.`
-            : `${rows.length} of ${MAX_SPARE_PART_DELIVERY_STEPS} steps.`}
+        <p className="text-small text-muted-foreground tabular-nums">
+          {rows.length}/{MAX_SPARE_PART_DELIVERY_STEPS}
         </p>
       </div>
     </div>

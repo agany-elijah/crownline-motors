@@ -18,7 +18,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { COUNTRY_OPTIONS } from "@/lib/constants/vehicle-options"
 import {
-  SPARE_PART_AVAILABILITY_DESCRIPTIONS,
   SPARE_PART_AVAILABILITY_OPTIONS,
   SPARE_PART_CONDITION_OPTIONS,
   SPARE_PART_STOCK_MAX,
@@ -88,24 +87,9 @@ export function SparePartForm({ part, categories }: SparePartFormProps) {
   const [controlKey, setControlKey] = useState(0)
   const [lastState, setLastState] = useState(state)
 
-  /**
-   * Mirrors the availability select, purely so the hint under it can say what
-   * the chosen state commits the business to.
-   *
-   * Presentation only — the value that is submitted is the select's own, so
-   * the control stays uncontrolled and this cannot fight the form reset that
-   * `controlKey` exists to handle.
-   */
-  const [availability, setAvailability] = useState<string>(
-    part?.availability ?? "ON_ORDER"
-  )
-
   if (state !== lastState) {
     setLastState(state)
     setControlKey((key) => key + 1)
-    // Re-synced with the remounted select, or the hint would go on describing
-    // whatever was chosen before a rejected save reset the control.
-    setAvailability(state.values?.availability ?? part?.availability ?? "ON_ORDER")
   }
 
   /** What was submitted, then what is stored, then nothing. */
@@ -238,7 +222,6 @@ export function SparePartForm({ part, categories }: SparePartFormProps) {
           name="price"
           error={error("price")}
           optional
-          hint="Leave empty to show &ldquo;Price on enquiry&rdquo;."
           controlKey={controlKey}
         >
           {(control) => (
@@ -250,7 +233,7 @@ export function SparePartForm({ part, categories }: SparePartFormProps) {
               min={0}
               step="0.01"
               defaultValue={defaultOf("price", part?.price) ?? ""}
-              placeholder="120"
+              placeholder="Price on enquiry"
             />
           )}
         </Field>
@@ -259,12 +242,6 @@ export function SparePartForm({ part, categories }: SparePartFormProps) {
           label="Availability"
           name="availability"
           error={error("availability")}
-          hint={
-            SPARE_PART_AVAILABILITY_DESCRIPTIONS[
-              (availability as keyof typeof SPARE_PART_AVAILABILITY_DESCRIPTIONS) ??
-                "ON_ORDER"
-            ]
-          }
           controlKey={controlKey}
         >
           {(control) => (
@@ -281,10 +258,6 @@ export function SparePartForm({ part, categories }: SparePartFormProps) {
                 "ON_ORDER"
               )}
               options={SPARE_PART_AVAILABILITY_OPTIONS}
-              // Only drives the hint below the control. The submitted value
-              // is the select's own, so this stays a display concern and the
-              // field stays uncontrolled.
-              onChange={(event) => setAvailability(event.target.value)}
             />
           )}
         </Field>
@@ -293,7 +266,6 @@ export function SparePartForm({ part, categories }: SparePartFormProps) {
           label="Description"
           name="description"
           error={error("description")}
-          hint="What it is, what it fits, and its condition."
           className="sm:col-span-2 lg:col-span-4"
           controlKey={controlKey}
         >
@@ -320,12 +292,7 @@ export function SparePartForm({ part, categories }: SparePartFormProps) {
             }
             className="mt-0.5 size-4 accent-[var(--gold)]"
           />
-          <span className="flex flex-col gap-0.5">
-            <span className="text-small font-semibold">Feature in the catalogue</span>
-            <span className="text-small text-muted-foreground">
-              Featured parts appear first once published.
-            </span>
-          </span>
+          <span className="text-small font-semibold">Feature in the catalogue</span>
         </label>
       </FormSection>
 
@@ -376,7 +343,6 @@ export function SparePartForm({ part, categories }: SparePartFormProps) {
           name="stockQuantity"
           error={error("stockQuantity")}
           optional
-          hint="Empty counts as none in stock."
           controlKey={controlKey}
         >
           {(control) => (
@@ -450,13 +416,7 @@ export function SparePartForm({ part, categories }: SparePartFormProps) {
         it, and an operator who does not find it assumes the form has no save.
       */}
       <div className="sticky bottom-0 z-20 -mx-4 mt-2 border-t border-border bg-card/95 px-4 py-4 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-small text-muted-foreground">
-            {isEdit
-              ? "Publishing and archiving are handled in the Status section above."
-              : "Saved as a draft — nothing appears on the website until you publish it."}
-          </p>
-
+        <div className="flex justify-end">
           <Button
             type="submit"
             size="lg"
@@ -568,7 +528,6 @@ function Field({
   name,
   error,
   optional,
-  hint,
   className,
   controlKey,
   children,
@@ -577,10 +536,6 @@ function Field({
   name: string
   error?: string
   optional?: boolean
-  /** One short line under the control, only where the field's behaviour is
-   *  not obvious from its label. Replaced by the error message when there is
-   *  one, so the two never stack. */
-  hint?: React.ReactNode
   className?: string
   /** Changes when the form's defaults change, re-mounting the control. */
   controlKey?: number
@@ -610,8 +565,6 @@ function Field({
         <p id={errorId} className="text-small text-destructive">
           {error}
         </p>
-      ) : hint ? (
-        <p className="text-xs text-muted-foreground">{hint}</p>
       ) : (
         <span aria-hidden="true" className="sr-only" data-field={name} />
       )}

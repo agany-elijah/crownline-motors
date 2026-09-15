@@ -202,17 +202,12 @@ export function SparePartPhotoBoard({
       id="photographs"
       className="flex flex-col gap-6 rounded-xl border border-border bg-card p-6"
     >
-      <div className="flex flex-col gap-1">
-        <h2 className="font-heading text-h3 font-semibold">
-          Photographs
-          <span className="ml-2 text-body font-normal text-muted-foreground tabular">
-            {photos.length}
-          </span>
-        </h2>
-        <p className="text-small text-muted-foreground">
-          {photos.length} of {MAX_PHOTOS_PER_SPARE_PART} used.
-        </p>
-      </div>
+      <h2 className="font-heading text-h3 font-semibold">
+        Photographs
+        <span className="ml-2 text-body font-normal text-muted-foreground tabular">
+          {photos.length}/{MAX_PHOTOS_PER_SPARE_PART}
+        </span>
+      </h2>
 
       {feedback.status === "success" && feedback.message ? (
         <Alert>
@@ -237,12 +232,7 @@ export function SparePartPhotoBoard({
 
       {/* ── Main image ───────────────────────────────────────────── */}
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-heading text-small font-semibold">Main image</h3>
-          <p className="text-small text-muted-foreground">
-            Shown on the catalogue card and first in the gallery.
-          </p>
-        </div>
+        <h3 className="font-heading text-small font-semibold">Main image</h3>
 
         <div className="max-w-xl">
           {main ? (
@@ -272,21 +262,14 @@ export function SparePartPhotoBoard({
 
       {/* ── Other images ─────────────────────────────────────────── */}
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-heading text-small font-semibold">
-            Other images
-            {others.length > 0 ? (
-              <span className="ml-2 font-normal text-muted-foreground tabular">
-                {others.length}
-              </span>
-            ) : null}
-          </h3>
-          <p className="text-small text-muted-foreground">
-            Shown after the main image, in this order. Use the{" "}
-            <span aria-hidden="true">⋯</span> menu to reorder or change the
-            main image.
-          </p>
-        </div>
+        <h3 className="font-heading text-small font-semibold">
+          Other images
+          {others.length > 0 ? (
+            <span className="ml-2 font-normal text-muted-foreground tabular">
+              {others.length}
+            </span>
+          ) : null}
+        </h3>
 
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {others.map((photo, index) => (
@@ -413,12 +396,6 @@ export function SparePartPhotoBoard({
                   </>
                 )}
               </Button>
-
-              <p className="text-small text-muted-foreground">
-                {photos.length === 0
-                  ? "The first of these becomes the main image."
-                  : "These are added after the existing images. The main image does not change."}
-              </p>
             </div>
           </div>
         ) : null}

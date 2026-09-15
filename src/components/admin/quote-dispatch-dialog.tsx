@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -43,6 +42,7 @@ interface QuoteDispatchDialogProps {
 const CHANNEL_LABEL: Record<QuoteDispatchChannel, string> = {
   [QuoteDispatchChannel.WHATSAPP]: "WhatsApp",
   [QuoteDispatchChannel.EMAIL]: "Email",
+  [QuoteDispatchChannel.BOTH]: "Email & WhatsApp",
 }
 
 /**
@@ -86,14 +86,27 @@ export function QuoteDispatchDialog({
   const { readinessProblem, isDirty, totals } = useQuotePricing()
 
   const [open, setOpen] = useState(false)
-  const [channel, setChannel] = useState<QuoteDispatchChannel>(
-    hasWhatsapp ? QuoteDispatchChannel.WHATSAPP : QuoteDispatchChannel.EMAIL
-  )
+  // A fresh id each time the dialog opens: repeat submissions from the same
+  // opening (a double-click, a retry) are one dispatch to the email provider.
+  const [dispatchId, setDispatchId] = useState("")
+  // Two independent toggles; selecting both sends on both channels.
+  const [sendWhatsapp, setSendWhatsapp] = useState(hasWhatsapp)
+  const [sendEmail, setSendEmail] = useState(!hasWhatsapp && hasEmail)
+  const channel =
+    sendEmail && sendWhatsapp
+      ? QuoteDispatchChannel.BOTH
+      : sendEmail
+        ? QuoteDispatchChannel.EMAIL
+        : QuoteDispatchChannel.WHATSAPP
   const [includeLink, setIncludeLink] = useState(true)
   const [note, setNote] = useState(() => defaultQuoteNote(siteConfig.name))
+  const [instructions, setInstructions] = useState("")
   const [state, formAction, isPending] = useActionState(sendQuoteDispatchAction, INITIAL_STATE)
   const includeLinkId = useId()
   const noteId = useId()
+  const instructionsId = useId()
+
+  const channelUnavailable = !(sendEmail && hasEmail) && !(sendWhatsapp && hasWhatsapp)
 
   const verb = alreadySent ? "Resend" : "Send"
 
@@ -123,7 +136,13 @@ export function QuoteDispatchDialog({
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (next) setDispatchId(newDispatchId())
+          setOpen(next)
+        }}
+      >
         <DialogTrigger
           render={
             <Button
@@ -140,7 +159,6 @@ export function QuoteDispatchDialog({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{verb} quotation</DialogTitle>
-            <DialogDescription>Review the details below, then choose how to send it.</DialogDescription>
           </DialogHeader>
 
           {state.status === "success" ? (
@@ -150,11 +168,14 @@ export function QuoteDispatchDialog({
                 <AlertDescription>
                   {state.channel === QuoteDispatchChannel.EMAIL
                     ? `The quotation has been emailed to ${contactEmail}.`
-                    : "The quotation has been marked as sent. Finish sending it below."}
+                    : state.channel === QuoteDispatchChannel.BOTH
+                      ? `The quotation has been emailed to ${contactEmail}. Finish sending it on WhatsApp below.`
+                      : "The quotation has been marked as sent. Finish sending it below."}
                 </AlertDescription>
               </Alert>
 
-              {state.channel === QuoteDispatchChannel.WHATSAPP && state.dispatchUrl ? (
+              {(state.channel === QuoteDispatchChannel.WHATSAPP || state.channel === QuoteDispatchChannel.BOTH) &&
+              state.dispatchUrl ? (
                 <Button
                   render={<a href={state.dispatchUrl} target="_blank" rel="noopener noreferrer" />}
                   variant="whatsapp"
@@ -176,6 +197,8 @@ export function QuoteDispatchDialog({
               <input type="hidden" name="quoteId" value={quoteId} />
               <input type="hidden" name="channel" value={channel} />
               <input type="hidden" name="note" value={note} />
+              <input type="hidden" name="instructions" value={instructions} />
+              <input type="hidden" name="dispatchId" value={dispatchId} />
 
               {state.status === "error" && state.message ? (
                 <Alert variant="destructive">
@@ -200,22 +223,23 @@ export function QuoteDispatchDialog({
               {/* Channel selector — two selectable cards. */}
               <div className="flex flex-col gap-2">
                 <span className="text-meta text-muted-foreground">Send via</span>
-                <div role="radiogroup" aria-label="Send via" className="grid grid-cols-2 gap-2.5">
+                <div role="group" aria-label="Send via" className="grid grid-cols-2 gap-2.5">
                   <ChannelCard
                     label="WhatsApp"
                     detail={contactWhatsapp ?? "Not on file"}
                     icon={<WhatsAppGlyph className="size-5 text-[#11823f]" />}
-                    selected={channel === QuoteDispatchChannel.WHATSAPP}
+                    selected={sendWhatsapp && hasWhatsapp}
                     disabled={!hasWhatsapp}
-                    onSelect={() => setChannel(QuoteDispatchChannel.WHATSAPP)}
+                    // The last selected channel cannot be switched off.
+                    onSelect={() => (sendWhatsapp && !sendEmail ? undefined : setSendWhatsapp(!sendWhatsapp))}
                   />
                   <ChannelCard
                     label="Email"
                     detail={contactEmail ?? "Not on file"}
                     icon={<Mail aria-hidden="true" className="size-5 text-gold-ink" />}
-                    selected={channel === QuoteDispatchChannel.EMAIL}
+                    selected={sendEmail && hasEmail}
                     disabled={!hasEmail}
-                    onSelect={() => setChannel(QuoteDispatchChannel.EMAIL)}
+                    onSelect={() => (sendEmail && !sendWhatsapp ? undefined : setSendEmail(!sendEmail))}
                   />
                 </div>
               </div>
@@ -229,16 +253,7 @@ export function QuoteDispatchDialog({
                   onChange={(event) => setIncludeLink(event.target.checked)}
                   className="mt-0.5 size-4 rounded border-input"
                 />
-                <span>
-                  Attach PDF quotation
-                  <span className="block text-muted-foreground">
-                    {includeLink
-                      ? channel === QuoteDispatchChannel.EMAIL
-                        ? "The quotation PDF will be attached to the email."
-                        : "The message will include a secure link to the PDF."
-                      : "The message will include the figures and payment instructions as text only."}
-                  </span>
-                </span>
+                <span>Attach PDF quotation</span>
               </label>
 
               <div className="flex flex-col gap-1.5">
@@ -253,10 +268,20 @@ export function QuoteDispatchDialog({
                   maxLength={2000}
                   placeholder={defaultQuoteNote(siteConfig.name)}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Sent above the figures and total. The prices and payment details below it always
-                  come from the quotation itself and can&apos;t be edited here.
-                </p>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor={instructionsId} className="text-meta text-muted-foreground">
+                  Notes for the customer
+                </label>
+                <Textarea
+                  id={instructionsId}
+                  value={instructions}
+                  onChange={(event) => setInstructions(event.target.value)}
+                  rows={2}
+                  maxLength={2000}
+                  placeholder="Optional"
+                />
               </div>
 
               <DialogFooter className="items-center sm:justify-between">
@@ -274,11 +299,7 @@ export function QuoteDispatchDialog({
 
                 <Button
                   type="submit"
-                  disabled={
-                    isPending ||
-                    effectiveDisabled ||
-                    (channel === QuoteDispatchChannel.EMAIL ? !hasEmail : !hasWhatsapp)
-                  }
+                  disabled={isPending || effectiveDisabled || channelUnavailable}
                 >
                   {isPending ? (
                     <Loader2 aria-hidden="true" className="animate-spin" />
@@ -302,6 +323,14 @@ export function QuoteDispatchDialog({
   )
 }
 
+/** `crypto.randomUUID` only exists in a secure context; the fallback keeps an
+ *  admin on plain http able to send, with the same uniqueness in practice. */
+function newDispatchId(): string {
+  return typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+}
+
 interface ChannelCardProps {
   label: string
   detail: string
@@ -315,12 +344,12 @@ function ChannelCard({ label, detail, icon, selected, disabled, onSelect }: Chan
   return (
     <button
       type="button"
-      role="radio"
+      role="checkbox"
       aria-checked={selected}
       disabled={disabled}
       onClick={onSelect}
       className={cn(
-        "flex flex-col items-start gap-2 rounded-xl border p-3.5 text-left transition-colors duration-fast",
+        "relative flex flex-col items-start gap-2 rounded-xl border p-3.5 text-left transition-colors duration-fast",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         "disabled:cursor-not-allowed disabled:opacity-45",
         selected
@@ -328,6 +357,9 @@ function ChannelCard({ label, detail, icon, selected, disabled, onSelect }: Chan
           : "border-border bg-card hover:border-gold-ink/30"
       )}
     >
+      {selected ? (
+        <CheckCircle2 aria-hidden="true" className="absolute top-3 right-3 size-4 text-gold-ink" />
+      ) : null}
       {icon}
       <span className="flex flex-col gap-0.5">
         <span className="text-small font-semibold text-foreground">{label}</span>

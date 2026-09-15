@@ -40,12 +40,6 @@ import { PHOTO_INPUT_ACCEPT } from "@/lib/constants/vehicle-photo-options"
  * would get the next fix.
  */
 export interface PhotoStagingCopy {
-  /** The paragraph under the section heading. */
-  intro: string
-  /** What the main image is used for, under its own sub-heading. */
-  mainImageHint: string
-  /** What the supporting images are, under theirs. */
-  otherImagesHint: React.ReactNode
   /** Label on the empty main-image tile. */
   mainDropLabel: string
   /** Hint on the empty main-image tile. */
@@ -100,10 +94,7 @@ export function PhotoStaging({
 
   return (
     <section className="flex flex-col gap-6 rounded-xl border border-border bg-card p-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="font-heading text-h3 font-semibold">Photographs</h2>
-        <p className="max-w-2xl text-small text-muted-foreground">{copy.intro}</p>
-      </div>
+      <h2 className="font-heading text-h3 font-semibold">Photographs</h2>
 
       <input
         ref={inputRef}
@@ -130,10 +121,7 @@ export function PhotoStaging({
 
       {/* ── Main photograph ──────────────────────────────────────── */}
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-heading text-small font-semibold">Main image</h3>
-          <p className="text-small text-muted-foreground">{copy.mainImageHint}</p>
-        </div>
+        <h3 className="font-heading text-small font-semibold">Main image</h3>
 
         <div className="max-w-xl">
           {main ? (
@@ -167,17 +155,14 @@ export function PhotoStaging({
       {/* ── Supporting photographs ───────────────────────────────── */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h3 className="font-heading text-small font-semibold">
-              Other images
-              {others.length > 0 ? (
-                <span className="ml-2 font-normal text-muted-foreground tabular">
-                  {others.length}
-                </span>
-              ) : null}
-            </h3>
-            <p className="text-small text-muted-foreground">{copy.otherImagesHint}</p>
-          </div>
+          <h3 className="font-heading text-small font-semibold">
+            Other images
+            {others.length > 0 ? (
+              <span className="ml-2 font-normal text-muted-foreground tabular">
+                {others.length}
+              </span>
+            ) : null}
+          </h3>
 
           {staged.length > 0 ? (
             <Button

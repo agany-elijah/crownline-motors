@@ -4,8 +4,7 @@ import {
   QUOTATION_PDF_MAX_PER_IP,
   QUOTATION_PDF_WINDOW_MS,
   RATE_LIMIT_SCOPES,
-  checkRateLimit,
-  recordAttempt,
+  consumeRateLimit,
 } from "@/lib/auth/rate-limit"
 import { getClientIp } from "@/lib/auth/client-ip"
 import { getQuoteForPdf } from "@/lib/queries/quote.queries"
@@ -54,9 +53,9 @@ export async function GET(
   const ip = await getClientIp()
 
   if (ip) {
-    const verdict = await checkRateLimit(
-      [{ scope: RATE_LIMIT_SCOPES.quotationPdfIp, identifier: ip }],
-      { max: QUOTATION_PDF_MAX_PER_IP, windowMs: QUOTATION_PDF_WINDOW_MS }
+    const verdict = await consumeRateLimit(
+      [{ key: { scope: RATE_LIMIT_SCOPES.quotationPdfIp, identifier: ip }, max: QUOTATION_PDF_MAX_PER_IP }],
+      QUOTATION_PDF_WINDOW_MS
     )
 
     if (!verdict.allowed) {
@@ -65,8 +64,6 @@ export async function GET(
         headers: { "Retry-After": "300" },
       })
     }
-
-    await recordAttempt([{ scope: RATE_LIMIT_SCOPES.quotationPdfIp, identifier: ip }])
   }
 
   const quote = await getQuoteForPdf(token)

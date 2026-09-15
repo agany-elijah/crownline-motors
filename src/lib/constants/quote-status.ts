@@ -50,16 +50,6 @@ export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
   EXPIRED: "Expired",
 }
 
-export const QUOTE_STATUS_DESCRIPTIONS: Record<QuoteStatus, string> = {
-  NEW: "Just arrived. Nobody has picked it up yet.",
-  CONTACTED: "Being worked: the customer has been contacted and the quotation is being prepared.",
-  SENT: "The priced quotation has been sent. Waiting for the customer's answer.",
-  ACCEPTED: "The customer has accepted. Convert it to an order to reserve the stock.",
-  WON: "Converted into an order.",
-  REJECTED: "Closed without a sale.",
-  EXPIRED: "The validity date passed without an answer.",
-}
-
 export const QUOTE_STATUS_TONES: Record<QuoteStatus, StatusTone> = {
   NEW: "warning",
   CONTACTED: "neutral",
@@ -101,6 +91,7 @@ export const QUOTE_SOURCE_LABELS: Record<QuoteSource, string> = {
 export const QUOTE_CHANNEL_LABELS: Record<QuoteDispatchChannel, string> = {
   WHATSAPP: "WhatsApp",
   EMAIL: "Email",
+  BOTH: "Email & WhatsApp",
 }
 
 /**

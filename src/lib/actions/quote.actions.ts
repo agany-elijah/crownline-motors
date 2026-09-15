@@ -1,6 +1,6 @@
 "use server"
 
-import { randomBytes } from "node:crypto"
+import { createHash, randomBytes } from "node:crypto"
 
 import { revalidatePath } from "next/cache"
 
@@ -23,16 +23,19 @@ import {
   VehicleUnavailableError,
   createOrderFromQuote,
 } from "@/lib/orders/create-order-from-quote"
+import { notificationNotice, notifyCustomerOrderConfirmed, resolveOrderContact } from "@/lib/email/notifications"
 import { sendQuoteEmail, type SendQuoteEmailAttachment } from "@/lib/email/send-quote-email"
 import { buildQuotationFilename, buildQuotePdfData, type QuotePdfSource } from "@/lib/pdf/quote-pdf-data"
 import { renderQuotePdfBuffer } from "@/lib/pdf/render-quote-pdf"
 import { prisma } from "@/lib/prisma"
-import { buildQuoteMessage, defaultQuoteNote } from "@/lib/quotes/quote-messages"
+import { buildQuoteMessage, defaultQuoteNote, type QuoteMessageInput } from "@/lib/quotes/quote-messages"
 import { UnknownListingReferenceError, resolveQuoteLines } from "@/lib/quotes/quote-line-resolution"
-import { computeQuoteTotals, quoteReadinessProblem } from "@/lib/quotes/quote-pricing"
+import { computeQuoteTotals, lineTotalCents, quoteReadinessProblem } from "@/lib/quotes/quote-pricing"
 import { getBusinessSettings } from "@/lib/queries/settings.queries"
+import { fromCents } from "@/lib/utils/money"
 import { isUniqueConstraintViolation } from "@/lib/utils/prisma-errors"
 import { buildWhatsAppUrl } from "@/lib/utils/whatsapp"
+import { revalidateVehicleSurfaces } from "@/lib/cache/vehicle-surfaces"
 import {
   convertQuoteSchema,
   quoteDetailsSchema,
@@ -374,7 +377,7 @@ export interface QuoteDispatchState {
    *  triggered by the operator's own click, never the server. Absent for
    *  email, which the server sends directly and needs no follow-up click. */
   dispatchUrl?: string
-  channel?: "WHATSAPP" | "EMAIL"
+  channel?: QuoteDispatchChannel
 }
 
 /**
@@ -411,10 +414,15 @@ export async function sendQuoteDispatchAction(
     channel: formData.get("channel"),
     includeLink: formData.get("includeLink"),
     note: formData.get("note"),
+    instructions: formData.get("instructions"),
+    dispatchId: formData.get("dispatchId"),
   })
 
   if (!parsed.success) {
-    return { status: "error", message: "Choose WhatsApp or email to send this quotation." }
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? "Choose WhatsApp, email, or both to send this quotation.",
+    }
   }
 
   const auth = await authorizePermission("quote:respond")
@@ -422,7 +430,9 @@ export async function sendQuoteDispatchAction(
     return { status: "error", message: auth.message }
   }
 
-  const { quoteId, channel, includeLink, note } = parsed.data
+  const { quoteId, channel, includeLink, note, instructions, dispatchId } = parsed.data
+  const sendsEmail = channel === QuoteDispatchChannel.EMAIL || channel === QuoteDispatchChannel.BOTH
+  const sendsWhatsapp = channel === QuoteDispatchChannel.WHATSAPP || channel === QuoteDispatchChannel.BOTH
 
   const quote = await prisma.quote.findUnique({
     where: { id: quoteId },
@@ -464,15 +474,24 @@ export async function sendQuoteDispatchAction(
     return { status: "error", message: readinessProblem }
   }
 
-  if (channel === QuoteDispatchChannel.EMAIL && !quote.contactEmail) {
+  if (sendsEmail && !quote.contactEmail) {
     return {
       status: "error",
-      message: "This customer has no email address on file. Send via WhatsApp instead, or add one.",
+      message:
+        channel === QuoteDispatchChannel.BOTH
+          ? "This customer has no email address on file, so the quotation cannot go by both channels. Send via WhatsApp instead."
+          : "This customer has no email address on file. Send via WhatsApp instead, or add one.",
     }
   }
 
-  if (channel === QuoteDispatchChannel.WHATSAPP && !quote.contactWhatsapp) {
-    return { status: "error", message: "This customer has no WhatsApp number on file." }
+  if (sendsWhatsapp && !quote.contactWhatsapp) {
+    return {
+      status: "error",
+      message:
+        channel === QuoteDispatchChannel.BOTH
+          ? "This customer has no WhatsApp number on file, so the quotation cannot go by both channels. Send via email instead."
+          : "This customer has no WhatsApp number on file.",
+    }
   }
 
   const mintingToken = Boolean(includeLink) && !quote.shareToken
@@ -486,43 +505,47 @@ export async function sendQuoteDispatchAction(
     .map((item) => ({
       description: item.description,
       quantity: item.quantity,
-      lineTotal: (item.quotedUnitPrice?.toNumber() ?? 0) * item.quantity,
+      // In cents, like every other total on the quotation, so the message and
+      // the PDF can never disagree by a rounding cent.
+      lineTotal: fromCents(
+        lineTotalCents({ quantity: item.quantity, unitPrice: item.quotedUnitPrice?.toNumber() ?? 0 }) ?? 0
+      ),
     }))
 
-  const message = buildQuoteMessage(
-    {
-      siteName: siteConfig.name,
-      customerName: quote.contactName ?? "Customer",
-      quoteNumber: quote.quoteNumber,
-      note: note && note.length > 0 ? note : defaultQuoteNote(siteConfig.name),
-      items: listedItems,
-      itemsSubtotal: totals.itemsSubtotal,
-      accessoriesTotal: totals.accessoriesTotal,
-      shippingCost: fees.shippingCost,
-      clearingCost: fees.clearingCost,
-      importDuty: fees.importDuty,
-      otherCostsLabel: quote.otherCostsLabel,
-      otherCostsAmount: fees.otherCosts,
-      total: totals.total,
-      // Guaranteed non-null: quoteReadinessProblem above refuses to proceed
-      // without a validity date.
-      validUntil: quote.validUntil as Date,
-      link,
-      paymentInstructions: quote.paymentInstructions,
-      isVehicle: quote.type === QuoteType.VEHICLE,
-    },
-    channel
-  )
+  const messageInput: QuoteMessageInput = {
+    siteName: siteConfig.name,
+    customerName: quote.contactName ?? "Customer",
+    quoteNumber: quote.quoteNumber,
+    note: note && note.length > 0 ? note : defaultQuoteNote(siteConfig.name),
+    items: listedItems,
+    itemsSubtotal: totals.itemsSubtotal,
+    accessoriesTotal: totals.accessoriesTotal,
+    shippingCost: fees.shippingCost,
+    clearingCost: fees.clearingCost,
+    importDuty: fees.importDuty,
+    otherCostsLabel: quote.otherCostsLabel,
+    otherCostsAmount: fees.otherCosts,
+    total: totals.total,
+    // Guaranteed non-null: quoteReadinessProblem above refuses to proceed
+    // without a validity date.
+    validUntil: quote.validUntil as Date,
+    link,
+    paymentInstructions: quote.paymentInstructions,
+    isVehicle: quote.type === QuoteType.VEHICLE,
+    instructions: instructions ?? null,
+  }
 
   // ── Actually reach the customer ──────────────────────────────────────
-  // WhatsApp: build the deep link now and hand it back — nothing has been
-  // "sent" until the operator clicks it, but there is nothing further to
-  // wait on here. Email: send it for real, now, before touching the quote's
-  // status at all, so a failed send is never recorded as SENT.
+  // WhatsApp: build the deep link first and hand it back — nothing has been
+  // "sent" until the operator clicks it. Built before any email goes out, so
+  // a "both" dispatch with an unusable number fails before emailing anyone.
+  // Email: send it for real, now, before touching the quote's status at all,
+  // so a failed send is never recorded as SENT.
   let dispatchUrl: string | undefined
 
-  if (channel === QuoteDispatchChannel.WHATSAPP) {
-    const url = buildWhatsAppUrl({ phoneNumber: quote.contactWhatsapp as string, message: message.body })
+  if (sendsWhatsapp) {
+    const whatsappMessage = buildQuoteMessage(messageInput, "WHATSAPP")
+    const url = buildWhatsAppUrl({ phoneNumber: quote.contactWhatsapp as string, message: whatsappMessage.body })
 
     if (!url) {
       return {
@@ -532,7 +555,10 @@ export async function sendQuoteDispatchAction(
     }
 
     dispatchUrl = url
-  } else {
+  }
+
+  if (sendsEmail) {
+    const message = buildQuoteMessage(messageInput, "EMAIL")
     let attachment: SendQuoteEmailAttachment | undefined
 
     if (includeLink) {
@@ -566,11 +592,26 @@ export async function sendQuoteDispatchAction(
       }
     }
 
+    /**
+     * One dialog opening, one email. The key carries a digest of what is
+     * being sent, so a double-click or a retry after a failed status write is
+     * a no-op at the provider, while an operator who edits the message and
+     * sends again from the same dialog still gets a real second send rather
+     * than a conflict.
+     */
+    const idempotencyKey = dispatchId
+      ? `quote-dispatch/${quoteId}/${dispatchId}/${createHash("sha256")
+          .update(JSON.stringify([quote.contactEmail, message.subject, message.body, Boolean(attachment)]))
+          .digest("hex")
+          .slice(0, 32)}`
+      : undefined
+
     const sendResult = await sendQuoteEmail({
       to: quote.contactEmail as string,
       subject: message.subject,
       text: message.body,
       attachment,
+      idempotencyKey,
     })
 
     if (!sendResult.ok) {
@@ -609,7 +650,12 @@ export async function sendQuoteDispatchAction(
           action: "QUOTE_SENT",
           entityType: "Quote",
           entityId: quoteId,
-          metadata: { channel, includeLink: Boolean(includeLink), ...(note ? { note } : {}) },
+          metadata: {
+            channel,
+            includeLink: Boolean(includeLink),
+            ...(note ? { note } : {}),
+            ...(instructions ? { instructions } : {}),
+          },
         },
         tx
       )
@@ -618,10 +664,9 @@ export async function sendQuoteDispatchAction(
     console.error("[quote] failed to record quotation dispatch", error)
     return {
       status: "error",
-      message:
-        channel === QuoteDispatchChannel.EMAIL
-          ? "The email was sent, but the quote could not be marked as sent — refresh the page and check its status."
-          : "Could not send this quotation. Please try again.",
+      message: sendsEmail
+        ? "The email was sent, but the quote could not be marked as sent — refresh the page and check its status."
+        : "Could not send this quotation. Please try again.",
     }
   }
 
@@ -629,7 +674,12 @@ export async function sendQuoteDispatchAction(
 
   return {
     status: "success",
-    message: channel === QuoteDispatchChannel.EMAIL ? "Quotation emailed." : "Quotation sent.",
+    message:
+      channel === QuoteDispatchChannel.EMAIL
+        ? "Quotation emailed."
+        : channel === QuoteDispatchChannel.BOTH
+          ? "Quotation emailed — finish sending it on WhatsApp."
+          : "Quotation sent.",
     dispatchUrl,
     channel,
   }
@@ -778,6 +828,10 @@ export async function convertQuoteToOrderAction(
     lines: priced,
     fees,
     validUntil: quote.validUntil,
+    // The customer accepted while the quotation was valid; converting it
+    // after the date must not undo their agreement. A quote still only SENT
+    // has not been accepted, so its validity still applies.
+    enforceValidity: quote.status !== QuoteStatus.ACCEPTED,
   })
 
   if (readinessProblem) {
@@ -786,7 +840,7 @@ export async function convertQuoteToOrderAction(
 
   const settings = await getBusinessSettings()
 
-  let created: { id: string; orderNumber: string }
+  let created: { id: string; orderNumber: string; totalAmount: number }
 
   try {
     created = await prisma.$transaction(async (tx) => {
@@ -857,8 +911,8 @@ export async function convertQuoteToOrderAction(
 
   for (const item of quote.items) {
     if (item.vehicleId) {
-      revalidatePath(`${ADMIN_BASE_PATH}/vehicles`)
-      revalidatePath(`${ADMIN_BASE_PATH}/vehicles/${item.vehicleId}`)
+      // Reserved by the conversion, so it leaves the public catalogue too.
+      revalidateVehicleSurfaces(item.vehicleId, item.vehicle?.slug ?? null)
     }
 
     if (item.sparePartId) {
@@ -869,10 +923,64 @@ export async function convertQuoteToOrderAction(
     }
   }
 
+  const emailNotice = await emailOrderConfirmation(created, quote)
+
   return {
     status: "success",
-    message: "Order created.",
+    message: `Order created. ${emailNotice}`,
     orderId: created.id,
     orderNumber: created.orderNumber,
   }
+}
+
+/**
+ * Tells the customer their order exists and what to pay first. Runs after
+ * the conversion has committed; a failure is reported to the operator and
+ * never undoes the order.
+ */
+async function emailOrderConfirmation(
+  order: { id: string; orderNumber: string; totalAmount: number },
+  quote: {
+    customerId: string
+    type: QuoteType
+    contactEmail: string | null
+    contactName: string | null
+    paymentInstructions: string | null
+  }
+): Promise<string> {
+  let customer: { email: string | null; fullName: string; deletedAt: Date | null } | null
+  let milestones: { label: string; amountDue: { toNumber: () => number } }[]
+
+  try {
+    ;[customer, milestones] = await Promise.all([
+      prisma.customer.findUnique({
+        where: { id: quote.customerId },
+        select: { email: true, fullName: true, deletedAt: true },
+      }),
+      prisma.paymentMilestone.findMany({
+        where: { orderId: order.id },
+        orderBy: { sequence: "asc" },
+        select: { label: true, amountDue: true },
+      }),
+    ])
+  } catch (error) {
+    console.error("[quote] could not load the order for its confirmation email", error)
+    return notificationNotice("FAILED")
+  }
+
+  if (!customer) return notificationNotice("NO_RECIPIENT")
+
+  const contact = resolveOrderContact({ quote, customer })
+  const outcome = await notifyCustomerOrderConfirmed({
+    to: contact.email,
+    customerName: contact.name,
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    isVehicle: quote.type === QuoteType.VEHICLE,
+    totalAmount: order.totalAmount,
+    milestones: milestones.map((milestone) => ({ label: milestone.label, amountDue: milestone.amountDue.toNumber() })),
+    paymentInstructions: quote.paymentInstructions,
+  })
+
+  return notificationNotice(outcome)
 }

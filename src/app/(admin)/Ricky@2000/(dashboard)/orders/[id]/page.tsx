@@ -4,14 +4,21 @@ import { notFound } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header"
+import { OrderCancelDialog } from "@/components/admin/order-cancel-dialog"
 import { OrderDeliveryDateForm } from "@/components/admin/order-delivery-date-form"
 import { OrderFinanceSummaryCard } from "@/components/admin/order-finance-summary"
+import { OrderPaymentsPanel } from "@/components/admin/order-payments-panel"
 import { OrderTrackingPanel } from "@/components/admin/order-tracking-panel"
 import { StatusBadge } from "@/components/admin/status-badge"
+import { siteConfig } from "@/config/site"
 import { requirePermission } from "@/lib/auth/admin-guard"
 import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
+import { trackingActivationProblem } from "@/lib/orders/order-lifecycle"
 import { getOrderById } from "@/lib/queries/order.queries"
+import { firstNameOf } from "@/lib/quotes/quote-messages"
+import { trackingPagePath } from "@/lib/tracking/tracking-number"
 import { formatCurrency, formatCurrencyOrDash } from "@/lib/utils/format-currency"
+import { buildTrackingNumberShareMessage, buildWhatsAppUrl } from "@/lib/utils/whatsapp"
 
 export async function generateMetadata(
   props: PageProps<"/Ricky@2000/orders/[id]">
@@ -28,13 +35,12 @@ export async function generateMetadata(
 const PANEL = "flex flex-col gap-4 rounded-xl bg-card p-6 shadow-[var(--shadow-subtle)] ring-1 ring-foreground/10"
 
 /**
- * A single order: what was sold, its payment position, its delivery
- * estimate, and its shipment/tracking timeline.
+ * A single order, and everywhere it is worked: what was sold, the payments
+ * recorded against it, its delivery estimate, and its shipment timeline.
  *
- * Recording a payment and changing the order's own status still belong to a
- * later phase's admin surface (see order.queries.ts) — this page's editable
- * surface is deliberately limited to the delivery-date estimate and the
- * tracking timeline, both wired directly to the sections below.
+ * There is no separate payments or tracking screen. Recording a deposit and
+ * posting a tracking update both happen here, beside the balance and the
+ * customer they belong to — and both email the customer automatically.
  */
 export default async function AdminOrderDetailPage(props: PageProps<"/Ricky@2000/orders/[id]">) {
   await requirePermission("order:read")
@@ -45,6 +51,29 @@ export default async function AdminOrderDetailPage(props: PageProps<"/Ricky@2000
   if (!order) {
     notFound()
   }
+
+  const trackingShareUrl =
+    order.shipment && order.customerWhatsapp
+      ? buildWhatsAppUrl({
+          phoneNumber: order.customerWhatsapp,
+          message: buildTrackingNumberShareMessage({
+            siteName: siteConfig.name,
+            customerFirstName: firstNameOf(order.customerName),
+            orderNumber: order.orderNumber,
+            trackingNumber: order.shipment.trackingNumber,
+            trackUrl: `${siteConfig.url}${trackingPagePath(order.shipment.trackingNumber)}`,
+          }),
+        })
+      : null
+
+  const isCancelled = order.status === "CANCELLED"
+  const canCancel = !isCancelled && order.status !== "COMPLETED"
+  // Shown instead of the "Activate tracking" button; the action enforces it.
+  const activationProblem = trackingActivationProblem({
+    type: order.type,
+    status: order.status,
+    stages: order.finance.milestones,
+  })
 
   return (
     <div className="flex flex-col gap-8">
@@ -72,9 +101,12 @@ export default async function AdminOrderDetailPage(props: PageProps<"/Ricky@2000
             </span>
           }
           actions={
-            <StatusBadge tone="neutral" className="text-[11px] px-2 py-0.5">
-              {order.status.replaceAll("_", " ").toLowerCase()}
-            </StatusBadge>
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge tone="neutral" className="text-[11px] px-2 py-0.5">
+                {order.status.replaceAll("_", " ").toLowerCase()}
+              </StatusBadge>
+              {canCancel ? <OrderCancelDialog orderId={order.id} orderNumber={order.orderNumber} /> : null}
+            </div>
           }
         />
       </div>
@@ -131,8 +163,28 @@ export default async function AdminOrderDetailPage(props: PageProps<"/Ricky@2000
           ) : null}
 
           <section className={PANEL}>
+            <h2 className="font-heading text-h3 font-semibold">Payments</h2>
+            <OrderPaymentsPanel
+              orderId={order.id}
+              milestones={order.finance.milestones}
+              currentlyDueId={order.finance.currentlyDue?.id ?? null}
+              payments={order.payments}
+              lockedReason={
+                isCancelled ? "This order is cancelled, so no further payments can be recorded." : null
+              }
+            />
+          </section>
+
+          <section className={PANEL}>
             <h2 className="font-heading text-h3 font-semibold">Tracking</h2>
-            <OrderTrackingPanel orderId={order.id} shipment={order.shipment} />
+            <OrderTrackingPanel
+              orderId={order.id}
+              shipment={order.shipment}
+              customerEmail={order.customerEmail}
+              shareUrl={trackingShareUrl}
+              activationProblem={activationProblem}
+              lockedReason={isCancelled ? "This order is cancelled, so its tracking can no longer be updated." : null}
+            />
           </section>
         </div>
 
@@ -147,10 +199,19 @@ export default async function AdminOrderDetailPage(props: PageProps<"/Ricky@2000
           <section className={PANEL}>
             <h2 className="font-heading text-h3 font-semibold">Customer</h2>
             <div className="flex flex-col gap-1 text-small">
-              <span className="font-medium">{order.customerName}</span>
+              <Link
+                href={`${ADMIN_BASE_PATH}/customers/${order.customerId}`}
+                className="font-medium hover:text-gold-ink"
+              >
+                {order.customerName}
+              </Link>
               {order.customerPhone ? (
                 <span className="text-muted-foreground">{order.customerPhone}</span>
               ) : null}
+              {order.customerWhatsapp && order.customerWhatsapp !== order.customerPhone ? (
+                <span className="text-muted-foreground">WhatsApp {order.customerWhatsapp}</span>
+              ) : null}
+              <span className="break-all text-muted-foreground">{order.customerEmail ?? "No email on file"}</span>
             </div>
           </section>
         </div>

@@ -176,3 +176,28 @@ export function buildTrackingWhatsAppMessage({
 }): string {
   return `Hello ${siteName}, I need assistance with tracking number ${trackingNumber}.`
 }
+
+/**
+ * The message an operator sends a customer to hand over their tracking
+ * number, from the order page.
+ *
+ * The one message in this file written in the business's voice rather than
+ * the customer's: it opens in the operator's WhatsApp, addressed to the
+ * customer. It carries only what the customer needs to follow the order —
+ * the tracking number and the page to enter it on.
+ */
+export function buildTrackingNumberShareMessage({
+  siteName,
+  customerFirstName,
+  orderNumber,
+  trackingNumber,
+  trackUrl,
+}: {
+  siteName: string
+  customerFirstName: string
+  orderNumber: string
+  trackingNumber: string
+  trackUrl: string
+}): string {
+  return `Hello ${customerFirstName}, your order ${orderNumber} with ${siteName} is now being tracked. Your tracking number is ${trackingNumber}. You can follow it at any time here: ${trackUrl}`
+}

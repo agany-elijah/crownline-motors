@@ -107,12 +107,7 @@ export default async function AdminOrdersPage(props: PageProps<"/Ricky@2000/orde
             >
               <Package className="size-6" />
             </span>
-            <div className="flex flex-col gap-1">
-              <h2 className="font-heading text-h3 font-semibold">No orders yet</h2>
-              <p className="max-w-sm text-body text-muted-foreground">
-                Convert an accepted quote from the Quotes screen to create the first one.
-              </p>
-            </div>
+            <h2 className="font-heading text-h3 font-semibold">No orders yet</h2>
           </div>
         }
       />

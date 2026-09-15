@@ -1,0 +1,14 @@
+-- Adds BOTH to QuoteDispatchChannel so an operator can send a quotation over
+-- email and WhatsApp in a single dispatch action, rather than sending twice.
+--
+-- ── Additive, safe on a live database ─────────────────────────────────
+-- Postgres enum values are appended, never inserted or reordered (see the
+-- schema documentation). ALTER TYPE ... ADD VALUE is safe on every existing
+-- row: no row currently holds BOTH, so nothing changes for data already in
+-- the table, and Quote.lastSentVia (nullable) is unaffected until the next
+-- dispatch chooses it.
+--
+-- ADD VALUE cannot run inside the same transaction as a statement that uses
+-- the new value, but it can run — and commit — on its own, which is all
+-- this migration does.
+ALTER TYPE "QuoteDispatchChannel" ADD VALUE 'BOTH';

@@ -285,9 +285,16 @@ enum QuoteLineKind {
 }
 
 /// How a quotation was last sent to the customer.
+///
+/// BOTH was appended (never inserted — see the schema documentation's rule
+/// on enum ordering) for the case where an operator wants a customer to
+/// receive the quotation on both channels in one action: the email is sent
+/// for real through Resend, and a WhatsApp deep link is handed back for the
+/// operator to open, exactly as the WhatsApp-only path already works.
 enum QuoteDispatchChannel {
   WHATSAPP
   EMAIL
+  BOTH
 }
 
 enum PreferredCountry {
@@ -856,9 +863,13 @@ model SparePartCompatibility {
 model Customer {
   id       String  @id @default(cuid())
   fullName String
-  phone    String // NOT unique — dedupe manually in server actions, see notes above
+  /// Identity is the combination of fullName, email, phone and WhatsApp —
+  /// none of them is unique alone (a shared household phone, a family or
+  /// office inbox). Public forms resolve it in application code; see
+  /// src/lib/quotes/customer-resolution.ts.
+  phone    String
   whatsapp String?
-  email    String? @unique
+  email    String?
   country  String?
   city     String?
 
@@ -871,6 +882,8 @@ model Customer {
   updatedAt DateTime @updatedAt
 
   @@index([phone])
+  @@index([whatsapp])
+  @@index([email])
   @@index([deletedAt])
 }
 

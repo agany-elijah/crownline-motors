@@ -106,6 +106,13 @@ export function quoteReadinessProblem(input: {
   fees: QuoteFees
   validUntil: Date | null
   now?: Date
+  /**
+   * Whether a passed validity date is a problem. True by default. The
+   * conversion of an ACCEPTED quote turns it off: the customer said yes
+   * while the quotation was valid, and an operator entering the order a day
+   * later must not be the reason the agreement fails.
+   */
+  enforceValidity?: boolean
 }): string | null {
   const totals = computeQuoteTotals(input.lines, input.fees)
 
@@ -127,7 +134,7 @@ export function quoteReadinessProblem(input: {
     return "Set the date this quotation is valid until before sending it."
   }
 
-  if (isPastValidity(input.validUntil, input.now)) {
+  if (input.enforceValidity !== false && isPastValidity(input.validUntil, input.now)) {
     return "This quotation's validity date has passed. Extend it before sending or converting."
   }
 

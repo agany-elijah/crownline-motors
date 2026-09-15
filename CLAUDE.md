@@ -3640,15 +3640,15 @@ The join back to inventory lives in `src/lib/utils/spare-part-compatibility.ts`,
 
 Deliberately thin in Wave A — no auth fields. Full customer accounts (Supabase Auth-backed) are a Wave B feature.
 
-**`phone` is indexed but NOT unique.** This is intentional, not an oversight: there's no auth layer yet to reliably dedupe by phone, and enforcing uniqueness would incorrectly block legitimate second enquiries from a shared household phone.
+**Identity is the combination of `fullName`, `email`, `phone` and `whatsapp`.** None of them is unique on its own — `phone`, `whatsapp` and `email` are indexed, not unique (migration `20260915100000_customer_identity_not_unique_email` dropped the former unique index on `email`). A shared household phone, a relative enquiring on someone's behalf, or a family/office inbox is a *different* customer, and filing them under whoever used the detail first puts one person's quotes, orders and payments on another's record.
 
-⚠️ **Developer responsibility:** because `phone` isn't unique, every server action that creates a `Customer` from a guest form submission (quote request, etc.) **must** perform a manual dedup lookup before inserting, in this priority order:
+⚠️ **Developer responsibility:** every server action that creates a `Customer` from a guest form submission **must** go through `resolveCustomerForEnquiry()` (`src/lib/quotes/customer-resolution.ts`), which:
 
-1. Match on `email` (if provided — it *is* unique, so this is a safe exact lookup).
-2. Fall back to exact match on **normalized** `phone` (strip spaces/dashes, normalize country-code format — do this in application code before the lookup, not as a query-time transform, since Postgres won't cheaply index a computed expression through Prisma).
-3. Otherwise, create a new `Customer` row.
+1. Takes a transaction-scoped advisory lock on the identity key, so two simultaneous submissions from one identity cannot both insert (there is no unique constraint to catch it).
+2. Reads live customers with the same normalised E.164 `phone`, and links to the oldest whose full identity matches — `customerIdentityKey()` in `src/lib/quotes/customer-identity.ts` ignores case, spacing, Latin accents, apostrophe/dash variants and full stops in the name, and case in the email; nothing else. No email is its own value.
+3. Otherwise creates a new `Customer` row.
 
-Skipping this check will accumulate duplicate customer rows over time.
+A match only links — it never rewrites the stored record, because the form is anonymous. The admin customer screen lists other records sharing a phone, WhatsApp or email so an operator can see the connection.
 
 `deletedAt DateTime?` — soft delete for right-to-be-forgotten style requests. On deletion, PII fields should be scrubbed in application code while the row itself persists (so `Order`/`Payment`/`Quote` foreign keys never dangle).
 
@@ -3694,7 +3694,7 @@ Created exactly once, at the moment a `Quote` is accepted (`quoteId` is `@unique
 | `type` | `VEHICLE` \| `SPARE_PART`. Set once at creation from the accepted quote and never changed — it decides the milestone structure, the tracking timeline and the customer-facing wording, and an order that changed type mid-flight would be one whose customer agreed to one payment schedule and is held to another. Every `OrderItem` must agree with it; that is an application invariant, not a CHECK, because a constraint cannot see across a parent row to its children. |
 | `customerId` | Denormalized from `quote.customerId` on purpose — lets admin/customer-dashboard queries filter orders by customer directly without joining through `Quote` every time. Set once at creation, never changes. |
 | `shippingCost`, `clearingCost`, `otherCharges`, `totalAmount` | **Locked-in snapshots taken at the moment the quote is accepted.** These are deliberately independent from `Vehicle`'s live estimate fields — if the vehicle listing's shipping estimate changes later (e.g. freight rates move), it must never silently change what a customer already committed to and is paying against. |
-| `status` | Vehicle: `PENDING_DEPOSIT → DEPOSIT_CONFIRMED → PROCESSING → AWAITING_FINAL_PAYMENT → COMPLETED` or `→ CANCELLED`. Parts: `AWAITING_PAYMENT → PROCESSING → COMPLETED` or `→ CANCELLED`. Coarse, list-view-friendly — the authoritative stage-by-stage detail lives in `PaymentMilestone` (what is owed) and `TrackingEvent` (where it is). A parts order opens at `AWAITING_PAYMENT` rather than `PENDING_DEPOSIT` because it is paid in full up front; reusing the vehicle value would tell an operator to chase a deposit that does not exist. |
+| `status` | Vehicle: `PENDING_DEPOSIT → DEPOSIT_CONFIRMED → PROCESSING → AWAITING_FINAL_PAYMENT → COMPLETED` or `→ CANCELLED`. Parts: `AWAITING_PAYMENT → PROCESSING → COMPLETED` or `→ CANCELLED`. Coarse, list-view-friendly — the authoritative stage-by-stage detail lives in `PaymentMilestone` (what is owed) and `TrackingEvent` (where it is). A parts order opens at `AWAITING_PAYMENT` rather than `PENDING_DEPOSIT` because it is paid in full up front; reusing the vehicle value would tell an operator to chase a deposit that does not exist. **Never set by hand except `CANCELLED`:** every other move is derived by `deriveOrderStatus()` (`src/lib/orders/order-lifecycle.ts`) from the confirmed payments and the shipment's current status, and applied by `syncOrderStatus()` in the same transaction as the payment, tracking update or void that caused it. A vehicle order that completes marks its car `SOLD`; voiding the delivery reopens it and puts the car back to `RESERVED`. |
 
 **There is no `MIXED` order type.** A customer buying a car and a set of filters gets two orders. One order would need a payment schedule neither business rule describes — 50% of a basket whose vehicle half ships in six weeks and whose parts half ships on Thursday is not a rule anybody has written down. Quotations *can* span both, because a quotation commits no money. If mixed baskets ever become a real requirement, `MIXED` is an additive `ALTER TYPE ... ADD VALUE` plus a third milestone strategy — no table changes.
 
@@ -3707,7 +3707,9 @@ balance    = Order.totalAmount - amountPaid
 
 This is the most safety-critical number in the system — storing it redundantly invites drift the moment any code path forgets to update it in lockstep. Always derive it at read time (a `getOrderBalance()` query helper, not a stored column).
 
-Orders are never hard-deleted from the admin UI — cancellation is a status transition (`CANCELLED`), not a `DELETE`.
+Orders are never hard-deleted from the admin UI — cancellation is a status transition (`CANCELLED`), not a `DELETE`. `cancelOrderAction()` is refused while confirmed payments remain (each must be reversed or refunded first) and on a completed order; otherwise, in one transaction, it puts a vehicle the order reserved back to `PUBLISHED` and returns every part's `OrderItem.stockReserved` to `SparePart.stockQuantity`.
+
+**A vehicle is held by at most one open order.** `Vehicle.status = RESERVED` cannot say that by itself (an operator can reserve by hand), so quote conversion locks the vehicle row and refuses when `findOpenOrderForVehicle()` finds an order that is neither cancelled nor completed, and the vehicle status action refuses `PUBLISHED`/`DRAFT`/`ARCHIVED` for the same reason. Every writer that changes an order's maintained columns locks the `Order` row first (`lockOrderLedger()`), so payments, tracking updates, voids and cancellation are serialised.
 
 ### `OrderItem`
 
@@ -3775,7 +3777,7 @@ model PaymentMilestone {
   percentage    Decimal @db.Decimal(5, 2)   // locked in from BusinessSettings at creation time
   amountDue     Decimal @db.Decimal(12, 2)  // locked in = percentage% of Order.totalAmount at creation time
   status        MilestoneStatus  @default(PENDING) // PENDING | DUE | PARTIALLY_PAID | PAID
-  triggerStatus TrackingStatus?  // e.g. ARRIVED_AT_MOMBASA — informational, does not auto-fire
+  triggerStatus TrackingStatus?  // e.g. ARRIVED_AT_MOMBASA — a PENDING stage becomes DUE once the journey reaches this step or any later one
   becameDueAt   DateTime?
   completedAt   DateTime?
 
@@ -3826,7 +3828,7 @@ model Shipment {
 }
 ```
 
-**A `Shipment` is not created at the same time as its `Order`.** Per the business requirement, tracking only activates once an order reaches the appropriate stage — an order can legitimately sit in `PENDING_DEPOSIT` with zero shipments. The relation is optional specifically so the public tracking page can distinguish "invalid tracking number" from "valid order, tracking not yet activated" and message the customer accordingly.
+**A `Shipment` is not created at the same time as its `Order`.** Per the business requirement, tracking only activates once an order reaches the appropriate stage — an order can legitimately sit in `PENDING_DEPOSIT` with zero shipments. The relation is optional specifically so tracking can wait for the order: `trackingActivationProblem()` allows activation once a vehicle order's initial payment is settled, or a parts order is paid in full, and never on a cancelled or completed order — checked, together with "no shipment yet", under the order lock. The public page answers an order-number lookup with one neutral "no tracking to show yet" message whether the order is missing or simply not activated, because order numbers are sequential and distinguishing the two would reveal which orders exist.
 
 `Order.shipments` is modeled as one-to-many even though Wave A only ever creates exactly one per order — this is intentional future-proofing for Wave B, where an order containing both a vehicle and spare parts might need separate shipments per product line. The Wave A server action simply always creates one.
 
@@ -3836,7 +3838,7 @@ A parts consignment leaves `vehicleId` null; its contents are its order's items.
 
 `currentStatus` defaults to `PURCHASED`, the vehicle opening state. A parts shipment is created at `ORDER_CONFIRMED`, set explicitly by the action that creates it: a column default cannot be conditional on a sibling column, so it names the commoner case rather than trying to be both.
 
-`currentStatus` **is a maintained column, not derived-on-read** — the opposite treatment from money fields, and deliberately so: it's read on every tracking-page lookup and admin list view, and updating it costs nothing extra at write time. `updateTrackingStatus()` must update this field and insert the new `TrackingEvent` inside a single `$transaction`, so the two can never drift apart.
+`currentStatus` **is a maintained column, not derived-on-read** — the opposite treatment from money fields, and deliberately so: it's read on every tracking-page lookup and admin list view, and updating it costs nothing extra at write time. It is rebuilt by `syncJourney()` (`src/lib/tracking/journey-sync.ts`) inside the same `$transaction` as every event insert or void: the latest live event **by `eventDate`** (ties by `createdAt`) sets `currentStatus`, the most recent recorded location sets `currentLocation`, triggered payment stages open or close to match, and the order status is re-derived. So a backdated event never moves the shipment backwards, and a voided event never leaves its status behind. Steps that require the order to be paid in full are refused while a balance remains — `DELIVERED` for a vehicle (the final payment falls due at `READY_FOR_COLLECTION`), `PACKED` onwards for parts — as is any update on a cancelled order.
 
 ### `TrackingEvent`
 
@@ -3907,7 +3909,7 @@ Two date fields, two different jobs — **do not conflate them:**
 | `SparePartPhoto` | `[sparePartId]`, `[deletedAt]` | Gallery load, soft-delete filtering |
 | `SparePartCompatibility` | `[sparePartId]`, GIN trigram on `make`, `model` | Fitment list; case-insensitive matching, which is `ILIKE` and cannot use a B-tree |
 | `QuoteItem` | `[quoteId]`, `[vehicleId]`, `[sparePartId]` | Quotation body, join performance |
-| `Customer` | `[phone]`, `[deletedAt]` | Dedup lookup, soft-delete filtering |
+| `Customer` | `[phone]`, `[whatsapp]`, `[email]`, `[deletedAt]` | Identity lookup, related-customer lookup, soft-delete filtering |
 | `Quote` | `[status]`, `[customerId]`, `[createdAt]`, `[type, status]` | Admin quote queue, split by product domain |
 | `Order` | `[status]`, `[customerId]`, `[createdAt]`, `[type, status]` | Admin order list, split by product domain |
 | `OrderItem` | `[orderId]`, `[vehicleId]`, `[sparePartId]` | Join performance |

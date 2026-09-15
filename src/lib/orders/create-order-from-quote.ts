@@ -14,6 +14,7 @@ import {
   sparePartMilestoneTemplates,
   vehicleMilestoneTemplates,
 } from "@/lib/orders/milestones"
+import { findOpenOrderForVehicle, lockVehicle } from "@/lib/orders/vehicle-holds"
 import { computeQuoteTotals, type PricedQuoteLine, type QuoteFees } from "@/lib/quotes/quote-pricing"
 import { fromCents, toCents } from "@/lib/utils/money"
 import { generateReference } from "@/lib/utils/generate-reference"
@@ -55,8 +56,16 @@ export class UnlinkedQuoteLineError extends Error {
 }
 
 export class VehicleUnavailableError extends Error {
-  constructor(public readonly description: string) {
-    super(`"${description}" is no longer available — it may already be reserved or sold.`)
+  constructor(
+    public readonly description: string,
+    /** The open order already holding the vehicle, when that is the reason. */
+    public readonly orderNumber?: string
+  ) {
+    super(
+      orderNumber
+        ? `"${description}" is already on order ${orderNumber}. Cancel that order before selling the vehicle again.`
+        : `"${description}" is no longer available — it may already be reserved or sold.`
+    )
   }
 }
 
@@ -115,8 +124,31 @@ export async function createOrderFromQuote(
 
   // Reserved before the order exists, so a failed reservation leaves nothing
   // half-created behind it (see the file note above).
+  const vehiclesOnThisOrder = new Set<string>()
+
   for (const line of itemLines) {
     if (line.vehicleId) {
+      // One car, one line: a quotation naming the same car twice is not two sales.
+      if (vehiclesOnThisOrder.has(line.vehicleId)) {
+        throw new VehicleUnavailableError(line.description)
+      }
+      vehiclesOnThisOrder.add(line.vehicleId)
+
+      /**
+       * Locked, checked for an open order, then reserved. RESERVED is still
+       * accepted, because an operator may have held the car by hand for this
+       * very customer — but never when another open order already holds it.
+       * The status alone cannot tell those apart, which is what used to let
+       * two quotes for one car both convert. The lock is what stops two
+       * conversions racing past the check together.
+       */
+      await lockVehicle(tx, line.vehicleId)
+
+      const holder = await findOpenOrderForVehicle(tx, line.vehicleId)
+      if (holder) {
+        throw new VehicleUnavailableError(line.description, holder.orderNumber)
+      }
+
       const reserved = await tx.vehicle.updateMany({
         where: {
           id: line.vehicleId,

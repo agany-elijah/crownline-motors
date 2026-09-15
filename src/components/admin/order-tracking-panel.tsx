@@ -1,7 +1,7 @@
 "use client"
 
 import { useActionState, useId, useState } from "react"
-import { AlertCircle, Loader2, MapPin, Plus, Truck } from "lucide-react"
+import { AlertCircle, Check, CheckCircle2, Copy, Loader2, MapPin, Plus, Truck } from "lucide-react"
 
 import {
   addTrackingEventAction,
@@ -13,7 +13,6 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -22,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { StatusBadge } from "@/components/admin/status-badge"
+import { WhatsAppGlyph } from "@/components/shared/whatsapp-glyph"
 import { Textarea } from "@/components/ui/textarea"
 import {
   TRACKING_STATUS_LABELS,
@@ -44,22 +44,44 @@ function todayInputValue(): string {
  * The order-page tracking surface: activates a shipment, records events
  * against it, and lets an operator void a mistaken one — the admin side of
  * the customer-facing "Track My Order" timeline.
+ *
+ * The tracking number is shown ready to hand over: copied, or sent straight
+ * to the customer's WhatsApp. It is also emailed to them automatically when
+ * tracking is activated, and every update after that is emailed too.
  */
 export function OrderTrackingPanel({
   orderId,
   shipment,
+  customerEmail,
+  shareUrl,
+  activationProblem,
+  lockedReason,
 }: {
   orderId: string
   shipment: OrderShipment | null
+  customerEmail: string | null
+  /** wa.me link that opens a chat with the customer, tracking number filled in. */
+  shareUrl: string | null
+  /** Why tracking cannot be activated yet, or null when it can. */
+  activationProblem: string | null
+  /** Why no further updates may be recorded, or null when they may. */
+  lockedReason: string | null
 }) {
   const [createState, createAction, isCreating] = useActionState(createShipmentAction, CREATE_INITIAL)
 
   if (!shipment) {
+    if (activationProblem) {
+      return (
+        <div className="flex flex-col gap-1">
+          <p className="text-small text-muted-foreground">Not activated.</p>
+          <p className="text-small text-muted-foreground">{activationProblem}</p>
+        </div>
+      )
+    }
+
     return (
       <div className="flex flex-col gap-3">
-        <p className="text-small text-muted-foreground">
-          Tracking has not been activated for this order yet.
-        </p>
+        <p className="text-small text-muted-foreground">Not activated.</p>
 
         <form action={createAction}>
           <input type="hidden" name="orderId" value={orderId} />
@@ -82,22 +104,47 @@ export function OrderTrackingPanel({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-col gap-0.5">
-          <span className="font-mono text-small">{shipment.trackingNumber}</span>
-          {shipment.currentLocation ? (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <MapPin aria-hidden="true" className="size-3" />
-              {shipment.currentLocation}
-            </span>
+      <div className="flex flex-col gap-3 rounded-lg bg-accent/30 p-4 ring-1 ring-foreground/10">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Customer tracking number</span>
+            <span className="font-mono text-h3 font-semibold tracking-wide">{shipment.trackingNumber}</span>
+            {shipment.currentLocation ? (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <MapPin aria-hidden="true" className="size-3" />
+                {shipment.currentLocation}
+              </span>
+            ) : null}
+          </div>
+          <StatusBadge tone={TRACKING_STATUS_TONES[shipment.currentStatus]}>
+            {TRACKING_STATUS_LABELS[shipment.currentStatus]}
+          </StatusBadge>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <CopyTrackingNumber value={shipment.trackingNumber} />
+          {shareUrl ? (
+            <Button
+              render={<a href={shareUrl} target="_blank" rel="noopener noreferrer" />}
+              variant="whatsapp"
+              size="sm"
+            >
+              <WhatsAppGlyph className="size-4" />
+              Send on WhatsApp
+            </Button>
           ) : null}
         </div>
-        <StatusBadge tone={TRACKING_STATUS_TONES[shipment.currentStatus]}>
-          {TRACKING_STATUS_LABELS[shipment.currentStatus]}
-        </StatusBadge>
+
+        {customerEmail ? null : (
+          <p className="text-xs text-muted-foreground">No email on file.</p>
+        )}
       </div>
 
-      <AddTrackingEventForm shipmentId={shipment.id} shipmentType={shipment.shipmentType} />
+      {lockedReason ? (
+        <p className="border-t border-border/60 pt-4 text-small text-muted-foreground">{lockedReason}</p>
+      ) : (
+        <AddTrackingEventForm shipmentId={shipment.id} shipmentType={shipment.shipmentType} />
+      )}
 
       {shipment.events.length > 0 ? (
         <ol className="flex flex-col gap-3">
@@ -107,6 +154,38 @@ export function OrderTrackingPanel({
         </ol>
       ) : null}
     </div>
+  )
+}
+
+function CopyTrackingNumber({ value }: { value: string }) {
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle")
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopyState("copied")
+    } catch (error) {
+      // Clipboard access is refused outside a secure context or by browser
+      // policy; say so rather than pretending it worked.
+      console.error("[tracking] could not copy the tracking number", error)
+      setCopyState("failed")
+    }
+  }
+
+  return (
+    <>
+      <Button type="button" size="sm" variant="outline" onClick={copy}>
+        {copyState === "copied" ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+        {copyState === "copied" ? "Copied" : "Copy number"}
+      </Button>
+      <span role="status" className={copyState === "failed" ? "text-xs text-destructive" : "sr-only"}>
+        {copyState === "failed"
+          ? "Could not copy — select the number and copy it manually."
+          : copyState === "copied"
+            ? "Tracking number copied"
+            : ""}
+      </span>
+    </>
   )
 }
 
@@ -131,6 +210,13 @@ function AddTrackingEventForm({
       {state.status === "error" && state.message ? (
         <p className="flex items-center gap-1.5 text-xs text-destructive">
           <AlertCircle aria-hidden="true" className="size-3.5" />
+          {state.message}
+        </p>
+      ) : null}
+
+      {state.status === "success" && state.message ? (
+        <p role="status" className="flex items-start gap-1.5 text-xs text-success">
+          <CheckCircle2 aria-hidden="true" className="mt-px size-3.5 shrink-0" />
           {state.message}
         </p>
       ) : null}
@@ -191,7 +277,7 @@ function AddTrackingEventForm({
           name="notes"
           rows={2}
           maxLength={1000}
-          placeholder="Optional — shown only to staff"
+          placeholder="Internal"
           className="min-h-16 rounded-md border-input px-2.5 py-2 text-small placeholder:text-muted-foreground/70"
         />
       </div>
@@ -243,10 +329,6 @@ function TrackingEventRow({ event }: { event: OrderTrackingEvent }) {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Void this update?</DialogTitle>
-              <DialogDescription>
-                It stays on record, marked voided, and stops appearing on the customer&apos;s
-                tracking page. Optionally say why.
-              </DialogDescription>
             </DialogHeader>
 
             {voidState.status === "error" && voidState.message ? (

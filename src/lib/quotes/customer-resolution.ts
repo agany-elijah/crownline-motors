@@ -1,30 +1,38 @@
 import "server-only"
 
 import type { Prisma } from "@/generated/prisma/client"
+import { customerIdentityKey } from "@/lib/quotes/customer-identity"
 
 /**
  * Finds the Customer an enquiry belongs to, or creates one.
  *
- * ── The rule, from the schema documentation ───────────────────────────
- * `Customer.phone` is indexed but deliberately not unique (a shared
- * household phone is a legitimate second enquirer), so every public form
- * must de-duplicate by hand, in this order:
+ * ── The rule ──────────────────────────────────────────────────────────
+ * An enquiry joins an existing Customer only when its full name, email,
+ * phone and WhatsApp all match that record (see customer-identity.ts for
+ * what "match" tolerates). Sharing a phone, an email or a WhatsApp number
+ * alone makes a *different* customer — a household phone, a relative
+ * enquiring on someone's behalf, an office inbox.
  *
- *   1. An exact match on email, which *is* unique.
- *   2. Otherwise an exact match on the normalised (E.164) phone number.
- *   3. Otherwise a new row.
+ * Phone is part of every identity and is indexed, so candidates are read by
+ * phone and compared in application code, where the name normalisation
+ * lives. Neither `phone` nor `email` is unique in the database.
  *
- * Skipping it accumulates a duplicate customer for every repeat enquiry,
- * and the admin's "everything this person has asked for" view falls apart.
+ * ── Concurrency ───────────────────────────────────────────────────────
+ * With no unique constraint to catch it, two simultaneous submissions from
+ * one identity could both miss the lookup and both insert. A transaction-
+ * scoped advisory lock on the identity key serialises exactly those
+ * submissions (and nothing else); the second waits, then finds the row the
+ * first committed. It is released with the transaction, so it is safe
+ * behind Supabase's transaction-mode pooler.
  *
  * ── Why a match never updates the existing row ────────────────────────
- * The form is anonymous, and anyone can type anyone's email address or phone
- * number. If a match rewrote the stored name or number, a stranger could
- * change the contact details of a customer with a deposit on a car — and the
- * next WhatsApp about that car would go to them. So a match only *links*:
- * what was typed is kept as a snapshot on the enquiry itself
- * (`Quote.contact*`), which is where the operator replies to, and the shared
- * record changes only through the dashboard.
+ * The form is anonymous, and anyone can type anyone's details. If a match
+ * rewrote the stored record, a stranger could change the contact details of
+ * a customer with a deposit on a car. So a match only *links*: what was
+ * typed is kept as a snapshot on the enquiry itself (`Quote.contact*`),
+ * which is where the operator replies to, and the shared record changes
+ * only through the dashboard. City is not part of the identity for the same
+ * reason — people move, and it is kept on the enquiry.
  *
  * Soft-deleted customers are never matched. Their PII has been scrubbed on
  * request, and reviving the row would re-attach a new enquiry to an identity
@@ -47,36 +55,26 @@ export async function resolveCustomerForEnquiry(
   tx: Prisma.TransactionClient,
   contact: EnquiryContact
 ): Promise<{ id: string; created: boolean }> {
-  if (contact.email) {
-    const byEmail = await tx.customer.findFirst({
-      where: { email: contact.email, deletedAt: null },
-      select: { id: true },
-    })
+  const identity = customerIdentityKey(contact)
 
-    if (byEmail) return { id: byEmail.id, created: false }
-  }
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`customer-identity:${identity}`}, 0))`
 
-  const byPhone = await tx.customer.findFirst({
+  const candidates = await tx.customer.findMany({
     where: { phone: contact.phone, deletedAt: null },
-    // The oldest record is the canonical one if duplicates already exist
-    // from before this rule was enforced.
-    orderBy: { createdAt: "asc" },
-    select: { id: true },
+    // The oldest record is the canonical one if identical duplicates already
+    // exist from before this rule was enforced.
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: { id: true, fullName: true, email: true, phone: true, whatsapp: true },
   })
 
-  if (byPhone) return { id: byPhone.id, created: false }
+  const match = candidates.find((candidate) => customerIdentityKey(candidate) === identity)
+  if (match) return { id: match.id, created: false }
 
   const created = await tx.customer.create({
     data: {
       fullName: contact.fullName,
       phone: contact.phone,
       whatsapp: contact.whatsapp,
-      /**
-       * `email` is unique. A concurrent request with the same address can win
-       * the race between the lookup above and this insert; the caller catches
-       * that unique violation and retries the whole transaction once, at
-       * which point the lookup finds the row the other request created.
-       */
       email: contact.email ?? null,
       city: contact.city,
     },

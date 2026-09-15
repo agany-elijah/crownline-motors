@@ -237,17 +237,12 @@ export function VehiclePhotoBoard({
   return (
     <section id="photographs" className="flex flex-col gap-6 rounded-xl border border-border bg-card p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h2 className="font-heading text-h3 font-semibold">
-            Photographs
-            <span className="ml-2 text-body font-normal text-muted-foreground tabular">
-              {photos.length}
-            </span>
-          </h2>
-          <p className="max-w-2xl text-small text-muted-foreground">
-            {photos.length} of {MAX_PHOTOS_PER_VEHICLE} used. Shown at 16:9 across the site.
-          </p>
-        </div>
+        <h2 className="font-heading text-h3 font-semibold">
+          Photographs
+          <span className="ml-2 text-body font-normal text-muted-foreground tabular">
+            {photos.length}/{MAX_PHOTOS_PER_VEHICLE}
+          </span>
+        </h2>
       </div>
 
       {feedback.status === "success" && feedback.message ? (
@@ -273,12 +268,7 @@ export function VehiclePhotoBoard({
 
       {/* ── Main image ───────────────────────────────────────────── */}
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-heading text-small font-semibold">Main image</h3>
-          <p className="text-small text-muted-foreground">
-            Shown first — on the vehicle card, search results, and the gallery.
-          </p>
-        </div>
+        <h3 className="font-heading text-small font-semibold">Main image</h3>
 
         <div className="max-w-xl">
           {main ? (
@@ -309,19 +299,14 @@ export function VehiclePhotoBoard({
 
       {/* ── Other images ─────────────────────────────────────────── */}
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-heading text-small font-semibold">
-            Other images
-            {others.length > 0 ? (
-              <span className="ml-2 font-normal text-muted-foreground tabular">
-                {others.length}
-              </span>
-            ) : null}
-          </h3>
-          <p className="text-small text-muted-foreground">
-            Use the <span aria-hidden="true">⋯</span> menu to reorder, describe, or set as main.
-          </p>
-        </div>
+        <h3 className="font-heading text-small font-semibold">
+          Other images
+          {others.length > 0 ? (
+            <span className="ml-2 font-normal text-muted-foreground tabular">
+              {others.length}
+            </span>
+          ) : null}
+        </h3>
 
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {others.map((photo, index) => (
@@ -447,12 +432,6 @@ export function VehiclePhotoBoard({
                   </>
                 )}
               </Button>
-
-              <p className="text-small text-muted-foreground">
-                {photos.length === 0
-                  ? "The first of these becomes the main image."
-                  : "These are added after the existing images. The main image does not change."}
-              </p>
             </div>
           </div>
         ) : null}

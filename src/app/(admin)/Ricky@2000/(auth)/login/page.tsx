@@ -53,7 +53,6 @@ export default async function AdminLoginPage(props: PageProps<"/Ricky@2000/login
   return (
     <AdminAuthShell
       title="Sign in"
-      description="Enter your Crownline Motors staff credentials to reach the dashboard."
       footer={
         <Link
           href={`${ADMIN_BASE_PATH}/forgot-password`}

@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils"
 
 interface AdminAuthShellProps {
   title: string
-  description: string
   children: React.ReactNode
   /** Optional secondary action rendered beneath the card. */
   footer?: React.ReactNode
@@ -29,7 +28,6 @@ interface AdminAuthShellProps {
  */
 export function AdminAuthShell({
   title,
-  description,
   children,
   footer,
   className,
@@ -64,10 +62,7 @@ export function AdminAuthShell({
         </div>
 
         <div className="rounded-xl border border-background/12 bg-background/[0.04] p-6 shadow-[var(--shadow-raised)] backdrop-blur-sm sm:p-8">
-          <div className="mb-6 flex flex-col gap-2">
-            <h1 className="font-heading text-h3 font-semibold">{title}</h1>
-            <p className="text-small text-background/65">{description}</p>
-          </div>
+          <h1 className="mb-6 font-heading text-h3 font-semibold">{title}</h1>
 
           {children}
         </div>

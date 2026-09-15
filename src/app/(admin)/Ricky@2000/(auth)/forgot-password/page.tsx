@@ -26,7 +26,6 @@ export default async function AdminForgotPasswordPage() {
   return (
     <AdminAuthShell
       title="Reset your password"
-      description="We will email a single-use link to the address on your staff account."
       footer={
         <Link
           href={`${ADMIN_BASE_PATH}/login`}

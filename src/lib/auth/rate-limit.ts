@@ -86,12 +86,23 @@ export const RATE_LIMIT_SCOPES = {
   quoteRequestIp: "quote-request:ip",
   quoteRequestPhone: "quote-request:phone",
   quotationPdfIp: "quotation-pdf:ip",
+  trackingLookupIp: "tracking-lookup:ip",
 } as const
 
 /** Quotation PDF reads per host inside the window. Generous: a customer may
  *  reload the page, forward the link, and reopen it themselves. */
 export const QUOTATION_PDF_MAX_PER_IP = 30
 export const QUOTATION_PDF_WINDOW_MS = 60 * 60 * 1000
+
+/**
+ * Track My Order lookups per host inside the window.
+ *
+ * Tracking numbers are sequential, so this is what stops a script walking
+ * through them. Forty an hour is far past a customer refreshing their own
+ * order, or a family checking two, and still turns enumeration into a crawl.
+ */
+export const TRACKING_LOOKUP_MAX_PER_IP = 40
+export const TRACKING_LOOKUP_WINDOW_MS = 60 * 60 * 1000
 
 /** Reset emails per address/host inside the window. Three covers "I did not
  *  get it, let me try again" twice over; a fourth in fifteen minutes is not
@@ -194,6 +205,85 @@ export async function checkRateLimit(
     console.error("[rate-limit] failed to read attempt counts", error)
 
     return { allowed: true, remaining: max }
+  }
+}
+
+/** One key and the number of uses it may make inside the window. */
+export interface RateLimitBudget {
+  key: RateLimitKey
+  max: number
+}
+
+/**
+ * Counts a use against every budget and decides, as one step.
+ *
+ * For limits on *uses* — a quote request, a tracking lookup, a reset email —
+ * where `checkRateLimit` followed by `recordAttempt` leaves a gap: a burst of
+ * parallel requests all read the count before any of them writes, and all
+ * get through. Here the use is recorded first and the count read afterwards,
+ * so every request in a burst sees the others. A refused use is removed
+ * again, so a customer retrying while limited does not extend their own
+ * lockout.
+ *
+ * The one cost of recording first is that two requests arriving together at
+ * the very edge of a budget can both be refused. A throttle erring towards
+ * refusal for a moment is the right way round.
+ *
+ * Fails open on a database error, like `checkRateLimit` and for the same
+ * reason: this is a throttle, not a gate.
+ */
+export async function consumeRateLimit(
+  budgets: readonly RateLimitBudget[],
+  windowMs: number = WINDOW_MS
+): Promise<RateLimitVerdict> {
+  if (budgets.length === 0) return { allowed: true, remaining: Number.MAX_SAFE_INTEGER }
+
+  const since = new Date(Date.now() - windowMs)
+  let insertedIds: string[]
+  let counts: number[]
+
+  try {
+    const inserted = await prisma.loginAttempt.createManyAndReturn({
+      data: budgets.map(({ key }) => ({
+        scope: key.scope,
+        identifierHash: hashIdentifier(key.scope, key.identifier),
+      })),
+      select: { id: true },
+    })
+    insertedIds = inserted.map((row) => row.id)
+
+    counts = await Promise.all(
+      budgets.map(({ key }) =>
+        prisma.loginAttempt.count({
+          where: {
+            scope: key.scope,
+            identifierHash: hashIdentifier(key.scope, key.identifier),
+            createdAt: { gte: since },
+          },
+        })
+      )
+    )
+  } catch (error) {
+    console.error("[rate-limit] failed to consume an attempt", error)
+
+    return { allowed: true, remaining: 0 }
+  }
+
+  if (budgets.some((budget, index) => counts[index] > budget.max)) {
+    try {
+      await prisma.loginAttempt.deleteMany({ where: { id: { in: insertedIds } } })
+    } catch (error) {
+      // The refusal stands either way; a leftover row only shortens the
+      // caller's next window slightly.
+      console.error("[rate-limit] failed to remove a refused attempt", error)
+    }
+
+    return { allowed: false, remaining: 0 }
+  }
+
+  return {
+    allowed: true,
+    remaining: Math.min(...budgets.map((budget, index) => budget.max - counts[index])),
   }
 }
 

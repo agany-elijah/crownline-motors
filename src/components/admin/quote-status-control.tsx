@@ -11,7 +11,6 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -19,11 +18,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  MANUAL_QUOTE_TRANSITIONS,
-  QUOTE_STATUS_DESCRIPTIONS,
-  transitionLabel,
-} from "@/lib/constants/quote-status"
+import { MANUAL_QUOTE_TRANSITIONS, transitionLabel } from "@/lib/constants/quote-status"
 
 const INITIAL_STATE = { status: "idle" as const }
 
@@ -49,10 +44,7 @@ export function QuoteStatusControl({ quoteId, status }: QuoteStatusControlProps)
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-meta text-muted-foreground">Status</h2>
-        <p className="text-small text-muted-foreground">{QUOTE_STATUS_DESCRIPTIONS[status]}</p>
-      </div>
+      <h2 className="text-meta text-muted-foreground">Status</h2>
 
       {state.status === "success" && state.message ? (
         <Alert>
@@ -68,11 +60,7 @@ export function QuoteStatusControl({ quoteId, status }: QuoteStatusControlProps)
         </Alert>
       ) : null}
 
-      {transitions.length === 0 ? (
-        <p className="text-small text-muted-foreground">
-          This quote is in a final state and has no further manual moves.
-        </p>
-      ) : (
+      {transitions.length === 0 ? null : (
         <div className="flex flex-wrap gap-2">
           {transitions.map((target) => {
             const needsReason = target === QuoteStatus.REJECTED || target === QuoteStatus.EXPIRED
@@ -91,9 +79,6 @@ export function QuoteStatusControl({ quoteId, status }: QuoteStatusControlProps)
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>{transitionLabel(status, target)}</DialogTitle>
-                      <DialogDescription>
-                        Optional — a short note on why, for the record.
-                      </DialogDescription>
                     </DialogHeader>
 
                     <form

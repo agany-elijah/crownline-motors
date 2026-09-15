@@ -115,8 +115,8 @@ describe("resolveReturnPath", () => {
   })
 
   it("passes a safe path through unchanged", () => {
-    expect(resolveReturnPath(`${ADMIN_BASE_PATH}/payments`)).toBe(
-      `${ADMIN_BASE_PATH}/payments`
+    expect(resolveReturnPath(`${ADMIN_BASE_PATH}/orders`)).toBe(
+      `${ADMIN_BASE_PATH}/orders`
     )
   })
 })

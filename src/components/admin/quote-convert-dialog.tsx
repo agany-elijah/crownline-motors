@@ -91,11 +91,7 @@ export function QuoteConvertDialog({ quoteId, total, disabled = false, disabledR
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Convert to order</DialogTitle>
-            <DialogDescription>
-              This creates a permanent order for {formatCurrency(total)}, reserves the vehicle or
-              stock on this quotation, and builds its payment schedule. It cannot be undone from
-              here.
-            </DialogDescription>
+            <DialogDescription>{formatCurrency(total)} · permanent</DialogDescription>
           </DialogHeader>
 
           {state.status === "error" && state.message ? (

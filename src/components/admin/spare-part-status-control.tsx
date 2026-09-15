@@ -12,10 +12,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { SparePartStatusBadge } from "@/components/admin/spare-part-status-badge"
-import {
-  SPARE_PART_STATUS_DESCRIPTIONS,
-  SPARE_PART_STATUS_LABELS,
-} from "@/lib/constants/spare-part-options"
+import { SPARE_PART_STATUS_LABELS } from "@/lib/constants/spare-part-options"
 // The same table the Server Action enforces. Rendering buttons from it is a
 // convenience; `updateSparePartStatusAction` is what actually refuses a move.
 import { ALLOWED_SPARE_PART_TRANSITIONS } from "@/lib/constants/spare-part-status-transitions"
@@ -112,12 +109,7 @@ export function SparePartStatusControl({
   return (
     <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h2 className="font-heading text-h3 font-semibold">Status</h2>
-          <p className="text-small text-muted-foreground">
-            {SPARE_PART_STATUS_DESCRIPTIONS[status]}
-          </p>
-        </div>
+        <h2 className="font-heading text-h3 font-semibold">Status</h2>
         <SparePartStatusBadge status={status} />
       </div>
 

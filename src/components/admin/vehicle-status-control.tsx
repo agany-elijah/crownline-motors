@@ -12,10 +12,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { VehicleStatusBadge } from "@/components/admin/vehicle-status-badge"
-import {
-  VEHICLE_STATUS_DESCRIPTIONS,
-  VEHICLE_STATUS_LABELS,
-} from "@/lib/constants/vehicle-options"
+import { VEHICLE_STATUS_LABELS } from "@/lib/constants/vehicle-options"
 // The same table the Server Action enforces. Rendering buttons from it is a
 // convenience; `updateVehicleStatusAction` is what actually refuses a move.
 import { ALLOWED_VEHICLE_TRANSITIONS } from "@/lib/constants/vehicle-status-transitions"
@@ -58,12 +55,7 @@ export function VehicleStatusControl({
   return (
     <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h2 className="font-heading text-h3 font-semibold">Status</h2>
-          <p className="text-small text-muted-foreground">
-            {VEHICLE_STATUS_DESCRIPTIONS[status]}
-          </p>
-        </div>
+        <h2 className="font-heading text-h3 font-semibold">Status</h2>
         <VehicleStatusBadge status={status} />
       </div>
 

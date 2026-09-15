@@ -3,13 +3,11 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  CreditCard,
   LayoutDashboard,
   Car,
   FileText,
   Package,
   Settings,
-  Ship,
   Users,
   Wrench,
   type LucideIcon,
@@ -37,9 +35,7 @@ const ICONS: Record<AdminNavIcon, LucideIcon> = {
   spareParts: Wrench,
   quotes: FileText,
   orders: Package,
-  payments: CreditCard,
   customers: Users,
-  tracking: Ship,
   settings: Settings,
 }
 

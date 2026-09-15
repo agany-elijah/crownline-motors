@@ -8,7 +8,6 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -54,15 +53,12 @@ export function QuotePdfDialog({ quoteId }: { quoteId: string }) {
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Quotation PDF</DialogTitle>
-          <DialogDescription>
-            Exactly what the customer receives — reviewed against the last saved figures.
-          </DialogDescription>
         </DialogHeader>
 
         {isDirty ? (
           <p className="flex items-center gap-1.5 text-xs text-warning">
             <AlertTriangle aria-hidden="true" className="size-3.5 shrink-0" />
-            Showing the last saved version — save your changes to include them here.
+            Unsaved changes are not included.
           </p>
         ) : null}
 

@@ -19,16 +19,8 @@ export function VehiclePhotoStaging({ disabled = false }: { disabled?: boolean }
       inputName="photos"
       disabled={disabled}
       copy={{
-        intro: "Added when you save the vehicle. Landscape photos look best — shown at 16:9 across the site.",
-        mainImageHint: "Shown first — on the vehicle card, search results, and the gallery.",
-        otherImagesHint: (
-          <>
-            The rest of the walk-around. Use the <span aria-hidden="true">⋯</span> menu to
-            change the main image.
-          </>
-        ),
         mainDropLabel: "Choose the main image",
-        mainDropHint: "The first photograph customers will see",
+        mainDropHint: "16:9 landscape",
         mainAlt: "Main photograph of this vehicle",
         otherAlt: (position) => `Photograph ${position} of this vehicle`,
       }}

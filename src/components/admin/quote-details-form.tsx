@@ -110,9 +110,7 @@ export function QuoteDetailsForm({
     return (
       <section id="pricing" className="flex flex-col gap-2 rounded-xl bg-card p-6 shadow-[var(--shadow-subtle)] ring-1 ring-foreground/10">
         <h2 className="font-heading text-h3 font-semibold">Details</h2>
-        <p className="text-small text-muted-foreground">
-          Not editable — reopen this quote to change its figures.
-        </p>
+        <p className="text-small text-muted-foreground">Locked.</p>
       </section>
     )
   }

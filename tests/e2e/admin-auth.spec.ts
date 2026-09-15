@@ -22,11 +22,8 @@ const PROTECTED_ADMIN_ROUTES = [
   adminPath("/quotes/some-id"),
   adminPath("/orders"),
   adminPath("/orders/some-id"),
-  adminPath("/payments"),
-  adminPath("/payments/some-id"),
   adminPath("/customers"),
   adminPath("/customers/some-id"),
-  adminPath("/tracking/some-shipment"),
   adminPath("/settings"),
   adminPath("/forbidden"),
 ]
@@ -44,10 +41,10 @@ test.describe("unauthenticated access to the admin area", () => {
   }
 
   test("preserves the requested page so sign-in returns there", async ({ page }) => {
-    await page.goto(adminPath("/payments"))
+    await page.goto(adminPath("/orders"))
 
     const url = new URL(page.url())
-    expect(url.searchParams.get("next")).toBe(adminPath("/payments"))
+    expect(url.searchParams.get("next")).toBe(adminPath("/orders"))
   })
 
   test("does not render admin content before redirecting", async ({ page }) => {
@@ -318,7 +315,7 @@ test.describe("hardening", () => {
     // meaningful under both servers. Once the Playwright webServer switches
     // to `build && start` (see playwright.config.ts), a rendered admin page
     // can be asserted here directly.
-    const response = await request.get(adminPath("/payments"), { maxRedirects: 0 })
+    const response = await request.get(adminPath("/orders"), { maxRedirects: 0 })
 
     expect(response.status()).toBe(307)
     expect(response.headers()["cache-control"]).toContain("no-store")

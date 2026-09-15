@@ -478,9 +478,17 @@ function toQuotePdfSourceRow(
   }
 }
 
+/**
+ * Quote statuses whose customer link still opens. A quote that was lost or
+ * lapsed is not a document the dealership stands behind any more, so its
+ * link stops working without anyone having to remember to revoke it —
+ * reopening the quote brings the link back.
+ */
+const SHAREABLE_QUOTE_STATUSES: readonly QuoteStatus[] = [QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.WON]
+
 export async function getQuoteForPdf(shareToken: string): Promise<QuotePdfSourceRow | null> {
-  const quote = await prisma.quote.findUnique({
-    where: { shareToken },
+  const quote = await prisma.quote.findFirst({
+    where: { shareToken, status: { in: [...SHAREABLE_QUOTE_STATUSES] } },
     select: QUOTE_PDF_SOURCE_SELECT,
   })
 

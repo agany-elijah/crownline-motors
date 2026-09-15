@@ -201,25 +201,14 @@ function EmptyVehicles({ hasFilters }: { hasFilters: boolean }) {
 
       {hasFilters ? (
         <>
-          <div className="flex flex-col gap-1">
-            <h2 className="font-heading text-h3 font-semibold">No matches</h2>
-            <p className="text-body text-muted-foreground">
-              No vehicles match that search or filter.
-            </p>
-          </div>
+          <h2 className="font-heading text-h3 font-semibold">No matches</h2>
           <Button render={<Link href={`${ADMIN_BASE_PATH}/vehicles`} />} variant="outline">
             Show all vehicles
           </Button>
         </>
       ) : (
         <>
-          <div className="flex flex-col gap-1">
-            <h2 className="font-heading text-h3 font-semibold">No vehicles yet</h2>
-            <p className="max-w-sm text-body text-muted-foreground">
-              Add your first vehicle. It starts as a draft, so nothing appears on
-              the website until you publish it.
-            </p>
-          </div>
+          <h2 className="font-heading text-h3 font-semibold">No vehicles yet</h2>
           <Button render={<Link href={`${ADMIN_BASE_PATH}/vehicles/new`} />}>
             <Plus aria-hidden="true" />
             Add vehicle

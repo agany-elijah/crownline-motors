@@ -34,7 +34,6 @@ export default async function AdminResetPasswordPage() {
   return (
     <AdminAuthShell
       title="Set a new password"
-      description="Choose a new password for your Crownline Motors staff account."
       footer={
         <Link
           href={`${ADMIN_BASE_PATH}/login`}

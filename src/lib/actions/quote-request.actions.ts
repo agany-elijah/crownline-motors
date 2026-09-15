@@ -1,7 +1,10 @@
 "use server"
 
+import { after } from "next/server"
+
 import { QuoteLineKind, QuoteType } from "@/generated/prisma/enums"
 import { logSecurityEvent } from "@/lib/audit"
+import { notifyAdminsOfQuoteRequest, notifyCustomerQuoteReceived } from "@/lib/email/notifications"
 import { MAX_ITEM_QUANTITY } from "@/lib/cart/cart-storage"
 import { getClientIp } from "@/lib/auth/client-ip"
 import {
@@ -9,9 +12,8 @@ import {
   QUOTE_REQUEST_MAX_PER_PHONE,
   QUOTE_REQUEST_WINDOW_MS,
   RATE_LIMIT_SCOPES,
-  checkRateLimit,
+  consumeRateLimit,
   pruneExpiredAttempts,
-  recordAttempt,
   type RateLimitKey,
 } from "@/lib/auth/rate-limit"
 import { prisma } from "@/lib/prisma"
@@ -23,7 +25,6 @@ import {
   vehicleLineDescription,
 } from "@/lib/quotes/quote-subjects"
 import { generateReference } from "@/lib/utils/generate-reference"
-import { isUniqueConstraintViolation } from "@/lib/utils/prisma-errors"
 import {
   QUOTE_HONEYPOT_FIELD,
   quoteRequestSchema,
@@ -286,6 +287,27 @@ async function buildRateLimitKeys(phone: string): Promise<{
   }
 }
 
+/** A one-line description of the enquiry, for the acknowledgement emails. */
+function enquirySummary(input: QuoteRequestInput, subject: PreparedSubject): string {
+  const described = subject.lines.map((line) =>
+    line.quantity > 1 ? `${line.quantity} × ${line.description}` : line.description
+  )
+
+  if (described.length === 1) return described[0]
+  if (described.length > 1) {
+    return `${described.length} items: ${described.slice(0, 3).join("; ")}${described.length > 3 ? "; …" : ""}`
+  }
+
+  const vehicle = [input.preferredYear, input.make, input.model].filter(Boolean).join(" ")
+
+  if (subject.type === QuoteType.SPARE_PART) {
+    const part = input.partName ?? "Spare part"
+    return vehicle ? `${part} for ${vehicle}` : part
+  }
+
+  return vehicle || "Vehicle enquiry"
+}
+
 export async function submitQuoteRequestAction(
   _prevState: QuoteRequestState,
   formData: FormData
@@ -356,25 +378,21 @@ export async function submitQuoteRequestAction(
   const input = parsed.data
 
   // ── Throttle ──────────────────────────────────────────────────────────
+  // Counted and checked in one step, before anything is stored, so a burst
+  // of parallel submissions cannot all pass the check together — see
+  // consumeRateLimit.
   const keys = await buildRateLimitKeys(input.phone)
 
-  const [ipVerdict, phoneVerdict] = await Promise.all([
-    keys.ip
-      ? checkRateLimit([keys.ip], {
-          max: QUOTE_REQUEST_MAX_PER_IP,
-          windowMs: QUOTE_REQUEST_WINDOW_MS,
-        })
-      : Promise.resolve({ allowed: true, remaining: QUOTE_REQUEST_MAX_PER_IP }),
-    checkRateLimit([keys.phone], {
-      max: QUOTE_REQUEST_MAX_PER_PHONE,
-      windowMs: QUOTE_REQUEST_WINDOW_MS,
-    }),
-  ])
+  const verdict = await consumeRateLimit(
+    [
+      ...(keys.ip ? [{ key: keys.ip, max: QUOTE_REQUEST_MAX_PER_IP }] : []),
+      { key: keys.phone, max: QUOTE_REQUEST_MAX_PER_PHONE },
+    ],
+    QUOTE_REQUEST_WINDOW_MS
+  )
 
-  if (!ipVerdict.allowed || !phoneVerdict.allowed) {
-    logSecurityEvent("quote_request_rate_limited", {
-      bucket: !ipVerdict.allowed ? "ip" : "phone",
-    })
+  if (!verdict.allowed) {
+    logSecurityEvent("quote_request_rate_limited", {})
     // Housekeeping rides on the refusal path, where it costs nothing a real
     // customer notices.
     await pruneExpiredAttempts()
@@ -417,7 +435,7 @@ export async function submitQuoteRequestAction(
       // counter back and leaves no gap in the quote series.
       const quoteNumber = await generateReference(tx, "QUOTE")
 
-      await tx.quote.create({
+      const created = await tx.quote.create({
         data: {
           quoteNumber,
           customerId: customer.id,
@@ -436,39 +454,54 @@ export async function submitQuoteRequestAction(
         select: { id: true },
       })
 
-      return quoteNumber
+      return { quoteNumber, quoteId: created.id }
     })
 
-  let quoteNumber: string
+  let written: { quoteNumber: string; quoteId: string }
 
   try {
-    quoteNumber = await write()
+    // Simultaneous submissions from one identity are serialised inside
+    // resolveCustomerForEnquiry, so there is no race here to retry.
+    written = await write()
   } catch (error) {
-    /**
-     * Two submissions with the same new email address can race between the
-     * customer lookup and the insert. The loser hits the unique index; one
-     * retry finds the row the winner created and links to it.
-     */
-    if (isUniqueConstraintViolation(error)) {
-      try {
-        quoteNumber = await write()
-      } catch (retryError) {
-        console.error("[quote-request] failed to store the request after retry", retryError)
-        return { status: "error", message: GENERIC_FAILURE, values }
-      }
-    } else {
-      console.error("[quote-request] failed to store the request", error)
-      return { status: "error", message: GENERIC_FAILURE, values }
-    }
+    console.error("[quote-request] failed to store the request", error)
+    return { status: "error", message: GENERIC_FAILURE, values }
   }
 
-  // Counted on success: a stored request is exactly what is being throttled.
-  await recordAttempt(keys.ip ? [keys.ip, keys.phone] : [keys.phone])
+  /**
+   * The acknowledgement to the customer and the alert to staff go out after
+   * the response, so the customer is not kept waiting on two email round
+   * trips. Neither can fail the request: it is already stored, and each
+   * notification logs its own failure (see notifications.ts).
+   */
+  const summary = enquirySummary(input, subject)
+  after(async () => {
+    await Promise.all([
+      notifyCustomerQuoteReceived({
+        to: input.email ?? null,
+        customerName: input.fullName,
+        quoteNumber: written.quoteNumber,
+        summary,
+      }),
+      notifyAdminsOfQuoteRequest({
+        quoteId: written.quoteId,
+        quoteNumber: written.quoteNumber,
+        typeLabel: subject.type === QuoteType.SPARE_PART ? "Spare parts" : "Vehicle",
+        summary,
+        contactName: input.fullName,
+        contactPhone: input.phone,
+        contactWhatsapp: input.whatsapp,
+        contactEmail: input.email ?? null,
+        contactCity: input.city,
+        notes: input.notes ?? null,
+      }),
+    ])
+  })
 
   return {
     status: "success",
     message: "Thank you — your request has been received.",
-    quoteNumber,
+    quoteNumber: written.quoteNumber,
     skippedItems: subject.skippedItems,
   }
 }

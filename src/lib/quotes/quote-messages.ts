@@ -52,6 +52,10 @@ export interface QuoteMessageInput {
   link: string | null
   paymentInstructions: string | null
   isVehicle: boolean
+  /** Optional operator notes or instructions for this customer ("the car
+   *  can be inspected on Tuesday", "bring your ID to collection"), printed
+   *  under the figures. Omitted when blank. */
+  instructions?: string | null
 }
 
 /** The polite opening line the dispatch dialog prefills its editable message
@@ -142,6 +146,13 @@ export function buildQuoteMessage(
   lines.push(bold(`Total: ${formatCurrency(input.total)}`))
   lines.push("")
   lines.push(`This quotation is valid until ${formatQuoteDate(input.validUntil)}.`)
+
+  const instructions = input.instructions?.trim()
+  if (instructions) {
+    lines.push("")
+    lines.push(bold("Additional notes"))
+    lines.push(instructions)
+  }
 
   if (input.link) {
     lines.push("")

@@ -73,21 +73,6 @@ export const VEHICLE_STATUS_LABELS: Record<VehicleStatus, string> = {
 }
 
 /**
- * What each status means operationally.
- *
- * Shown beside the status control, because "Reserved" and "Sold" are the
- * kind of pair whose difference is obvious to whoever designed the workflow
- * and genuinely ambiguous to whoever is using it at 7pm.
- */
-export const VEHICLE_STATUS_DESCRIPTIONS: Record<VehicleStatus, string> = {
-  DRAFT: "Not visible on the website. Still being prepared.",
-  PUBLISHED: "Live on the website and open to enquiries.",
-  RESERVED: "Held for a customer. Visible, but marked as unavailable.",
-  SOLD: "Sold and no longer available. Kept for the record.",
-  ARCHIVED: "Hidden from the website. Kept because orders may reference it.",
-}
-
-/**
  * Severity for the status badge.
  *
  * Encoding state in form as well as colour — a viewer who cannot

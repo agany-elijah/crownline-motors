@@ -39,9 +39,7 @@ export type AdminNavIcon =
   | "spareParts"
   | "quotes"
   | "orders"
-  | "payments"
   | "customers"
-  | "tracking"
   | "settings"
 
 export interface AdminNavGroup {
@@ -52,9 +50,15 @@ export interface AdminNavGroup {
 
 /**
  * Grouped to match how the business actually works rather than how the
- * database is shaped: what we sell, who we sell it to and what they owe,
- * where their vehicle is, and finally configuration. An operator working a
- * customer enquiry moves top to bottom through that order.
+ * database is shaped: what we sell, who we sell it to, and finally
+ * configuration. An operator working a customer enquiry moves top to bottom
+ * through that order.
+ *
+ * There is deliberately no Payments or Tracking section. Money and the
+ * shipment are always about one order, so both are worked on that order's
+ * own page — recording a deposit and posting "Arrived at Mombasa" happen
+ * beside the customer, the items and the balance they relate to, rather than
+ * in a second list an operator has to cross-reference.
  */
 export const adminNavGroups: AdminNavGroup[] = [
   {
@@ -101,30 +105,10 @@ export const adminNavGroups: AdminNavGroup[] = [
         icon: "orders",
       },
       {
-        label: "Payments",
-        href: adminPath("/payments"),
-        permission: "payment:read",
-        icon: "payments",
-        available: false,
-      },
-      {
         label: "Customers",
         href: adminPath("/customers"),
         permission: "customer:read",
         icon: "customers",
-        available: false,
-      },
-    ],
-  },
-  {
-    title: "Logistics",
-    links: [
-      {
-        label: "Tracking",
-        href: adminPath("/tracking"),
-        permission: "tracking:read",
-        icon: "tracking",
-        available: false,
       },
     ],
   },

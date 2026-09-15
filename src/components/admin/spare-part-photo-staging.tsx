@@ -24,17 +24,8 @@ export function SparePartPhotoStaging({ disabled = false }: { disabled?: boolean
       inputName="photos"
       disabled={disabled}
       copy={{
-        intro: `Added when you save the part. Up to ${MAX_PHOTOS_PER_SPARE_PART} images, selected several at a time.`,
-        mainImageHint:
-          "Shown on the catalogue card and first in the gallery. A clear shot of the whole part on a plain background works best.",
-        otherImagesHint: (
-          <>
-            Part markings, wearing surfaces, what is in the box. Use the{" "}
-            <span aria-hidden="true">⋯</span> menu to change the main image.
-          </>
-        ),
         mainDropLabel: "Choose the main image",
-        mainDropHint: "The first photograph customers will see",
+        mainDropHint: `Up to ${MAX_PHOTOS_PER_SPARE_PART} images`,
         mainAlt: "Main photograph of this part",
         otherAlt: (position) => `Photograph ${position} of this part`,
       }}

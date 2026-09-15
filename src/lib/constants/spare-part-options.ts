@@ -44,18 +44,6 @@ export const SPARE_PART_STATUS_LABELS: Record<SparePartStatus, string> = {
 }
 
 /**
- * What each status means operationally, shown beside the status control —
- * the same courtesy the vehicle dashboard extends, because "archived" is
- * obvious to whoever designed the workflow and genuinely ambiguous to
- * whoever is using it at 7pm.
- */
-export const SPARE_PART_STATUS_DESCRIPTIONS: Record<SparePartStatus, string> = {
-  DRAFT: "Not visible on the website. Still being prepared.",
-  PUBLISHED: "Live in the catalogue. Out-of-stock parts stay visible and enquirable.",
-  ARCHIVED: "Hidden from the website. Kept because orders may reference it.",
-}
-
-/**
  * Severity for the status badge, reusing the vehicle tones so the two
  * dashboards read identically. Encoding state in the label as well as the
  * colour, so a viewer who cannot distinguish the hues still reads it.
@@ -89,25 +77,6 @@ export const SPARE_PART_AVAILABILITY_LABELS: Record<SparePartAvailability, strin
   ON_ORDER: "Available to order",
   OUT_OF_STOCK: "Out of stock",
   DISCONTINUED: "Discontinued",
-}
-
-/**
- * The one line of explanation beside each option on the admin form.
- *
- * The labels above are short because a card has no room; an operator
- * choosing between six of them has every right to know what each one commits
- * the business to.
- */
-export const SPARE_PART_AVAILABILITY_DESCRIPTIONS: Record<
-  SparePartAvailability,
-  string
-> = {
-  IN_STOCK: "Held here in Juba and ready to hand over.",
-  LOW_STOCK: "Held, but only one or two left.",
-  READY_TO_SHIP: "Bought and in the pipeline — allocated, packed or on the next shipment.",
-  ON_ORDER: "Not held. We source it when a customer asks.",
-  OUT_OF_STOCK: "Nothing in hand and nothing on the way. Customers can still enquire.",
-  DISCONTINUED: "No longer obtainable. Kept listed so we can offer an alternative.",
 }
 
 /**

@@ -90,16 +90,7 @@ export function SparePartFitmentBoard({
 
   return (
     <section className="flex flex-col gap-5 rounded-xl border border-border bg-card p-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="font-heading text-h3 font-semibold">Fits these vehicles</h2>
-        <p className="max-w-2xl text-small text-muted-foreground">
-          Leave a field empty to widen the rule — no model means every model, and{" "}
-          <strong className="font-semibold text-foreground">
-            leaving everything empty means the part fits any vehicle
-          </strong>
-          .
-        </p>
-      </div>
+      <h2 className="font-heading text-h3 font-semibold">Fits these vehicles</h2>
 
       {state.status === "success" && state.message ? (
         <Alert>
@@ -138,9 +129,7 @@ export function SparePartFitmentBoard({
         </ul>
       ) : (
         <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-small text-muted-foreground">
-          No fitment listed. A part with no rules tells customers it fits
-          nothing — which is the honest answer for an unfinished listing, and
-          the wrong one for a published part.
+          No fitment listed.
         </p>
       )}
 
@@ -157,14 +146,13 @@ export function SparePartFitmentBoard({
             id={makeId}
             label="Make"
             error={error("make")}
-            hint="Empty = any vehicle"
           >
             <Input
               key={formKey}
               id={makeId}
               name="make"
               defaultValue=""
-              placeholder="Toyota"
+              placeholder="Any"
               aria-invalid={error("make") ? true : undefined}
             />
           </FitmentField>
@@ -173,14 +161,13 @@ export function SparePartFitmentBoard({
             id={modelId}
             label="Model"
             error={error("model")}
-            hint="Empty = all models"
           >
             <Input
               key={formKey}
               id={modelId}
               name="model"
               defaultValue=""
-              placeholder="Harrier"
+              placeholder="All models"
               aria-invalid={error("model") ? true : undefined}
             />
           </FitmentField>
@@ -189,7 +176,6 @@ export function SparePartFitmentBoard({
             id={yearFromId}
             label="From year"
             error={error("yearFrom")}
-            hint="Empty = any"
           >
             <Input
               key={formKey}
@@ -199,7 +185,7 @@ export function SparePartFitmentBoard({
               inputMode="numeric"
               step={1}
               defaultValue=""
-              placeholder="2020"
+              placeholder="Any"
               aria-invalid={error("yearFrom") ? true : undefined}
             />
           </FitmentField>
@@ -208,7 +194,6 @@ export function SparePartFitmentBoard({
             id={yearToId}
             label="To year"
             error={error("yearTo")}
-            hint="Empty = onwards"
           >
             <Input
               key={formKey}
@@ -218,7 +203,7 @@ export function SparePartFitmentBoard({
               inputMode="numeric"
               step={1}
               defaultValue=""
-              placeholder="2023"
+              placeholder="Onwards"
               aria-invalid={error("yearTo") ? true : undefined}
             />
           </FitmentField>
@@ -227,14 +212,13 @@ export function SparePartFitmentBoard({
             id={engineId}
             label="Engine"
             error={error("engine")}
-            hint="Empty = any"
           >
             <Input
               key={formKey}
               id={engineId}
               name="engine"
               defaultValue=""
-              placeholder="2.0L"
+              placeholder="Any"
               aria-invalid={error("engine") ? true : undefined}
             />
           </FitmentField>
@@ -244,7 +228,6 @@ export function SparePartFitmentBoard({
           id={notesId}
           label="Note"
           error={error("notes")}
-          hint="Optional qualifier shown to the customer — “front axle only”, “not the hybrid”."
         >
           <Input
             key={formKey}
@@ -327,30 +310,23 @@ function RemoveFitmentButton({
   )
 }
 
-/** A labelled cell in the add-fitment grid. The hint doubles as the "what does
- *  empty mean here" documentation, which is the whole subtlety of this form. */
+/** A labelled cell in the add-fitment grid. Placeholders say what empty means. */
 function FitmentField({
   id,
   label,
   error,
-  hint,
   children,
 }: {
   id: string
   label: string
   error?: string
-  hint: string
   children: React.ReactNode
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
       {children}
-      {error ? (
-        <p className="text-xs text-destructive">{error}</p>
-      ) : (
-        <p className="text-xs text-muted-foreground">{hint}</p>
-      )}
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>
   )
 }

@@ -48,6 +48,10 @@ vi.mock("@/lib/prisma", () => ({
         createManyData.push(...args.data)
         return { count: args.data.length }
       },
+      createManyAndReturn: async (args: { data: { scope: string; identifierHash: string }[] }) => {
+        createManyData.push(...args.data)
+        return args.data.map((_, index) => ({ id: `attempt-${createManyData.length}-${index}` }))
+      },
       deleteMany: async (args: unknown) => {
         deleteManyCalls.push(args)
         return { count: 0 }
@@ -63,6 +67,7 @@ const {
   RATE_LIMIT_SCOPES,
   checkRateLimit,
   clearAttempts,
+  consumeRateLimit,
   recordFailedAttempt,
 } = await import("@/lib/auth/rate-limit")
 
@@ -82,6 +87,45 @@ beforeEach(() => {
   deleteManyCalls = []
   countsByScope = {}
   countShouldThrow = false
+})
+
+describe("consumeRateLimit", () => {
+  const budget = (max: number) => ({ key: IP_KEY, max })
+
+  it("records the use before counting, and allows it within the budget", async () => {
+    // The count includes the row just written.
+    countsByScope[RATE_LIMIT_SCOPES.adminLoginIp] = 3
+
+    const verdict = await consumeRateLimit([budget(3)])
+
+    expect(verdict).toEqual({ allowed: true, remaining: 0 })
+    expect(createManyData).toHaveLength(1)
+    expect(deleteManyCalls).toHaveLength(0)
+  })
+
+  it("refuses a use past the budget and removes the row it wrote", async () => {
+    countsByScope[RATE_LIMIT_SCOPES.adminLoginIp] = 4
+
+    const verdict = await consumeRateLimit([budget(3)])
+
+    expect(verdict.allowed).toBe(false)
+    expect(deleteManyCalls).toHaveLength(1)
+  })
+
+  it("refuses when any one budget is exhausted", async () => {
+    countsByScope[RATE_LIMIT_SCOPES.adminLoginEmail] = 1
+    countsByScope[RATE_LIMIT_SCOPES.adminLoginIp] = 9
+
+    const verdict = await consumeRateLimit([{ key: EMAIL_KEY, max: 5 }, budget(8)])
+
+    expect(verdict.allowed).toBe(false)
+  })
+
+  it("fails open when the database is unavailable", async () => {
+    countShouldThrow = true
+
+    expect((await consumeRateLimit([budget(3)])).allowed).toBe(true)
+  })
 })
 
 describe("the configured limit", () => {

@@ -161,16 +161,9 @@ function EmptyQuotes({ hasFilters }: { hasFilters: boolean }) {
         <FileText className="size-6" />
       </span>
 
-      <div className="flex flex-col gap-1">
-        <h2 className="font-heading text-h3 font-semibold">
-          {hasFilters ? "No matches" : "No quotes yet"}
-        </h2>
-        <p className="max-w-sm text-body text-muted-foreground">
-          {hasFilters
-            ? "No quotes match that search or filter."
-            : "Enquiries raised from the website — vehicle and spare-parts requests, and Get a Quote submissions — will appear here."}
-        </p>
-      </div>
+      <h2 className="font-heading text-h3 font-semibold">
+        {hasFilters ? "No matches" : "No quotes yet"}
+      </h2>
 
       {hasFilters ? (
         <Link

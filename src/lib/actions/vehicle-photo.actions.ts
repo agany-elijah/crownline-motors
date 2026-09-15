@@ -1,9 +1,8 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
-
 import { recordAuditLog } from "@/lib/audit"
 import { authorizePermission } from "@/lib/auth/admin-guard"
+import { revalidateVehicleSurfaces } from "@/lib/cache/vehicle-surfaces"
 import { prisma } from "@/lib/prisma"
 import {
   capacityRefusal,
@@ -19,7 +18,6 @@ import {
   vehiclePhotoRefSchema,
   vehiclePhotoUploadSchema,
 } from "@/lib/validations/vehicle-photo.schema"
-import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
 
 /**
  * Vehicle photograph management.
@@ -46,11 +44,10 @@ function succeed(message: string): VehiclePhotoActionState {
   return { status: "success", message }
 }
 
-/** Both admin surfaces that show photo state, refreshed together. The public
- *  vehicle page joins this list at Stage 11. */
-function revalidateVehicle(vehicleId: string): void {
-  revalidatePath(`${ADMIN_BASE_PATH}/vehicles`)
-  revalidatePath(`${ADMIN_BASE_PATH}/vehicles/${vehicleId}`)
+/** Every surface that shows photo state — the dashboard, the catalogue card
+ *  and the public listing — refreshed together. */
+function revalidateVehicle(vehicleId: string, slug: string): void {
+  revalidateVehicleSurfaces(vehicleId, slug)
 }
 
 /**
@@ -69,7 +66,7 @@ async function findOwnedPhoto(vehicleId: string, photoId: string) {
       isPrimary: true,
       displayOrder: true,
       storagePath: true,
-      vehicle: { select: { referenceNumber: true } },
+      vehicle: { select: { referenceNumber: true, slug: true } },
     },
   })
 }
@@ -108,7 +105,7 @@ export async function uploadVehiclePhotosAction(
 
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: vehicleId },
-    select: { id: true, referenceNumber: true },
+    select: { id: true, referenceNumber: true, slug: true },
   })
 
   if (!vehicle) return fail("That vehicle no longer exists.")
@@ -129,7 +126,7 @@ export async function uploadVehiclePhotosAction(
 
   if (!stored.ok) return fail(stored.message)
 
-  revalidateVehicle(vehicleId)
+  revalidateVehicle(vehicleId, vehicle.slug)
 
   return succeed(
     stored.count === 1 ? "Photograph added." : `${stored.count} photographs added.`
@@ -171,7 +168,7 @@ export async function reorderVehiclePhotosAction(
 
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: vehicleId },
-    select: { referenceNumber: true },
+    select: { referenceNumber: true, slug: true },
   })
 
   if (!vehicle) return fail("That vehicle no longer exists.")
@@ -240,7 +237,7 @@ export async function reorderVehiclePhotosAction(
     return fail("Could not save that order. Please try again.")
   }
 
-  revalidateVehicle(vehicleId)
+  revalidateVehicle(vehicleId, vehicle.slug)
 
   return succeed("Order saved.")
 }
@@ -315,7 +312,7 @@ export async function updateVehiclePhotoAltTextAction(
     return fail("Could not save that description. Please try again.")
   }
 
-  revalidateVehicle(vehicleId)
+  revalidateVehicle(vehicleId, photo.vehicle.slug)
 
   return succeed(altText ? "Description saved." : "Description cleared.")
 }
@@ -372,7 +369,7 @@ export async function setPrimaryVehiclePhotoAction(
     return fail("Could not change the main image. Please try again.")
   }
 
-  revalidateVehicle(vehicleId)
+  revalidateVehicle(vehicleId, photo.vehicle.slug)
 
   return succeed("Main image updated.")
 }
@@ -436,7 +433,7 @@ export async function deleteVehiclePhotoAction(
     return fail("Could not remove that photograph. Please try again.")
   }
 
-  revalidateVehicle(vehicleId)
+  revalidateVehicle(vehicleId, photo.vehicle.slug)
 
   return succeed(
     photo.isPrimary

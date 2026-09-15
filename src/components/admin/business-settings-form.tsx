@@ -88,11 +88,7 @@ export function BusinessSettingsForm({ settings }: BusinessSettingsFormProps) {
             placeholder="+211900000000"
             defaultValue={settings.whatsappNumber}
             aria-invalid={fieldError("whatsappNumber") ? true : undefined}
-            aria-describedby={`${whatsappId}-hint`}
           />
-          <p id={`${whatsappId}-hint`} className="text-small text-muted-foreground">
-            Leave empty to hide WhatsApp buttons sitewide.
-          </p>
           {fieldError("whatsappNumber") ? (
             <p className="text-small text-destructive">
               {fieldError("whatsappNumber")}
@@ -103,12 +99,7 @@ export function BusinessSettingsForm({ settings }: BusinessSettingsFormProps) {
 
       {/* ── Payment structure ───────────────────────────────── */}
       <section className="flex flex-col gap-5 rounded-xl border border-border bg-card p-6">
-        <div className="flex flex-col gap-1">
-          <h2 className="font-heading text-h3 font-semibold">Payment stages</h2>
-          <p className="text-small text-muted-foreground">
-            Applies to new orders only — existing orders keep their original split.
-          </p>
-        </div>
+        <h2 className="font-heading text-h3 font-semibold">Payment stages</h2>
 
         <div className="grid gap-4 sm:grid-cols-3">
           {[
@@ -116,7 +107,6 @@ export function BusinessSettingsForm({ settings }: BusinessSettingsFormProps) {
               id: initialId,
               name: "defaultInitialPercentage",
               label: "Initial payment",
-              hint: "On order confirmation, before procurement",
               value: initial,
               onChange: setInitial,
             },
@@ -124,7 +114,6 @@ export function BusinessSettingsForm({ settings }: BusinessSettingsFormProps) {
               id: mombasaId,
               name: "defaultMombasaPercentage",
               label: "Mombasa payment",
-              hint: "On arrival at Mombasa",
               value: mombasa,
               onChange: setMombasa,
             },
@@ -132,7 +121,6 @@ export function BusinessSettingsForm({ settings }: BusinessSettingsFormProps) {
               id: finalId,
               name: "defaultFinalPercentage",
               label: "Final payment",
-              hint: "Before release to the customer",
               value: final,
               onChange: setFinal,
             },
@@ -153,7 +141,6 @@ export function BusinessSettingsForm({ settings }: BusinessSettingsFormProps) {
                   value={field.value}
                   onChange={(event) => field.onChange(event.target.value)}
                   aria-invalid={fieldError(field.name) ? true : undefined}
-                  aria-describedby={`${field.id}-hint`}
                 />
                 <span
                   aria-hidden="true"
@@ -162,9 +149,6 @@ export function BusinessSettingsForm({ settings }: BusinessSettingsFormProps) {
                   %
                 </span>
               </div>
-              <p id={`${field.id}-hint`} className="text-small text-muted-foreground">
-                {field.hint}
-              </p>
               {fieldError(field.name) ? (
                 <p className="text-small text-destructive">{fieldError(field.name)}</p>
               ) : null}
@@ -196,12 +180,7 @@ export function BusinessSettingsForm({ settings }: BusinessSettingsFormProps) {
 
       {/* ── How a spare part reaches the customer ───────────── */}
       <section className="flex flex-col gap-5 rounded-xl border border-border bg-card p-6">
-        <div className="flex flex-col gap-1">
-          <h2 className="font-heading text-h3 font-semibold">
-            How a spare part reaches the customer
-          </h2>
-          <p className="text-small text-muted-foreground">Shown on every spare-part page.</p>
-        </div>
+        <h2 className="font-heading text-h3 font-semibold">How a spare part reaches the customer</h2>
 
         <SparePartDeliveryStepsEditor
           steps={settings.sparePartDeliverySteps}

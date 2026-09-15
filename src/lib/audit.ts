@@ -75,6 +75,9 @@ export type AuditAction =
   // ── Orders and money ────────────────────────────────────────────────
   | "ORDER_CREATED"
   | "ORDER_CANCELLED"
+  // Derived moves — deposit confirmed, awaiting final payment, completed —
+  // recorded with the payment or tracking change that caused them.
+  | "ORDER_STATUS_CHANGED"
   | "ORDER_DELIVERY_DATE_UPDATED"
   | "PAYMENT_RECORDED"
   | "PAYMENT_REVERSED"

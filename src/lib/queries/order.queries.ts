@@ -1,18 +1,24 @@
 import "server-only"
 
 import type { Prisma } from "@/generated/prisma/client"
-import type { OrderStatus, OrderType, ShipmentType, TrackingStatus } from "@/generated/prisma/enums"
+import type {
+  OrderStatus,
+  OrderType,
+  PaymentMethod,
+  PaymentStatus,
+  ShipmentType,
+  TrackingStatus,
+} from "@/generated/prisma/enums"
+import { resolveOrderContact } from "@/lib/email/notifications"
 import { prisma } from "@/lib/prisma"
 import { summarizeOrderFinance, type OrderFinanceSummary } from "@/lib/orders/order-finance"
 
 /**
  * Reads for the order screens.
  *
- * Deliberately minimal for now: this module exists to give the "Convert
- * Quote to Order" action somewhere real to send an operator, and to show
- * what that action created. The full order-management surface (recording
- * payments, cancelling, creating shipments) is a later phase's work; nothing
- * here should be extended to imply it already exists.
+ * The order page is where an order is worked: its payment ledger and its
+ * shipment timeline are read here alongside the items, rather than from
+ * separate payment or tracking screens.
  */
 
 export const ORDERS_PER_PAGE = 20
@@ -142,6 +148,21 @@ export interface OrderShipment {
   events: OrderTrackingEvent[]
 }
 
+/** One row of an order's payment ledger, as the order page lists it. */
+export interface OrderPaymentRecord {
+  id: string
+  amount: number
+  method: PaymentMethod
+  status: PaymentStatus
+  transactionReference: string | null
+  paymentDate: Date | null
+  milestoneId: string | null
+  milestoneLabel: string | null
+  verifiedByAdminName: string | null
+  adminNotes: string | null
+  createdAt: Date
+}
+
 export interface OrderDetail {
   id: string
   orderNumber: string
@@ -150,6 +171,9 @@ export interface OrderDetail {
   customerId: string
   customerName: string
   customerPhone: string | null
+  /** Where this order's automatic emails go — see `resolveOrderContact`. */
+  customerEmail: string | null
+  customerWhatsapp: string | null
   quoteId: string
   quoteNumber: string
   shippingCost: number | null
@@ -160,6 +184,8 @@ export interface OrderDetail {
   estimatedDeliveryDate: Date | null
   items: OrderDetailItem[]
   finance: OrderFinanceSummary
+  /** Every payment ever recorded, newest first — reversed ones included. */
+  payments: OrderPaymentRecord[]
   /** At most one in Wave A — see the schema note on `Order.shipments`. Null
    *  until an operator activates tracking with `createShipmentAction`. */
   shipment: OrderShipment | null
@@ -171,14 +197,33 @@ export async function getOrderById(id: string): Promise<OrderDetail | null> {
   const order = await prisma.order.findUnique({
     where: { id },
     include: {
-      customer: { select: { id: true, fullName: true, phone: true } },
-      quote: { select: { id: true, quoteNumber: true } },
+      customer: {
+        select: { id: true, fullName: true, phone: true, whatsapp: true, email: true, deletedAt: true },
+      },
+      quote: {
+        select: { id: true, quoteNumber: true, contactEmail: true, contactName: true, contactWhatsapp: true },
+      },
       items: true,
       milestones: {
         orderBy: { sequence: "asc" },
         select: { id: true, sequence: true, label: true, amountDue: true, status: true },
       },
-      payments: { select: { amount: true, status: true, milestoneId: true } },
+      payments: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          amount: true,
+          method: true,
+          status: true,
+          transactionReference: true,
+          paymentDate: true,
+          milestoneId: true,
+          milestone: { select: { label: true } },
+          verifiedByAdmin: { select: { displayName: true } },
+          adminNotes: true,
+          createdAt: true,
+        },
+      },
       shipments: {
         take: 1,
         select: {
@@ -209,6 +254,7 @@ export async function getOrderById(id: string): Promise<OrderDetail | null> {
 
   const totalAmount = order.totalAmount.toNumber()
   const shipment = order.shipments[0]
+  const contact = resolveOrderContact(order)
 
   return {
     id: order.id,
@@ -218,6 +264,10 @@ export async function getOrderById(id: string): Promise<OrderDetail | null> {
     customerId: order.customer.id,
     customerName: order.customer.fullName,
     customerPhone: order.customer.phone,
+    customerEmail: contact.email,
+    customerWhatsapp: order.customer.deletedAt
+      ? null
+      : (order.quote.contactWhatsapp ?? order.customer.whatsapp ?? null),
     quoteId: order.quote.id,
     quoteNumber: order.quote.quoteNumber,
     shippingCost: order.shippingCost?.toNumber() ?? null,
@@ -250,6 +300,19 @@ export async function getOrderById(id: string): Promise<OrderDetail | null> {
         milestoneId: payment.milestoneId,
       })),
     }),
+    payments: order.payments.map((payment) => ({
+      id: payment.id,
+      amount: payment.amount.toNumber(),
+      method: payment.method,
+      status: payment.status,
+      transactionReference: payment.transactionReference,
+      paymentDate: payment.paymentDate,
+      milestoneId: payment.milestoneId,
+      milestoneLabel: payment.milestone?.label ?? null,
+      verifiedByAdminName: payment.verifiedByAdmin?.displayName ?? null,
+      adminNotes: payment.adminNotes,
+      createdAt: payment.createdAt,
+    })),
     shipment: shipment
       ? {
           id: shipment.id,

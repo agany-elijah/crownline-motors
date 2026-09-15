@@ -6,10 +6,12 @@ import { redirect } from "next/navigation"
 import { VehicleStatus } from "@/generated/prisma/enums"
 import { logSecurityEvent, recordAuditLog } from "@/lib/audit"
 import { authorizePermission } from "@/lib/auth/admin-guard"
+import { revalidateVehicleSurfaces } from "@/lib/cache/vehicle-surfaces"
 import {
   canTransitionVehicleStatus,
   describeRefusedTransition,
 } from "@/lib/constants/vehicle-status-transitions"
+import { findOpenOrderForVehicle, lockVehicle } from "@/lib/orders/vehicle-holds"
 import { prisma } from "@/lib/prisma"
 import {
   prepareVehiclePhotos,
@@ -128,6 +130,25 @@ const INVALID = "Check the highlighted fields and try again."
 
 /** Signals that the vehicle changed after the form being saved was rendered. */
 class StaleVehicleError extends Error {}
+
+/** Signals that an open order holds the vehicle a status change would release. */
+class VehicleOnOrderError extends Error {
+  constructor(public readonly orderNumber: string) {
+    super(`Vehicle is held by order ${orderNumber}.`)
+  }
+}
+
+/**
+ * Statuses that take a car away from the customer holding it — back on sale,
+ * back to draft, or withdrawn. Refused while an open order holds the car;
+ * cancelling the order is what releases it. SOLD is not among them: marking
+ * the car sold is consistent with the order.
+ */
+const RELEASING_STATUSES: readonly VehicleStatus[] = [
+  VehicleStatus.PUBLISHED,
+  VehicleStatus.DRAFT,
+  VehicleStatus.ARCHIVED,
+]
 
 /**
  * Creates a vehicle as a DRAFT, with the photographs staged alongside it.
@@ -347,7 +368,7 @@ export async function updateVehicleAction(
 
   const existing = await prisma.vehicle.findUnique({
     where: { id },
-    select: { id: true, referenceNumber: true, price: true, status: true },
+    select: { id: true, referenceNumber: true, slug: true, price: true, status: true },
   })
 
   if (!existing) {
@@ -461,8 +482,7 @@ export async function updateVehicleAction(
     }
   }
 
-  revalidatePath(`${ADMIN_BASE_PATH}/vehicles`)
-  revalidatePath(`${ADMIN_BASE_PATH}/vehicles/${id}`)
+  revalidateVehicleSurfaces(id, existing.slug)
 
   /**
    * Confirmed explicitly rather than returning silently.
@@ -533,7 +553,7 @@ export async function updateVehicleStatusAction(
 
   const existing = await prisma.vehicle.findUnique({
     where: { id },
-    select: { status: true, referenceNumber: true },
+    select: { status: true, referenceNumber: true, slug: true },
   })
 
   if (!existing) {
@@ -571,7 +591,19 @@ export async function updateVehicleStatusAction(
 
   try {
     await prisma.$transaction(async (tx) => {
-      await tx.vehicle.update({ where: { id }, data: { status } })
+      // Locked so a quote conversion for this car cannot slip in between the
+      // order check and the write (see vehicle-holds.ts).
+      await lockVehicle(tx, id)
+
+      if (RELEASING_STATUSES.includes(status)) {
+        const holder = await findOpenOrderForVehicle(tx, id)
+        if (holder) throw new VehicleOnOrderError(holder.orderNumber)
+      }
+
+      // Conditional on the status the transition was checked from, so a
+      // change landing since the read above is refused rather than skipped.
+      const written = await tx.vehicle.updateMany({ where: { id, status: existing.status }, data: { status } })
+      if (written.count === 0) throw new StaleVehicleError()
 
       await recordAuditLog(
         {
@@ -589,6 +621,20 @@ export async function updateVehicleStatusAction(
       )
     })
   } catch (error) {
+    if (error instanceof VehicleOnOrderError) {
+      return {
+        status: "error",
+        message: `This vehicle is on order ${error.orderNumber}. Cancel that order before moving the vehicle to ${status.toLowerCase()}.`,
+      }
+    }
+
+    if (error instanceof StaleVehicleError) {
+      return {
+        status: "error",
+        message: "This vehicle's status changed while you were looking at it. Reload the page to see the actions available now.",
+      }
+    }
+
     console.error("[vehicle] failed to change vehicle status", error)
     return {
       status: "error",
@@ -596,8 +642,7 @@ export async function updateVehicleStatusAction(
     }
   }
 
-  revalidatePath(`${ADMIN_BASE_PATH}/vehicles`)
-  revalidatePath(`${ADMIN_BASE_PATH}/vehicles/${id}`)
+  revalidateVehicleSurfaces(id, existing.slug)
 
   return {
     status: "success",

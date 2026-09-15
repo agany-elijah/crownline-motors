@@ -5,11 +5,10 @@
  * Two things downstream depend on a phone number being in one canonical
  * shape, and neither works with what people actually type:
  *
- *   1. Customer deduplication. `Customer.phone` is indexed but deliberately
- *      not unique (see the schema), so every public form must look an
- *      existing customer up by normalised phone before creating one. "0912
- *      345 678", "+211 912-345-678" and "00211912345678" are one person, and
- *      comparing them as typed would file them as three.
+ *   1. Customer identity. Phone and WhatsApp are two of the four details
+ *      that together identify a customer (see quotes/customer-identity.ts).
+ *      "0912 345 678", "+211 912-345-678" and "00211912345678" are one
+ *      number, and comparing them as typed would file one person as three.
  *   2. WhatsApp. A wa.me link needs the full international number in digits.
  *      A South Sudanese customer types the national form with a leading 0,
  *      and wa.me/0912345678 opens a chat with nobody.
