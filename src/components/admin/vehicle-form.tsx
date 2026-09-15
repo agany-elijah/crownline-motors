@@ -151,14 +151,7 @@ export function VehicleForm({ vehicle }: VehicleFormProps) {
         </Alert>
       ) : null}
 
-      <FormSection
-        title="Identity"
-        description={
-          isEdit
-            ? "What the vehicle is. These can be corrected, but the web address was fixed when the vehicle was created and will not change — that keeps links already shared with customers working."
-            : "What the vehicle is. This becomes the listing title customers see, and the make, model and year form the permanent web address — check the spelling before saving."
-        }
-      >
+      <FormSection title="Identity" description="Make, model and year set the permanent web address.">
         <Field label="Make" name="make" error={error("make")} className="sm:col-span-2"
           controlKey={controlKey}>
           {(control) => (
@@ -247,7 +240,7 @@ export function VehicleForm({ vehicle }: VehicleFormProps) {
 
       <FormSection
         title="Pricing"
-        description="The vehicle price is required. Import estimates are optional — leave one blank if you have not priced it yet, and it will show as unquoted rather than as zero."
+        description="Leave an estimate blank if not yet quoted — it shows as unquoted, not zero."
       >
         <Field label="Price (USD)" name="price" error={error("price")}
           controlKey={controlKey}>
@@ -327,10 +320,7 @@ export function VehicleForm({ vehicle }: VehicleFormProps) {
         </Field>
       </FormSection>
 
-      <FormSection
-        title="Specification"
-        description="The details a buyer compares between listings."
-      >
+      <FormSection title="Specification">
         <Field label="Mileage (km)" name="mileageKm" error={error("mileageKm")}
           controlKey={controlKey}>
           {(control) => (
@@ -463,7 +453,6 @@ export function VehicleForm({ vehicle }: VehicleFormProps) {
 
       <FormSection
         title="Features"
-        description="The equipment list shown on the listing's Features tab — one per line. Leave it empty and the tab simply says none are listed."
         columns={1}
       >
         <Field
@@ -487,18 +476,10 @@ export function VehicleForm({ vehicle }: VehicleFormProps) {
           )}
         </Field>
 
-        <p className="text-small text-muted-foreground">
-          One feature per line. Bullet characters are stripped, blank lines
-          and repeats are dropped, and the order you type is the order
-          customers see.
-        </p>
+        <p className="text-small text-muted-foreground">One feature per line.</p>
       </FormSection>
 
-      <FormSection
-        title="Description"
-        description="What a specification table cannot say — condition, history, anything a buyer should know before enquiring."
-        columns={1}
-      >
+      <FormSection title="Description" columns={1}>
         <Field label="Description" name="description" error={error("description")}
           controlKey={controlKey}>
           {(control) => (
@@ -529,8 +510,7 @@ export function VehicleForm({ vehicle }: VehicleFormProps) {
           <span className="flex flex-col gap-0.5">
             <span className="text-small font-semibold">Feature on the homepage</span>
             <span className="text-small text-muted-foreground">
-              Featured vehicles appear first on the website. Only takes effect once
-              the vehicle is published.
+              Shows first on the website once published.
             </span>
           </span>
         </label>

@@ -159,7 +159,6 @@ async function prepareSubject(input: QuoteRequestInput): Promise<PreparedSubject
         model: true,
         year: true,
         transmission: true,
-        referenceNumber: true,
       },
     })
 
@@ -198,7 +197,7 @@ async function prepareSubject(input: QuoteRequestInput): Promise<PreparedSubject
 
     const parts = await prisma.sparePart.findMany({
       where: publicSparePartWhere({ slug: { in: [...quantities.keys()] } }),
-      select: { id: true, slug: true, name: true, referenceNumber: true, oemPartNumber: true },
+      select: { id: true, slug: true, name: true },
     })
 
     if (parts.length === 0) throw new SubjectUnavailableError()

@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { AdminNav } from "@/components/admin/admin-nav"
 import { AdminTopBar } from "@/components/admin/admin-top-bar"
+import { QuoteLeadWatcher } from "@/components/admin/quote-lead-watcher"
 import { BrandMark } from "@/components/layout/brand-mark"
 import { requireAdmin } from "@/lib/auth/admin-guard"
 import { can } from "@/lib/auth/permissions"
@@ -90,6 +91,8 @@ export default async function AdminDashboardLayout({
         <AdminTopBar admin={admin} navGroups={navGroups} />
         <main className="flex-1 px-4 py-8 sm:px-6 lg:px-8">{children}</main>
       </div>
+
+      {can(admin.role, "quote:read") ? <QuoteLeadWatcher /> : null}
     </div>
   )
 }

@@ -286,6 +286,46 @@ export default function nextConfig(phase: string): NextConfig {
           source: "/:path*",
           headers: [...baseSecurityHeaders, ...framingHeaders],
         },
+        {
+          /**
+           * The one deliberate exception: the admin "Generate PDF" action
+           * (quote-pdf-dialog.tsx) embeds this exact route in an `<iframe>`
+           * on the quote detail page so an operator can review the document
+           * without leaving it — a same-origin embed, by our own page, of
+           * our own admin-authenticated route.
+           *
+           * `frame-ancestors 'none'`/`DENY` above refuses that too: neither
+           * directive carries a same-origin exception the way `SAMEORIGIN`/
+           * `'self'` do, so without this override the iframe silently
+           * renders nothing. Scoped to this one route rather than loosened
+           * globally — matched *after* the blanket rule above, so Next.js's
+           * header merge lets these two keys override it here while every
+           * other route keeps the harder `DENY`/`'none'`, including the
+           * unrelated `/quotation/:token` customer PDF link, which is never
+           * framed and stays fully protected.
+           */
+          source: "/api/quotes/:id/preview",
+          headers: [
+            { key: "X-Frame-Options", value: "SAMEORIGIN" },
+            { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+          ],
+        },
+      ];
+    },
+
+    async rewrites() {
+      return [
+        /**
+         * The customer's quotation link, exactly the shape the schema
+         * documentation promises (`Quote.shareToken`): `/quotation/<token>`.
+         * It resolves to the API route rather than living in `app/quotation`
+         * directly because the PDF renderer needs the Node runtime, which a
+         * page route in this project does not otherwise require.
+         */
+        {
+          source: "/quotation/:token",
+          destination: "/api/quotations/:token",
+        },
       ];
     },
   };

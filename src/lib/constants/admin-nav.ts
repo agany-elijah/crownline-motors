@@ -93,14 +93,12 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: adminPath("/quotes"),
         permission: "quote:read",
         icon: "quotes",
-        available: false,
       },
       {
         label: "Orders",
         href: adminPath("/orders"),
         permission: "order:read",
         icon: "orders",
-        available: false,
       },
       {
         label: "Payments",

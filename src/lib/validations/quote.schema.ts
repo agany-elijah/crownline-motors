@@ -473,7 +473,13 @@ const validUntilField = z.preprocess(
     .optional()
 )
 
-export const quotePricingSchema = z.object({
+/**
+ * Everything an operator edits on the quote detail page, saved by the one
+ * "Save details" action: line items, fees (including the miscellaneous
+ * fourth one), validity, the text that ends up in the PDF and dispatch
+ * message, and the staff-only notes that never leave this screen.
+ */
+export const quoteDetailsSchema = z.object({
   quoteId: quoteIdField,
   /** Optimistic concurrency — see updateVehicleAction for the mechanism. */
   expectedUpdatedAt: z.coerce.date({ error: "Reload the page and try again." }),
@@ -493,17 +499,15 @@ export const quotePricingSchema = z.object({
   shippingCost: optionalMoneyField("Shipping"),
   clearingCost: optionalMoneyField("Clearing"),
   importDuty: optionalMoneyField("Import duty"),
+  otherCostsLabel: optionalText("Other costs label", 120),
+  otherCostsAmount: optionalMoneyField("Other costs"),
   validUntil: validUntilField,
   paymentInstructions: optionalText("Payment instructions", 2000),
   terms: optionalText("Terms", 3000),
-})
-
-export type QuotePricingInput = z.infer<typeof quotePricingSchema>
-
-export const quoteNotesSchema = z.object({
-  quoteId: quoteIdField,
   adminNotes: optionalText("Internal notes", 5000),
 })
+
+export type QuoteDetailsInput = z.infer<typeof quoteDetailsSchema>
 
 export const quoteStatusSchema = z.object({
   quoteId: quoteIdField,
@@ -516,6 +520,9 @@ export const quoteDispatchSchema = z.object({
   quoteId: quoteIdField,
   channel: z.enum(QuoteDispatchChannel, { error: "Choose WhatsApp or email." }),
   includeLink: checkboxField,
+  /** The operator's editable opening line. Blank falls back to
+   *  `defaultQuoteNote` server-side — see `sendQuoteDispatchAction`. */
+  note: optionalText("Message", 2000),
 })
 
 export const quoteRefSchema = z.object({ quoteId: quoteIdField })

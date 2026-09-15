@@ -64,8 +64,7 @@ export type AuditAction =
   // A quote request itself is created by an anonymous customer and has no
   // admin actor, so it is never audited here; Quote.createdAt is its record.
   // Everything an operator then does to it is.
-  | "QUOTE_PRICING_UPDATED"
-  | "QUOTE_NOTES_UPDATED"
+  | "QUOTE_DETAILS_UPDATED"
   | "QUOTE_STATUS_CHANGED"
   | "QUOTE_SENT"
   // The customer's PDF link is a bearer credential; minting and revoking it
@@ -76,11 +75,16 @@ export type AuditAction =
   // ── Orders and money ────────────────────────────────────────────────
   | "ORDER_CREATED"
   | "ORDER_CANCELLED"
+  | "ORDER_DELIVERY_DATE_UPDATED"
   | "PAYMENT_RECORDED"
   | "PAYMENT_REVERSED"
   // Stock taken off the shelf by an order, and put back by a cancellation.
   | "SPARE_PART_STOCK_RESERVED"
   | "SPARE_PART_STOCK_RELEASED"
+  // ── Shipments and tracking ──────────────────────────────────────────
+  | "SHIPMENT_CREATED"
+  | "TRACKING_EVENT_ADDED"
+  | "TRACKING_EVENT_VOIDED"
 
 export type AuditEntityType =
   | "AdminProfile"
@@ -91,6 +95,8 @@ export type AuditEntityType =
   | "Quote"
   | "Order"
   | "Payment"
+  | "Shipment"
+  | "TrackingEvent"
 
 export interface AuditLogEntry {
   actorId: string

@@ -93,9 +93,7 @@ export function SparePartFitmentBoard({
       <div className="flex flex-col gap-1">
         <h2 className="font-heading text-h3 font-semibold">Fits these vehicles</h2>
         <p className="max-w-2xl text-small text-muted-foreground">
-          Shown on the part&rsquo;s public page and, briefly, on its catalogue
-          card. Leave a field empty to widen the rule — no model means every
-          model of that make, and{" "}
+          Leave a field empty to widen the rule — no model means every model, and{" "}
           <strong className="font-semibold text-foreground">
             leaving everything empty means the part fits any vehicle
           </strong>

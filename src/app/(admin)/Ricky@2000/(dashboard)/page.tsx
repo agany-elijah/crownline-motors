@@ -71,7 +71,6 @@ export default async function AdminDashboardPage() {
     <div className="flex flex-col gap-8">
       <AdminPageHeader
         title={`Welcome back, ${firstName}`}
-        description="Crownline Motors staff dashboard. Sections light up as each part of the platform is built."
         actions={
           <Link
             href={`${ADMIN_BASE_PATH}/settings`}

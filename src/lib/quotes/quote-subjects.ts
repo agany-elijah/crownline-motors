@@ -22,14 +22,8 @@ export interface VehicleSubject {
   transmission: string
 }
 
-export interface VehicleLineSubject extends VehicleSubject {
-  referenceNumber: string
-}
-
 export interface SparePartLineSubject {
   name: string
-  referenceNumber: string
-  oemPartNumber: string | null
 }
 
 function transmissionLabel(value: string): string {
@@ -55,18 +49,31 @@ export function vehicleSubjectLabel(vehicle: VehicleSubject): string {
 }
 
 /**
- * The quotation line for a listed vehicle, with its reference.
+ * The quotation line for a listed vehicle — the name only, no reference.
  *
- * The reference is part of the snapshot because an importer can hold three
- * 2024 Harriers at once, and a line that does not say which one is a line
- * nobody can convert with confidence.
+ * A customer reading a PDF or a WhatsApp message has no use for
+ * "CLM-V-2026-000123" beside the car they are being quoted; that number
+ * exists to disambiguate stock behind the scenes, which is exactly what
+ * `QuoteItem.vehicleId` already does structurally. An operator who needs to
+ * see which physical unit a line names still can — it is the admin editor's
+ * own "Reference" column (quote-details-form.tsx), read from that same
+ * `vehicleId`, not from this string. Folding it into the text a customer
+ * reads would be showing them our inventory bookkeeping.
  */
-export function vehicleLineDescription(vehicle: VehicleLineSubject): string {
-  return clamp(`${vehicleSubjectLabel(vehicle)} — ${vehicle.referenceNumber}`)
+export function vehicleLineDescription(vehicle: VehicleSubject): string {
+  return clamp(vehicleSubjectLabel(vehicle))
 }
 
-/** "Front brake pad set (OEM 04465-48150) — CLM-SP-2026-000045". */
+/**
+ * "Front brake pad set" — the part's own name only.
+ *
+ * Neither the OEM number nor the Crownline reference is part of this string,
+ * for the same reason given on `vehicleLineDescription`: both are lookup
+ * keys, not something a customer reading a quotation needs printed beside
+ * the part's name. An operator confirming fitment still has the OEM number
+ * on the part's own catalogue record and reference lookup — this function
+ * only decides what the *customer* reads.
+ */
 export function sparePartLineDescription(part: SparePartLineSubject): string {
-  const oem = part.oemPartNumber ? ` (OEM ${part.oemPartNumber})` : ""
-  return clamp(`${part.name}${oem} — ${part.referenceNumber}`)
+  return clamp(part.name)
 }

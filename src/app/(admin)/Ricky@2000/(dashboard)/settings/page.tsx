@@ -26,17 +26,11 @@ export default async function AdminSettingsPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <AdminPageHeader
-        title="Business settings"
-        description="Configuration used across the website and every new vehicle order."
-      />
+      <AdminPageHeader title="Business settings" />
 
       <BusinessSettingsForm settings={settings} />
 
-      <p className="text-small text-muted-foreground">
-        Last updated {lastUpdated} UTC. Every change is recorded in the audit log
-        with the administrator who made it.
-      </p>
+      <p className="text-small text-muted-foreground">Last updated {lastUpdated} UTC.</p>
     </div>
   )
 }

@@ -123,7 +123,7 @@
   // thrash; asking for four makes Codespaces refuse to start on an
   // undersized machine rather than giving you a slow one.
   "hostRequirements": {
-    "cpus": 4,
+    "cpus": 2,
     "memory": "8gb",
     "storage": "32gb"
   }

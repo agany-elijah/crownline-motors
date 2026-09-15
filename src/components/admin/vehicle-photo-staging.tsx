@@ -19,15 +19,12 @@ export function VehiclePhotoStaging({ disabled = false }: { disabled?: boolean }
       inputName="photos"
       disabled={disabled}
       copy={{
-        intro:
-          "Added when you save the vehicle. You can select several at once, on a phone as well as a computer. Landscape photographs look best — every image is shown at 16:9 across the website, and each one is resized in your browser before it is sent so the listing stays fast on a mobile connection.",
-        mainImageHint:
-          "This is the first image customers see — on the vehicle card, in search results, and at the top of the gallery.",
+        intro: "Added when you save the vehicle. Landscape photos look best — shown at 16:9 across the site.",
+        mainImageHint: "Shown first — on the vehicle card, search results, and the gallery.",
         otherImagesHint: (
           <>
-            The rest of the walk-around, shown after the main image. Pick as
-            many as you like in one go. Use the <span aria-hidden="true">⋯</span>{" "}
-            menu on any of them to make it the main image instead.
+            The rest of the walk-around. Use the <span aria-hidden="true">⋯</span> menu to
+            change the main image.
           </>
         ),
         mainDropLabel: "Choose the main image",

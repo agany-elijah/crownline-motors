@@ -29,6 +29,9 @@ export interface QuoteFees {
   shippingCost: number | null
   clearingCost: number | null
   importDuty: number | null
+  /** A fourth, miscellaneous fee — see `Quote.otherCostsAmount`. Its label
+   *  is cosmetic (PDF/message display only) and plays no part in the math. */
+  otherCosts: number | null
 }
 
 export interface QuoteTotals {
@@ -36,7 +39,7 @@ export interface QuoteTotals {
   itemsSubtotal: number
   /** ACCESSORY lines. */
   accessoriesTotal: number
-  /** The three fees, summed. Unquoted fees contribute nothing. */
+  /** The four fees, summed. Unquoted fees contribute nothing. */
   feesTotal: number
   total: number
   /** Lines with no price yet. A quote with any cannot be sent or converted. */
@@ -78,7 +81,8 @@ export function computeQuoteTotals(
   const feesCents =
     (toCentsOrNull(fees.shippingCost) ?? 0) +
     (toCentsOrNull(fees.clearingCost) ?? 0) +
-    (toCentsOrNull(fees.importDuty) ?? 0)
+    (toCentsOrNull(fees.importDuty) ?? 0) +
+    (toCentsOrNull(fees.otherCosts) ?? 0)
 
   return {
     itemsSubtotal: fromCents(itemsCents),

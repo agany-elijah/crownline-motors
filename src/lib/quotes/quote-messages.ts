@@ -32,6 +32,11 @@ export interface QuoteMessageInput {
   siteName: string
   customerName: string
   quoteNumber: string
+  /** The operator-editable opening line, prefilled by `defaultQuoteNote` and
+   *  shown for confirmation in the dispatch dialog before sending. Replaces
+   *  the old hard-coded "Thank you for your enquiry..." sentence — the
+   *  figures below it are never editable, only this personal touch is. */
+  note: string
   /** ITEM lines, in the order the operator arranged them. */
   items: readonly QuoteMessageLine[]
   itemsSubtotal: number
@@ -39,12 +44,21 @@ export interface QuoteMessageInput {
   shippingCost: number | null
   clearingCost: number | null
   importDuty: number | null
+  otherCostsLabel: string | null
+  otherCostsAmount: number | null
   total: number
   validUntil: Date
   /** The secure PDF link, or null for a text-only message. */
   link: string | null
   paymentInstructions: string | null
   isVehicle: boolean
+}
+
+/** The polite opening line the dispatch dialog prefills its editable message
+ *  field with — an operator can personalise it before sending, but this is
+ *  what a fresh dialog shows. */
+export function defaultQuoteNote(siteName: string): string {
+  return `Thank you for your enquiry. Here is your quotation from ${siteName}.`
 }
 
 /** Beyond this many items a WhatsApp message stops being read. The PDF
@@ -75,7 +89,7 @@ export function buildQuoteMessage(
 
   lines.push(`Hello ${firstNameOf(input.customerName)},`)
   lines.push("")
-  lines.push(`Thank you for your enquiry. Here is your quotation from ${input.siteName}.`)
+  lines.push(input.note)
   lines.push("")
   lines.push(bold(`Quotation ${input.quoteNumber}`))
 
@@ -101,7 +115,8 @@ export function buildQuoteMessage(
     input.accessoriesTotal > 0 ||
     input.shippingCost !== null ||
     input.clearingCost !== null ||
-    input.importDuty !== null
+    input.importDuty !== null ||
+    input.otherCostsAmount !== null
 
   if (hasAdditions) {
     lines.push(
@@ -118,6 +133,9 @@ export function buildQuoteMessage(
     }
     if (input.importDuty !== null) {
       lines.push(`Import duty: ${formatCurrency(input.importDuty)}`)
+    }
+    if (input.otherCostsAmount !== null) {
+      lines.push(`${input.otherCostsLabel ?? "Other costs"}: ${formatCurrency(input.otherCostsAmount)}`)
     }
   }
 
@@ -146,30 +164,3 @@ export function buildQuoteMessage(
   }
 }
 
-/**
- * A `mailto:` link that opens the operator's own mail app with the message
- * written.
- *
- * ── Why mailto and not a mail service ─────────────────────────────────
- * The stack has no transactional email provider (it is not on the approved
- * list, and adding one is its own decision). A mailto link sends from the
- * dealership's real mailbox, so replies land where staff already work and
- * the sent copy sits in their Sent folder — which for a quotation is exactly
- * where it should be.
- *
- * Every component is percent-encoded with `encodeURIComponent`, never
- * `URLSearchParams`: the latter encodes spaces as "+", which several mail
- * clients show literally. Line breaks are CRLF, as RFC 6068 specifies for a
- * mailto body.
- */
-export function buildMailtoUrl(input: { to: string; subject: string; body: string }): string {
-  const body = input.body.replace(/\r?\n/g, "\r\n")
-
-  // The "@" is left readable: RFC 6068 permits it percent-encoded, and some
-  // mail clients then fail to recognise the address at all.
-  const to = encodeURIComponent(input.to).replace(/%40/g, "@")
-
-  return `mailto:${to}?subject=${encodeURIComponent(
-    input.subject
-  )}&body=${encodeURIComponent(body)}`
-}

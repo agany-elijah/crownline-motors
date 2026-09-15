@@ -968,6 +968,16 @@ model Quote {
   clearingCost Decimal? @db.Decimal(12, 2)
   importDuty   Decimal? @db.Decimal(12, 2)
 
+  /// A miscellaneous fourth fee alongside the three above — a registration
+  /// fee, an inspection charge, anything that does not fit shipping,
+  /// clearing or duty but still belongs on the quotation's total. The label
+  /// is free text because what this row means varies quote to quote; the
+  /// amount participates in `computeQuoteTotals` exactly like the other
+  /// three. Both null together mean "no other cost on this quote" — the
+  /// same "unquoted, never zero" convention the three fees above use.
+  otherCostsLabel  String?
+  otherCostsAmount Decimal? @db.Decimal(12, 2)
+
   /// The last day these figures are honoured. Freight rates and auction
   /// stock move, and a quotation without an end date is a price the
   /// dealership has promised indefinitely.
@@ -1124,6 +1134,14 @@ model Order {
   milestones            PaymentMilestone[]
 
   notes String? @db.Text
+
+  /// When the order is expected to reach the customer — an admin-editable
+  /// estimate, distinct from the Shipment/TrackingEvent logistics timeline
+  /// below. A shipment does not exist until the order reaches the right
+  /// operational stage (see Shipment's own note), but staff can promise a
+  /// customer a date well before that, and revise it as freight schedules
+  /// firm up. Null means "no estimate given yet".
+  estimatedDeliveryDate DateTime?
 
   items     OrderItem[]
   payments  Payment[]

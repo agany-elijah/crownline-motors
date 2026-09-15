@@ -203,7 +203,6 @@ export default async function AdminSparePartsPage(
     <div className="flex flex-col gap-8">
       <AdminPageHeader
         title="Spare parts"
-        description="Everything in the parts catalogue, including archived listings."
         actions={
           <Button
             render={<Link href={`${ADMIN_BASE_PATH}/spare-parts/new`} />}

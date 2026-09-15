@@ -70,8 +70,8 @@
 
      --duration-fast       250ms  micro-interactions: buttons, links, arrows.
      --duration-base       400ms  section reveals, gallery and modal changes.
-     --duration-slow       800ms  the card hover gesture — lift, shadow, CTA.
-     --duration-cinematic 1200ms  an image scaling inside its fixed crop.
+     --duration-slow       480ms  the card hover gesture — lift, shadow, CTA.
+     --duration-cinematic  720ms  an image scaling inside its fixed crop.
 
      The two slow steps exist because of the curve, not the clock. Paired
      with the expo ease below, a 250ms hover has already travelled ~93% of
@@ -82,19 +82,35 @@
 
      A card hover is the one place in this design where the movement is
      meant to be *felt*, so it gets both a longer duration and a gentler
-     curve. Everything else keeps the fast pair.
+     curve than the fast pair, while staying brisk enough that a customer
+     scanning a grid of cards never feels held up by it.
 
-     600ms/900ms was the first attempt at that and still read as a snap:
-     the rise and the shadow arrived together, near enough to instantly,
-     and a gesture that resolves before the eye has followed it is
-     indistinguishable from no gesture at all. 800ms on the soft curve is
-     roughly the point where a 6px rise stops being a state change and
-     starts being a movement, and the photograph behind it is given 1200ms
-     so it is still drifting closer after the card itself has settled —
-     which is what makes the two read as one gesture with depth rather
-     than as two properties animating in lockstep. Neither is long enough
-     to be in the way: both are hover-only, and a pointer that leaves
-     early simply reverses.
+     ── Tuning these two numbers ──────────────────────────────────────
+     `--duration-slow` and `--duration-cinematic` are the only two knobs
+     for "how fast does a vehicle card feel on hover" — everything that
+     reacts to hovering a card (the lift and shadow in `components/ui/
+     card.tsx`, the Explore cue and arrow in `vehicle-card.tsx`, and the
+     photograph's zoom via the shared `media-frame` utility below) reads
+     its speed from one of these two tokens rather than setting its own,
+     specifically so the whole gesture can be sped up or slowed down from
+     this one place. `--duration-cinematic` is kept at 1.5× `--duration-
+     slow` — the photograph should still be drifting closer after the
+     card itself has settled, which is what makes the two read as one
+     gesture with depth rather than as two properties animating in
+     lockstep — so change both together and keep that ratio rather than
+     tuning one in isolation. Currently 480ms/720ms, 40% faster than this
+     design system's original 800ms/1200ms tuning (noted below) per
+     stakeholder request; go lower than roughly 350ms/525ms and the lift
+     starts reading as a snap rather than a movement, the exact failure
+     the paragraph below describes at 600ms/900ms.
+
+     600ms/900ms was the first attempt at the original, slower tuning and
+     still read as a snap: the rise and the shadow arrived together, near
+     enough to instantly, and a gesture that resolves before the eye has
+     followed it is indistinguishable from no gesture at all. 800ms/1200ms
+     on the soft curve was roughly the point where a 6px rise stopped
+     being a state change and started being a movement. Both are still
+     hover-only, so a pointer that leaves early simply reverses.
 
      --ease-crownline       fast-out expo. Correct for entrances and
                             reveals, where content should arrive and settle.
@@ -105,8 +121,8 @@
                             movement makes the extra milliseconds invisible. */
   --duration-fast: 250ms;
   --duration-base: 400ms;
-  --duration-slow: 800ms;
-  --duration-cinematic: 1200ms;
+  --duration-slow: 480ms;
+  --duration-cinematic: 720ms;
   --ease-crownline: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-crownline-soft: cubic-bezier(0.4, 0.15, 0.3, 1);
 

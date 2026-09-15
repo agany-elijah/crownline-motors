@@ -73,6 +73,10 @@ export const ADMIN_LOGIN_RATE_LIMITED_MESSAGE = `429 Too many attempts, try agai
  *                      way to exhaust the project's hourly email quota
  *   quote-request:*    public quotation requests — the one form anyone on
  *                      the internet can write to the database through
+ *   quotation-pdf:*    reads of the public quotation PDF endpoint. The
+ *                      256-bit share token already makes guessing one
+ *                      infeasible; this is defence in depth against a script
+ *                      hammering the endpoint, not the actual protection.
  */
 export const RATE_LIMIT_SCOPES = {
   adminLoginEmail: "admin-login:email",
@@ -81,7 +85,13 @@ export const RATE_LIMIT_SCOPES = {
   passwordResetIp: "password-reset:ip",
   quoteRequestIp: "quote-request:ip",
   quoteRequestPhone: "quote-request:phone",
+  quotationPdfIp: "quotation-pdf:ip",
 } as const
+
+/** Quotation PDF reads per host inside the window. Generous: a customer may
+ *  reload the page, forward the link, and reopen it themselves. */
+export const QUOTATION_PDF_MAX_PER_IP = 30
+export const QUOTATION_PDF_WINDOW_MS = 60 * 60 * 1000
 
 /** Reset emails per address/host inside the window. Three covers "I did not
  *  get it, let me try again" twice over; a fourth in fifteen minutes is not

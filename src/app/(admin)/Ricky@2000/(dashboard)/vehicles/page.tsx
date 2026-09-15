@@ -144,7 +144,6 @@ export default async function AdminVehiclesPage(
     <div className="flex flex-col gap-8">
       <AdminPageHeader
         title="Vehicles"
-        description="Everything in the inventory, including archived listings."
         actions={
           <Button render={<Link href={`${ADMIN_BASE_PATH}/vehicles/new`} />} size="lg">
             <Plus aria-hidden="true" />

@@ -245,11 +245,7 @@ export function VehiclePhotoBoard({
             </span>
           </h2>
           <p className="max-w-2xl text-small text-muted-foreground">
-            {photos.length} of {MAX_PHOTOS_PER_VEHICLE} used. You can select
-            several at once, on a phone as well as a computer. Every image is
-            shown at 16:9 across the website and is resized in your browser
-            before it is sent, so the listing stays fast on a mobile
-            connection.
+            {photos.length} of {MAX_PHOTOS_PER_VEHICLE} used. Shown at 16:9 across the site.
           </p>
         </div>
       </div>
@@ -280,8 +276,7 @@ export function VehiclePhotoBoard({
         <div className="flex flex-col gap-1">
           <h3 className="font-heading text-small font-semibold">Main image</h3>
           <p className="text-small text-muted-foreground">
-            This is the first image customers see — on the vehicle card, in
-            search results, and at the top of the gallery.
+            Shown first — on the vehicle card, search results, and the gallery.
           </p>
         </div>
 
@@ -324,9 +319,7 @@ export function VehiclePhotoBoard({
             ) : null}
           </h3>
           <p className="text-small text-muted-foreground">
-            Shown after the main image, in this order. Use the{" "}
-            <span aria-hidden="true">⋯</span> menu on any of them to move it
-            earlier or later, describe it, or make it the main image.
+            Use the <span aria-hidden="true">⋯</span> menu to reorder, describe, or set as main.
           </p>
         </div>
 

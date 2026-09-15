@@ -75,13 +75,7 @@ export function BusinessSettingsForm({ settings }: BusinessSettingsFormProps) {
 
       {/* ── Contact ─────────────────────────────────────────── */}
       <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-6">
-        <div className="flex flex-col gap-1">
-          <h2 className="font-heading text-h3 font-semibold">Customer contact</h2>
-          <p className="max-w-2xl text-small text-muted-foreground">
-            The WhatsApp number customers reach you on. Stored here rather than in
-            each page, so changing it is one edit.
-          </p>
-        </div>
+        <h2 className="font-heading text-h3 font-semibold">Customer contact</h2>
 
         <div className="flex max-w-md flex-col gap-2">
           <Label htmlFor={whatsappId}>WhatsApp number</Label>
@@ -97,8 +91,7 @@ export function BusinessSettingsForm({ settings }: BusinessSettingsFormProps) {
             aria-describedby={`${whatsappId}-hint`}
           />
           <p id={`${whatsappId}-hint`} className="text-small text-muted-foreground">
-            Full international format. Leave empty to hide every WhatsApp button
-            rather than link customers to a number that does not answer.
+            Leave empty to hide WhatsApp buttons sitewide.
           </p>
           {fieldError("whatsappNumber") ? (
             <p className="text-small text-destructive">
@@ -112,12 +105,8 @@ export function BusinessSettingsForm({ settings }: BusinessSettingsFormProps) {
       <section className="flex flex-col gap-5 rounded-xl border border-border bg-card p-6">
         <div className="flex flex-col gap-1">
           <h2 className="font-heading text-h3 font-semibold">Payment stages</h2>
-          <p className="max-w-2xl text-small text-muted-foreground">
-            How a vehicle&rsquo;s agreed price is split across the three payments a
-            customer makes. These are the defaults applied to{" "}
-            <strong className="font-semibold text-foreground">new orders only</strong>
-            {" "}— each order keeps its own copy from the day it was accepted, so
-            changing these never alters what an existing customer already agreed to.
+          <p className="text-small text-muted-foreground">
+            Applies to new orders only — existing orders keep their original split.
           </p>
         </div>
 
@@ -211,17 +200,7 @@ export function BusinessSettingsForm({ settings }: BusinessSettingsFormProps) {
           <h2 className="font-heading text-h3 font-semibold">
             How a spare part reaches the customer
           </h2>
-          <p className="max-w-2xl text-small text-muted-foreground">
-            Shown on{" "}
-            <strong className="font-semibold text-foreground">
-              every spare-part page
-            </strong>
-            , under the part&rsquo;s details. It is what reassures someone in
-            Juba that a part ordered from Japan actually arrives, so keep each
-            step to something the business can honour. These are parts only —
-            the vehicle import timeline is separate and lives on{" "}
-            <em>How It Works</em>.
-          </p>
+          <p className="text-small text-muted-foreground">Shown on every spare-part page.</p>
         </div>
 
         <SparePartDeliveryStepsEditor

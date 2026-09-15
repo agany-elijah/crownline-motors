@@ -325,6 +325,10 @@ async function main() {
       `UPDATE "Quote" SET "shippingCost" = -1.00 WHERE id = 'chk-quote'`
     )
     await mustReject(
+      "a negative other-costs amount on a quote",
+      `UPDATE "Quote" SET "otherCostsAmount" = -1.00 WHERE id = 'chk-quote'`
+    )
+    await mustReject(
       "a negative import duty on an order",
       `UPDATE "Order" SET "importDuty" = -5.00 WHERE id = 'chk-order'`
     )
