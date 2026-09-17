@@ -38,11 +38,11 @@ export function ServicesMenu({
               "transition-colors duration-fast ease-crownline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring",
               "after:absolute after:inset-x-0 after:-bottom-0.5 after:h-px after:origin-left after:bg-gold-ink",
               "after:transition-transform after:duration-fast after:ease-crownline",
-              active ? "text-gold-ink after:scale-x-100" : "after:scale-x-0 data-popup-open:after:scale-x-100",
+              active ? "text-gold-ink after:scale-x-100" : "after:scale-x-0 hover:after:scale-x-100 data-popup-open:after:scale-x-100",
               !active &&
                 (tone === "dark"
-                  ? "text-white/80 hover:text-white data-popup-open:text-white"
-                  : "text-muted-foreground hover:text-foreground data-popup-open:text-foreground")
+                  ? "text-white/80 hover:text-gold-ink data-popup-open:text-gold-ink"
+                  : "text-muted-foreground hover:text-gold-ink data-popup-open:text-gold-ink")
             )}
           >
             {group.label}
@@ -67,7 +67,7 @@ export function ServicesMenu({
                       className={cn(
                         "group/item flex items-center justify-between gap-3 rounded-md px-3 py-2.5 text-small font-medium outline-none",
                         "transition-colors duration-fast ease-crownline",
-                        "text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:bg-secondary focus-visible:text-foreground",
+                        "text-white/75 hover:bg-white/8 hover:text-white focus-visible:bg-white/8 focus-visible:text-white",
                         "data-active:text-gold-ink"
                       )}
                     >
@@ -93,9 +93,12 @@ export function ServicesMenu({
       <NavigationMenu.Portal>
         <NavigationMenu.Positioner sideOffset={14} align="start" alignOffset={-12} className="z-50">
           <NavigationMenu.Popup
+            data-tone="dark"
             className={cn(
-              "origin-[var(--transform-origin)] rounded-lg bg-popover text-popover-foreground",
-              "shadow-[var(--shadow-raised)] ring-1 ring-foreground/10 outline-none",
+              // Dark glass, matching the header it drops from, on every page.
+              // `data-tone` re-points --gold-ink so the active item stays legible.
+              "origin-[var(--transform-origin)] rounded-lg bg-night/90 text-white backdrop-blur-xl backdrop-saturate-150",
+              "shadow-[0_18px_48px_-12px_oklch(0_0_0/0.6)] ring-1 ring-white/10 outline-none",
               "transition-[opacity,scale,translate] duration-base ease-crownline",
               "data-starting-style:-translate-y-1 data-starting-style:scale-[0.98] data-starting-style:opacity-0",
               "data-ending-style:-translate-y-1 data-ending-style:scale-[0.98] data-ending-style:opacity-0"

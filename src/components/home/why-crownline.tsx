@@ -12,7 +12,7 @@ import {
 import { cn } from "@/lib/utils"
 import { Container } from "@/components/layout/container"
 import { InView } from "@/components/motion/in-view"
-import { HomeSectionHeading } from "@/components/home/section-heading"
+import { ShowroomHeading } from "@/components/layout/showroom-heading"
 import { ITEM_STEP_MS, delay } from "@/components/motion/motion"
 import { HOME_MEDIA } from "@/components/home/home-media"
 
@@ -67,7 +67,7 @@ export function WhyCrownline({ businessName }: { businessName: string }) {
 
       <Container size="wide">
         <InView className="flex flex-col gap-14">
-          <HomeSectionHeading
+          <ShowroomHeading
             id="home-why-heading"
             icon={BadgeCheck}
             label={`Why ${businessName}`}

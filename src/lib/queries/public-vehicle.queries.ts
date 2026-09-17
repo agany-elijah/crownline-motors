@@ -747,20 +747,19 @@ export const listVehicleBodyTypes = cache(async (): Promise<VehicleBodyType[]> =
 export const HOMEPAGE_VEHICLES_LIMIT = 8
 
 /**
- * The homepage's featured vehicles.
+ * The vehicles an operator has marked "Feature on the homepage".
  *
- * Featured listings first, then the most recently published — the same
- * `CARD_ORDER_BY` the catalogue uses — so the homepage is never empty while
- * something is for sale, and an operator who ticks "Feature on the homepage"
- * moves that vehicle to the front without the grid depending on anyone
- * remembering to.
+ * Featured only, with no fallback to the newest listings: the homepage grid
+ * is a choice the dealership makes in the dashboard, and it shows exactly
+ * what was chosen. With nothing featured the section is left out rather than
+ * filled with listings nobody picked. Newest first within the selection.
  */
 export async function listHomepageVehicles(
   limit: number = HOMEPAGE_VEHICLES_LIMIT
 ): Promise<PublicVehicleCard[]> {
   const [rows, siteWide] = await Promise.all([
     prisma.vehicle.findMany({
-      where: publicVehicleWhere(),
+      where: publicVehicleWhere({ isFeatured: true }),
       orderBy: CARD_ORDER_BY,
       take: Math.max(0, limit),
       select: CARD_SELECT,
@@ -771,90 +770,27 @@ export async function listHomepageVehicles(
   return rows.map((row) => toCard(row, siteWide))
 }
 
-/** One way of grouping the live inventory, with a photograph to show for it. */
-export interface VehicleShowcaseGroup<TValue extends string> {
-  value: TValue
-  /** Published vehicles in the group. */
-  count: number
-  /** The main photograph of the group's lead vehicle, or null if it has none. */
-  photoUrl: string | null
+/** The figures the homepage hero counts up to. */
+export interface InventorySummary {
+  /** Published vehicles. */
+  vehicleCount: number
+  /** Distinct makes among them. */
+  makeCount: number
 }
 
 /**
- * Picks each group's cover: the main photograph of the first vehicle in
- * catalogue order that has one, so a featured listing fronts its category.
- */
-function coverFor(rows: { photos: { storagePath: string }[] }[]): string | null {
-  const photo = rows.find((row) => row.photos.length > 0)?.photos[0]
-  return photo ? vehiclePhotoPublicUrl(photo.storagePath) : null
-}
-
-/** Largest group first; ties alphabetically, so the order is stable. */
-function byCountThenValue<T extends string>(a: VehicleShowcaseGroup<T>, b: VehicleShowcaseGroup<T>) {
-  return b.count - a.count || a.value.localeCompare(b.value)
-}
-
-/**
- * Published vehicles grouped by body type — the homepage's category tiles.
+ * Live counts of what is for sale, for the homepage hero.
  *
- * Two bounded reads rather than one per category: the counts from a
- * `groupBy`, and one row per body type (with its main photograph) from a
- * `distinct` in catalogue order. Neither grows with the size of the
- * inventory, only with the ten body types there are.
+ * Two small aggregate reads against the `[status, …]` indexes; neither
+ * returns a row per vehicle.
  */
-export const listBodyTypeShowcase = cache(
-  async (): Promise<VehicleShowcaseGroup<VehicleBodyType>[]> => {
-    const where = publicVehicleWhere({ bodyType: { not: null } })
-
-    const [groups, leads] = await Promise.all([
-      prisma.vehicle.groupBy({ by: ["bodyType"], where, _count: { _all: true } }),
-      prisma.vehicle.findMany({
-        where: { AND: [where, { photos: { some: { deletedAt: null, isPrimary: true } } }] },
-        distinct: ["bodyType"],
-        orderBy: CARD_ORDER_BY,
-        select: { bodyType: true, photos: CARD_PHOTO },
-      }),
-    ])
-
-    return groups
-      .flatMap((group) =>
-        group.bodyType === null
-          ? []
-          : [
-              {
-                value: group.bodyType,
-                count: group._count._all,
-                photoUrl: coverFor(leads.filter((lead) => lead.bodyType === group.bodyType)),
-              },
-            ]
-      )
-      .sort(byCountThenValue)
-  }
-)
-
-/**
- * Published vehicles grouped by make — the brands the dealership has on
- * sale, and the homepage's fallback categories while no listing carries a
- * body type yet.
- */
-export const listMakeShowcase = cache(async (): Promise<VehicleShowcaseGroup<string>[]> => {
+export const getInventorySummary = cache(async (): Promise<InventorySummary> => {
   const where = publicVehicleWhere()
 
-  const [groups, leads] = await Promise.all([
-    prisma.vehicle.groupBy({ by: ["make"], where, _count: { _all: true } }),
-    prisma.vehicle.findMany({
-      where: { AND: [where, { photos: { some: { deletedAt: null, isPrimary: true } } }] },
-      distinct: ["make"],
-      orderBy: CARD_ORDER_BY,
-      select: { make: true, photos: CARD_PHOTO },
-    }),
+  const [vehicleCount, makes] = await Promise.all([
+    prisma.vehicle.count({ where }),
+    prisma.vehicle.groupBy({ by: ["make"], where }),
   ])
 
-  return groups
-    .map((group) => ({
-      value: group.make,
-      count: group._count._all,
-      photoUrl: coverFor(leads.filter((lead) => lead.make === group.make)),
-    }))
-    .sort(byCountThenValue)
+  return { vehicleCount, makeCount: makes.length }
 })

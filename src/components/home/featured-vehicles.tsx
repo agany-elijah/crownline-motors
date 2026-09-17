@@ -1,11 +1,10 @@
 import Link from "next/link"
-import { ArrowRight, CarFront, Sparkles } from "lucide-react"
+import { ArrowRight, Sparkles } from "lucide-react"
 
 import { Container } from "@/components/layout/container"
 import { InView } from "@/components/motion/in-view"
-import { HomeSectionHeading } from "@/components/home/section-heading"
+import { ShowroomHeading } from "@/components/layout/showroom-heading"
 import { ITEM_STEP_MS, delay } from "@/components/motion/motion"
-import { Button } from "@/components/ui/button"
 import { VehicleCard } from "@/components/vehicles/vehicle-card"
 import type { PublicVehicleCard } from "@/lib/queries/public-vehicle.queries"
 
@@ -13,7 +12,9 @@ import type { PublicVehicleCard } from "@/lib/queries/public-vehicle.queries"
 const CARD_SIZES = "(min-width: 1280px) 400px, (min-width: 1024px) 32vw, (min-width: 640px) 50vw, 100vw"
 
 /**
- * The vehicles on sale now, featured listings first.
+ * The vehicles an operator has marked "Feature on the homepage" in the
+ * dashboard — and only those. Renders nothing when none are featured, so the
+ * homepage never fills this space with listings nobody chose.
  *
  * The "View inventory" link sits above the grid rather than below it, where a
  * visitor who already knows they want the full catalogue finds it before
@@ -22,18 +23,18 @@ const CARD_SIZES = "(min-width: 1280px) 400px, (min-width: 1024px) 32vw, (min-wi
 export function FeaturedVehicles({
   vehicles,
   totalVehicles,
-  showQuote,
 }: {
   vehicles: PublicVehicleCard[]
   totalVehicles: number
-  showQuote: boolean
 }) {
+  if (vehicles.length === 0) return null
+
   return (
     <section aria-labelledby="home-featured-heading" className="bg-background py-20 md:py-28">
       <Container size="wide">
         <InView className="flex flex-col gap-12">
           <div className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
-            <HomeSectionHeading
+            <ShowroomHeading
               id="home-featured-heading"
               icon={Sparkles}
               label="Featured vehicles"
@@ -60,33 +61,13 @@ export function FeaturedVehicles({
             ) : null}
           </div>
 
-          {vehicles.length > 0 ? (
-            <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {vehicles.map((vehicle, index) => (
-                <li key={vehicle.slug} className="rv-up flex" style={delay(300 + index * ITEM_STEP_MS)}>
-                  <VehicleCard vehicle={vehicle} sizes={CARD_SIZES} />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="rv-up flex flex-col items-center gap-5 rounded-2xl border border-dashed border-white/12 bg-card/40 px-6 py-16 text-center" style={delay(300)}>
-              <span className="grid size-14 place-items-center rounded-full bg-gold/10 text-gold">
-                <CarFront aria-hidden="true" className="size-6" />
-              </span>
-              <div className="flex flex-col gap-2">
-                <h3 className="text-h3 text-foreground">New vehicles are on their way</h3>
-                <p className="mx-auto max-w-md text-body text-muted-foreground">
-                  Listings are added as vehicles are sourced. Tell us what you are looking for and
-                  we will find it for you.
-                </p>
-              </div>
-              {showQuote ? (
-                <Button render={<Link href="/get-a-quote" />} size="lg">
-                  Request a vehicle
-                </Button>
-              ) : null}
-            </div>
-          )}
+          <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {vehicles.map((vehicle, index) => (
+              <li key={vehicle.slug} className="rv-up flex" style={delay(300 + index * ITEM_STEP_MS)}>
+                <VehicleCard vehicle={vehicle} sizes={CARD_SIZES} />
+              </li>
+            ))}
+          </ul>
         </InView>
       </Container>
     </section>

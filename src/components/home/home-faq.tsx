@@ -2,7 +2,7 @@ import Link from "next/link"
 import { ArrowRight, HelpCircle, Plus } from "lucide-react"
 
 import { Container } from "@/components/layout/container"
-import { HomeSectionHeading } from "@/components/home/section-heading"
+import { ShowroomHeading } from "@/components/layout/showroom-heading"
 import { InView } from "@/components/motion/in-view"
 import { ITEM_STEP_MS, delay } from "@/components/motion/motion"
 import { serializeJsonLd } from "@/lib/utils/json-ld"
@@ -90,7 +90,7 @@ export function HomeFaq({ faqs }: { faqs: FaqItem[] }) {
       <Container size="wide">
         <InView className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-16">
           <div className="flex flex-col gap-8 lg:col-span-5">
-            <HomeSectionHeading
+            <ShowroomHeading
               id="home-faq-heading"
               icon={HelpCircle}
               label="Questions"

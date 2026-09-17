@@ -253,6 +253,7 @@ export const quoteRequestSchema = z
         QuoteSource.VEHICLE_CATALOGUE,
         QuoteSource.SPARE_PART_CATALOGUE,
         QuoteSource.QUOTE_PAGE,
+        QuoteSource.CONTACT_PAGE,
       ]
 
       if (!value.domain) ctx.addIssue({ code: "custom", path: ["domain"], message: "Choose what you are looking for." })

@@ -4,7 +4,7 @@ import { ArrowRight, ArrowUpRight, Wrench } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Container } from "@/components/layout/container"
 import { InView } from "@/components/motion/in-view"
-import { HomeSectionHeading } from "@/components/home/section-heading"
+import { ShowroomHeading } from "@/components/layout/showroom-heading"
 import { ITEM_STEP_MS, delay } from "@/components/motion/motion"
 import { SparePartCard } from "@/components/spare-parts/spare-part-card"
 import type {
@@ -42,7 +42,7 @@ export function SparePartsTeaser({
       <Container size="wide">
         <InView className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-16">
           <div className={hasShowcase ? "flex flex-col gap-8 lg:col-span-5" : "flex flex-col gap-8 lg:col-span-8"}>
-            <HomeSectionHeading
+            <ShowroomHeading
               id="home-parts-heading"
               icon={Wrench}
               label="Spare parts"

@@ -14,7 +14,7 @@ import {
 
 import { Container } from "@/components/layout/container"
 import { InView } from "@/components/motion/in-view"
-import { HomeSectionHeading } from "@/components/home/section-heading"
+import { ShowroomHeading } from "@/components/layout/showroom-heading"
 import { delay } from "@/components/motion/motion"
 
 interface JourneyStep {
@@ -75,7 +75,7 @@ export function JourneyOverview() {
       <Container size="wide">
         <InView className="flex flex-col gap-14 lg:gap-20">
           <div className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
-            <HomeSectionHeading
+            <ShowroomHeading
               id="home-journey-heading"
               icon={Route}
               label="How it works"

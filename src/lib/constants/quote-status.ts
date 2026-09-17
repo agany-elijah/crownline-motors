@@ -86,6 +86,7 @@ export const QUOTE_SOURCE_LABELS: Record<QuoteSource, string> = {
   SPARE_PART_CART: "Parts list",
   SPARE_PART_CATALOGUE: "Parts catalogue",
   QUOTE_PAGE: "Get a Quote page",
+  CONTACT_PAGE: "Contact page",
 }
 
 export const QUOTE_CHANNEL_LABELS: Record<QuoteDispatchChannel, string> = {

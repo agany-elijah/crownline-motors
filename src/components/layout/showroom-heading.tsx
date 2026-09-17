@@ -5,13 +5,14 @@ import { AnimatedWords, wordsDuration } from "@/components/motion/animated-words
 import { delay } from "@/components/motion/motion"
 
 /**
- * A homepage section's opening: a small pill naming the section, a two-part
- * headline whose second part is set in gold, and a short supporting line.
+ * A showroom section's opening — used on the homepage, How It Works and
+ * Contact: a small pill naming the section, a two-part headline whose second
+ * part is set in gold, and a short supporting line.
  *
  * Must sit inside an InView — every piece animates on the `.rv-*` trigger,
  * in reading order: the pill, then the words, then the line beneath.
  */
-export function HomeSectionHeading({
+export function ShowroomHeading({
   id,
   icon: Icon,
   label,

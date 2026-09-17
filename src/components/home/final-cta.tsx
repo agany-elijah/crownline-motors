@@ -58,7 +58,7 @@ export function FinalCta({
 
                 <div className="rv-up flex flex-wrap gap-3 pt-2" style={delay(850)}>
                   {showQuote ? (
-                    <Button render={<Link href="/get-a-quote" />} size="xl" className="group/final">
+                    <Button render={<Link href="/get-a-quote" />} size="lg" className="group/final">
                       Get a quote
                       <ArrowRight
                         aria-hidden="true"
@@ -70,13 +70,13 @@ export function FinalCta({
                     <Button
                       render={<a href={whatsappUrl} target="_blank" rel="noopener noreferrer" />}
                       variant="whatsapp"
-                      size="xl"
+                      size="lg"
                     >
                       <WhatsAppGlyph className="size-5" />
                       WhatsApp us
                     </Button>
                   ) : null}
-                  <Button render={<Link href="/contact" />} variant="outline" size="xl">
+                  <Button render={<Link href="/contact" />} variant="outline" size="lg">
                     <Mail aria-hidden="true" className="size-4" />
                     Contact us
                   </Button>

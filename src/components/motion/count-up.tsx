@@ -17,10 +17,13 @@ import { delay } from "@/components/motion/motion"
  */
 export function CountUp({
   value,
+  trigger = "load",
   startDelay = 0,
   className,
 }: {
   value: number
+  /** `load` counts on first paint; `view` when the nearest InView reveals. */
+  trigger?: "load" | "view"
   startDelay?: number
   className?: string
 }) {
@@ -30,7 +33,7 @@ export function CountUp({
     <span className={className}>
       <span
         aria-hidden="true"
-        className={cn("count-up load-count tabular")}
+        className={cn("count-up tabular", trigger === "load" ? "load-count" : "rv-count")}
         style={{ ...delay(startDelay), "--to": safe } as React.CSSProperties}
       />
       <span className="sr-only">{safe}</span>

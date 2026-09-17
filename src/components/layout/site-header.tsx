@@ -188,7 +188,8 @@ export function SiteHeader({ whatsappUrl }: SiteHeaderProps) {
           {/* Inline nav starts at xl, not lg: eight items plus a CTA
               measure past 1100px, so at lg they would crush together.
               Below xl the hamburger takes over. */}
-          <ul className="hidden items-center gap-6 xl:flex 2xl:gap-7">
+          <div className="hidden items-center gap-9 xl:flex 2xl:gap-11">
+          <ul className="flex items-center gap-6 2xl:gap-7">
             {headerNavItems.map((item) =>
               isNavGroup(item) ? (
                 <li key={item.label}>
@@ -208,11 +209,12 @@ export function SiteHeader({ whatsappUrl }: SiteHeaderProps) {
             )}
           </ul>
 
-          {/* One call to action. Track My Order and Get a Quote live under
-              Services in the nav; the header's button sends a visitor to what
-              the business sells. The solid gold fill is reserved for exactly
-              this one button, per the brief. */}
-          <div className="hidden shrink-0 items-center xl:flex">
+          {/* One call to action, grouped with the navigation so it sits a
+              short step after Contact rather than out at the far edge. Track
+              My Order and Get a Quote live under Services; this button sends a
+              visitor to what the business sells. The solid gold fill is
+              reserved for exactly this one button, per the brief. */}
+          <div className="flex shrink-0 items-center">
             <Link
               href={INVENTORY_CTA.href}
               className={cn(buttonVariants({ variant: "default", size: "default" }), "group/cta gap-1.5")}
@@ -223,6 +225,7 @@ export function SiteHeader({ whatsappUrl }: SiteHeaderProps) {
                 className="size-3.5 transition-transform duration-fast ease-crownline group-hover/cta:translate-x-0.5"
               />
             </Link>
+          </div>
           </div>
 
           {/*

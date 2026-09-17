@@ -92,7 +92,7 @@ export type QuoteRequestSubject =
     }
   | {
       kind: "GENERAL"
-      source: "VEHICLE_CATALOGUE" | "SPARE_PART_CATALOGUE" | "QUOTE_PAGE"
+      source: "VEHICLE_CATALOGUE" | "SPARE_PART_CATALOGUE" | "QUOTE_PAGE" | "CONTACT_PAGE"
       /** Fixed by a catalogue; chosen by the customer on the Get a Quote page. */
       domain?: QuoteType
       /** Offer the optional structured fields (make, budget, part number…). */
@@ -344,7 +344,9 @@ export function QuoteRequestForm({
             subject.kind === "GENERAL"
               ? subject.detailed
                 ? "Anything else we should know?"
-                : "What are you looking for?"
+                : subject.source === "CONTACT_PAGE"
+                  ? "How can we help?"
+                  : "What are you looking for?"
               : "Additional notes"
           }
           placeholder={notesPlaceholder(subject)}
@@ -437,6 +439,10 @@ function notesPlaceholder(subject: QuoteRequestSubject): string {
 
   if (subject.kind === "PARTS_LIST") {
     return "Your car's make, model and year help us confirm fitment. Add anything else we should know."
+  }
+
+  if (subject.source === "CONTACT_PAGE") {
+    return "Your question, or what you are looking for — a vehicle, a part, or help with an order."
   }
 
   if (subject.domain === QuoteType.SPARE_PART) {

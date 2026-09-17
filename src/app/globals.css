@@ -501,6 +501,12 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: var(--gold);
 
+  /* The recessed surface — a field, a table header — on the public site's
+     dark sections. Defined here as well as in :root because `Input` paints
+     itself `dark:bg-sunken`: without a dark value the token fell through to
+     the light one and every field on a dark page came out white. */
+  --sunken: oklch(0.135 0.003 90);
+
   --gold: oklch(0.82 0.15 88);
   /* On a dark surface the fill gold is already the most legible gold
      available (10.9:1), so ink and fill converge — same reasoning as the
@@ -1037,15 +1043,15 @@
 }
 
 /* The deeper glass pane behind the hero's words: opaque where the copy sits
-   and clearing away from it — upwards on a phone, where the copy sits at the
-   bottom; leftwards from `lg`, where it sits on the right. */
+   and clearing away from it — upwards on a phone, where the copy fills the
+   lower screen; rightwards from `lg`, where it sits on the left. */
 .hero-glass {
-  mask-image: linear-gradient(to top, black 35%, transparent 80%);
+  mask-image: linear-gradient(to top, black 45%, transparent 90%);
 }
 
 @media (width >= 64rem) {
   .hero-glass {
-    mask-image: linear-gradient(to left, black 22%, transparent 62%);
+    mask-image: linear-gradient(to right, black 22%, transparent 62%);
   }
 }
 
@@ -1246,6 +1252,18 @@
   [data-inview] .rv-unveil img {
     scale: 1.2;
     transition: scale 1800ms var(--ease-crownline) var(--d, 0ms);
+  }
+
+  /* Counts from zero when revealed. Transitioning a registered property is
+     what lets a CSS counter animate without an animation that would already
+     have finished by the time the figure scrolls into view. */
+  [data-inview] .rv-count {
+    --count: 0;
+    transition: --count 1600ms var(--ease-crownline) var(--d, 0ms);
+  }
+
+  [data-inview="true"] .rv-count {
+    --count: var(--to, 0);
   }
 
   [data-inview="true"] :is(.rv-up, .rv-word, .rv-icon, .rv-draw-x, .rv-draw-y, .rv-pop) {

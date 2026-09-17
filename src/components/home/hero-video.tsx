@@ -175,7 +175,7 @@ export function HeroVideo({
           onClick={toggle}
           aria-label={isPlaying ? "Pause background video" : "Play background video"}
           className={cn(
-            "absolute bottom-6 left-4 z-10 grid size-11 place-items-center rounded-full sm:left-6 lg:left-12",
+            "absolute right-4 bottom-8 z-10 grid size-11 place-items-center rounded-full sm:right-6 lg:right-12 lg:bottom-10",
             "border border-white/20 bg-night/40 text-white/80 backdrop-blur-md",
             "transition-[background-color,border-color,color] duration-fast ease-crownline",
             "hover:border-gold/60 hover:bg-night/60 hover:text-gold",

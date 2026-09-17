@@ -285,6 +285,9 @@ enum QuoteSource {
   SPARE_PART_CART
   SPARE_PART_CATALOGUE
   QUOTE_PAGE
+  /// The enquiry form on the Contact page. A general question arrives as a
+  /// quote in NEW status, in the same inbox, with the same notifications.
+  CONTACT_PAGE
 }
 
 /// What a quotation line is.

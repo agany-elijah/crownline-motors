@@ -39,18 +39,22 @@ function splitName(name: string) {
 /**
  * The homepage's opening screen.
  *
- * Deliberately spare: the dealership's name, the positioning statement, the
- * two actions and three counts — nothing else. The film carries the
- * atmosphere; the words sit on the right, over a glass panel that darkens
- * behind them and clears towards the left, so most of the screen is left to
- * the moving picture.
+ * Deliberately spare, and spread across the frame rather than stacked in one
+ * block: the dealership's name sits high, the positioning statement and the
+ * two actions hold the middle, and the stock counts run along the bottom edge
+ * beside the scroll cue. Everything is on the left, over a glass pane that
+ * darkens behind the words and clears towards the right, where the film is
+ * left to itself.
  *
  *     ┌──────────────────────────────────────────────────────────┐
- *     │  film, frosted lightly             ░░▒▒▓▓ CROWNLINE MOTORS│
- *     │                                   ░░▒▒▓▓  Quality Cars.   │
- *     │                                   ░░▒▒▓▓  Global Standards│
- *     │                                   ░░▒▒▓▓  Local Commitment│
- *     │ ▶                                 ░░▒▒▓▓  [Explore] [Quote]│
+ *     │ ── CROWNLINE MOTORS ▓▓▒▒░░                               │
+ *     │                     ▓▓▒▒░░                               │
+ *     │ Quality Cars.       ▓▓▒▒░░          film                 │
+ *     │ Global Standards.   ▓▓▒▒░░                               │
+ *     │ Local Commitment.   ▓▓▒▒░░                               │
+ *     │ [Explore] [Quote]   ▓▓▒▒░░                               │
+ *     │                                                          │
+ *     │ 4 vehicles │ 4 makes │ 2 countries     scroll          ▶ │
  *     └──────────────────────────────────────────────────────────┘
  *
  * Everything animates on first paint rather than on scroll, because it is
@@ -78,55 +82,57 @@ export function HomeHero({ businessName, vehicleCount, makeCount, showQuote }: H
       <div aria-hidden="true" className="absolute inset-0 -z-10">
         {/* The fallback surface: what shows before the film starts, and in
             place of it when it cannot play. */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_25%_45%,oklch(0.8_0.145_85/0.14),transparent_70%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_75%_45%,oklch(0.8_0.145_85/0.14),transparent_70%)]" />
         <div className="bg-dot-grid absolute inset-0" />
 
         <HeroVideo sources={HOME_MEDIA.heroVideo.sources} poster={HOME_MEDIA.heroVideo.poster} />
 
         {/* The glass. A light frost across the whole film, then a deeper
-            pane behind the words that clears towards the left — so the copy
+            pane behind the words that clears towards the right — so the copy
             is legible and the picture stays alive where there is none. */}
         <div className="absolute inset-0 bg-night/20 backdrop-blur-[2px]" />
         <div className="hero-glass absolute inset-0 bg-night/55 backdrop-blur-xl backdrop-saturate-125" />
-        <div className="absolute inset-0 bg-gradient-to-t from-night/90 via-night/40 to-transparent lg:bg-gradient-to-l lg:from-night/85 lg:via-night/45 lg:via-45% lg:to-transparent lg:to-75%" />
+        <div className="absolute inset-0 bg-gradient-to-t from-night/90 via-night/40 to-transparent lg:bg-gradient-to-r lg:from-night/85 lg:via-night/45 lg:via-45% lg:to-transparent lg:to-75%" />
 
         {/* Under the header, and into the section below. */}
         <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-night/70 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-transparent" />
       </div>
 
-      <Container
-        size="wide"
-        className="grid flex-1 grid-cols-1 items-end pt-32 pb-28 md:pt-40 lg:grid-cols-12 lg:items-center lg:pb-32"
-      >
-        <div className="flex flex-col gap-8 lg:col-span-6 lg:col-start-7 lg:items-end lg:text-end">
-          <h1 id="home-hero-heading" className="flex flex-col gap-5 lg:items-end">
-            <span
-              className="load-rise flex items-center gap-3 font-heading text-small font-semibold tracking-[0.32em] uppercase"
-              style={delay(120)}
-            >
-              <span aria-hidden="true" className="h-px w-10 bg-gold lg:order-last" />
-              <span>
-                <span className="text-white/90">{name.lead}</span>
-                {name.accent ? <span className="text-gold"> {name.accent}</span> : null}
+      <Container size="wide" className="flex flex-1 flex-col pt-28 pb-8 md:pt-36 lg:pb-10">
+        {/* High: the name. */}
+        {/* Hidden from assistive technology: the heading below carries the
+            name for screen readers, so it is not announced twice. */}
+        <p
+          aria-hidden="true"
+          className="load-rise flex items-center gap-3 font-heading text-small font-semibold tracking-[0.32em] uppercase"
+          style={delay(120)}
+        >
+          <span aria-hidden="true" className="h-px w-10 bg-gold" />
+          <span>
+            <span className="text-white/90">{name.lead}</span>
+            {name.accent ? <span className="text-gold"> {name.accent}</span> : null}
+          </span>
+        </p>
+
+        {/* The middle: the statement and the two actions. */}
+        <div className="flex flex-1 flex-col justify-center gap-10 py-14 lg:max-w-3xl">
+          <h1 id="home-hero-heading" className="flex flex-col text-hero">
+            <span className="sr-only">{businessName}: </span>
+            {STATEMENT.map((line, index) => (
+              <span key={line} className="block">
+                <AnimatedWords
+                  text={line}
+                  trigger="load"
+                  startDelay={LINE_STARTS[index]}
+                  wordClassName={index === 2 ? "text-gold-sheen" : undefined}
+                />
               </span>
-            </span>
-            <span className="flex flex-col text-hero">
-              {STATEMENT.map((line, index) => (
-                <span key={line} className="block">
-                  <AnimatedWords
-                    text={line}
-                    trigger="load"
-                    startDelay={LINE_STARTS[index]}
-                    wordClassName={index === 2 ? "text-gold-sheen" : undefined}
-                  />
-                </span>
-              ))}
-            </span>
+            ))}
           </h1>
 
-          <div className="load-rise flex flex-wrap gap-3 lg:justify-end" style={delay(STATEMENT_DONE + 120)}>
-            <Button render={<Link href="/cars" />} size="xl" className="group/cta">
+          <div className="load-rise flex flex-wrap gap-3" style={delay(STATEMENT_DONE + 120)}>
+            <Button render={<Link href="/cars" />} size="lg" className="group/cta">
               Explore cars
               <ArrowRight
                 aria-hidden="true"
@@ -134,34 +140,41 @@ export function HomeHero({ businessName, vehicleCount, makeCount, showQuote }: H
               />
             </Button>
             {showQuote ? (
-              <Button render={<Link href="/get-a-quote" />} variant="outline" size="xl" className="backdrop-blur-md">
+              <Button render={<Link href="/get-a-quote" />} variant="outline" size="lg" className="backdrop-blur-md">
                 <MessageSquareText aria-hidden="true" className="size-4" />
                 Get a quote
               </Button>
             ) : null}
           </div>
-
-          <dl
-            className="load-rise grid grid-cols-3 gap-4 border-t border-white/15 pt-7 lg:flex lg:justify-end lg:gap-x-10"
-            style={delay(STATEMENT_DONE + 260)}
-          >
-            {stats.map((stat, index) => (
-              <div key={stat.label} className="flex flex-col gap-1 lg:items-end">
-                <dt className="order-2 text-small text-white/60">{stat.label}</dt>
-                <dd className="order-1 font-heading text-h2 font-bold text-white">
-                  <CountUp value={stat.value} startDelay={STATEMENT_DONE + 360 + index * 120} />
-                </dd>
-              </div>
-            ))}
-          </dl>
         </div>
+
+        {/* Low: the counts, along the bottom edge. Clears the video control
+            on the right, and the scroll cue sits between them. */}
+        {/* Content-width columns, not thirds: "Vehicles for sale" is half
+            again as wide as "Makes in stock", and equal columns clip it. */}
+        <dl
+          className="load-rise flex flex-wrap self-start border-t border-white/15 pt-6 pr-14 lg:pr-0"
+          style={delay(STATEMENT_DONE + 300)}
+        >
+          {stats.map((stat, index) => (
+            <div
+              key={stat.label}
+              className="flex flex-col gap-1 px-5 first:pl-0 not-first:border-l not-first:border-white/15 sm:px-8"
+            >
+              <dt className="order-2 text-small text-white/60">{stat.label}</dt>
+              <dd className="order-1 font-heading text-h3 font-bold text-white">
+                <CountUp value={stat.value} startDelay={STATEMENT_DONE + 400 + index * 120} />
+              </dd>
+            </div>
+          ))}
+        </dl>
       </Container>
 
       {/* A cue that there is more below. Decorative, and hidden where the
           hero is already shorter than the screen. */}
       <div
         aria-hidden="true"
-        className="load-rise pointer-events-none absolute inset-x-0 bottom-6 hidden flex-col items-center gap-2 text-small text-white/50 lg:flex [@media(max-height:820px)]:hidden"
+        className="load-rise pointer-events-none absolute inset-x-0 bottom-8 hidden flex-col items-center gap-2 text-small text-white/50 lg:flex [@media(max-height:820px)]:hidden"
         style={delay(STATEMENT_DONE + 700)}
       >
         Scroll to explore

@@ -31,12 +31,8 @@ export const HOME_MEDIA = {
     poster: null as string | null,
   },
   shipping: {
-    src: "/images/journey/vehicle-shipping.jpg",
+    src: "/images/home/why-sourcing.jpg",
     alt: "A container ship carrying vehicles across open water",
   },
-  road: { src: "/images/journey/vehicle-road.jpg", alt: "A car transporter carrying vehicles by road" },
-  inspection: {
-    src: "/images/journey/vehicle-secured.jpg",
-    alt: "Two people reviewing a vehicle's paperwork beside it in a showroom",
-  },
+  road: { src: "/images/home/final-cta.jpg", alt: "A car transporter carrying vehicles by road" },
 } as const
