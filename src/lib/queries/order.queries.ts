@@ -182,6 +182,8 @@ export interface OrderDetail {
   otherCharges: number | null
   notes: string | null
   estimatedDeliveryDate: Date | null
+  /** The end of the expected delivery window, or null for a single day. */
+  estimatedDeliveryLatest: Date | null
   items: OrderDetailItem[]
   finance: OrderFinanceSummary
   /** Every payment ever recorded, newest first — reversed ones included. */
@@ -276,6 +278,7 @@ export async function getOrderById(id: string): Promise<OrderDetail | null> {
     otherCharges: order.otherCharges?.toNumber() ?? null,
     notes: order.notes,
     estimatedDeliveryDate: order.estimatedDeliveryDate,
+    estimatedDeliveryLatest: order.estimatedDeliveryLatest,
     items: order.items.map((item) => ({
       id: item.id,
       description: item.description,

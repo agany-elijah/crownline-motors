@@ -2,6 +2,7 @@ import type React from "react"
 import Link from "next/link"
 
 import { BrandMark } from "@/components/layout/brand-mark"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import { cn } from "@/lib/utils"
 
 interface AdminAuthShellProps {
@@ -26,12 +27,14 @@ interface AdminAuthShellProps {
  * re-pointing --gold-ink at the fill gold on dark surfaces, so the wordmark
  * and any outline buttons resolve correctly without per-placement classes.
  */
-export function AdminAuthShell({
+export async function AdminAuthShell({
   title,
   children,
   footer,
   className,
 }: AdminAuthShellProps) {
+  const { businessName } = await getPublicSiteSettings()
+
   return (
     <main
       data-tone="dark"
@@ -53,8 +56,8 @@ export function AdminAuthShell({
             href="/"
             className="rounded-sm transition-opacity duration-fast hover:opacity-80"
           >
-            <BrandMark size="lg" />
-            <span className="sr-only">Return to the Crownline Motors website</span>
+            <BrandMark size="lg" tone="dark" />
+            <span className="sr-only">Return to the {businessName} website</span>
           </Link>
           <p className="font-heading text-[0.6875rem] font-semibold tracking-[0.34em] text-gold-ink uppercase">
             Staff Access

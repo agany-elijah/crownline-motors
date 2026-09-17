@@ -9,6 +9,7 @@ import {
 import { getClientIp } from "@/lib/auth/client-ip"
 import { getQuoteForPdf } from "@/lib/queries/quote.queries"
 import { buildQuotePdfData, buildQuotationFilename } from "@/lib/pdf/quote-pdf-data"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import { renderQuotePdfBuffer } from "@/lib/pdf/render-quote-pdf"
 
 /**
@@ -75,7 +76,7 @@ export async function GET(
   let buffer: Buffer
 
   try {
-    buffer = await renderQuotePdfBuffer(buildQuotePdfData(quote))
+    buffer = await renderQuotePdfBuffer(buildQuotePdfData(quote, (await getPublicSiteSettings()).businessName))
   } catch (error) {
     console.error("[quotation-pdf] failed to render PDF", error)
     return new NextResponse("Could not generate this document. Please try again shortly.", {

@@ -590,6 +590,27 @@
   }
 }
 
+/* ── Inverse surfaces in the dark theme ─────────────────────────
+   The dashboard rail, its drawer and the sign-in screen paint themselves
+   with `bg-foreground text-background` and mark themselves
+   `data-tone="dark"`. In the light theme that is the deep black end of the
+   palette. Under `.dark` the two tokens swap, so the same classes would
+   paint the rail near-white — a dark mode whose navigation is the one light
+   thing on the screen.
+
+   Re-pointing the two tokens on the surface itself keeps it the deep black
+   it is designed to be. Custom properties declared on an element resolve for
+   that element's own `bg-foreground`, so no class at any call site changes.
+   Slightly deeper than the dark page background, so the rail still reads as
+   a distinct surface rather than merging into the content beside it.
+
+   Unlayered, after the `.dark` block, for the same reason as the button
+   rules below: it must win over the theme tokens on specificity alone. */
+.dark [data-tone="dark"] {
+  --foreground: oklch(0.075 0.003 90);
+  --background: oklch(0.98 0.004 90);
+}
+
 /* ── Neutral buttons on a dark surface ──────────────────────────
    Descendant rules keyed off the data attributes Button already emits,
    rather than extra variants threaded through every call site. The
@@ -810,5 +831,32 @@
     [data-mobile-action-bar] {
       padding-right: 5.25rem;
     }
+  }
+}
+
+/* Settings search: the setting a result lands on glows gold once, briefly,
+   so the eye finds it after the scroll. */
+@keyframes settings-search-hit {
+  0%,
+  35% {
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--gold) 55%, transparent);
+    background-color: color-mix(in oklch, var(--gold) 8%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+    background-color: transparent;
+  }
+}
+
+[data-search-hit] {
+  border-radius: 0.625rem;
+  animation: settings-search-hit 1.8s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-search-hit] {
+    animation-duration: 1ms;
+    outline: 2px solid var(--gold);
+    outline-offset: 4px;
   }
 }

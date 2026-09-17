@@ -81,6 +81,14 @@ interface SparePartCardProps {
    * photographs nobody has scrolled to yet.
    */
   priority?: boolean
+  /**
+   * Units in hand, or undefined when the count is not published. Supplied by
+   * the page only while Settings → Catalogue display → "Show stock quantity"
+   * is on (see public-spare-part-stock.queries.ts) — the card DTO itself never
+   * carries it, so no card can show a count the dealership has not chosen to
+   * publish.
+   */
+  stockQuantity?: number
 }
 
 const CARD_IMAGE_SIZES =
@@ -90,10 +98,16 @@ export function SparePartCard({
   part,
   sizes = CARD_IMAGE_SIZES,
   priority = false,
+  stockQuantity,
 }: SparePartCardProps) {
   const [previewOpen, setPreviewOpen] = React.useState(false)
-
-  const [leadFitment] = part.preview.fitment
+  // Settings → Catalogue display, and the part's own hidden facts: both
+  // arrive as null or empty from the query layer, so every row arrive as null or empty from the query layer, so every row
+  // below renders only what the customer may see.
+  const leadFitment = part.preview.fitment[0]
+  const oemPartNumber = part.preview.oemPartNumber
+  const labels = [part.brand, part.categoryName].filter(Boolean)
+  const stockCount = stockQuantity !== undefined && stockQuantity > 0 ? stockQuantity : null
 
   return (
     <>
@@ -153,11 +167,13 @@ export function SparePartCard({
           {/* Top left, out of the way of the eye's path to the name below.
               It does not scale with the photograph on hover — a tag that
               drifts is a tag that draws attention to itself. */}
-          <SparePartAvailabilityTag
-            availability={part.availability}
-            size="overlay"
-            className="absolute top-2 left-2"
-          />
+          {part.availability ? (
+            <SparePartAvailabilityTag
+              availability={part.availability}
+              size="overlay"
+              className="absolute top-2 left-2"
+            />
+          ) : null}
         </div>
 
         {/* ── The details ────────────────────────────────────────
@@ -192,12 +208,12 @@ export function SparePartCard({
             the card, because it is what the basket stores and what the
             WhatsApp message quotes.
           */}
-          {part.preview.oemPartNumber || leadFitment ? (
+          {oemPartNumber || leadFitment ? (
             <p className="line-clamp-1 text-xs text-muted-foreground">
-              {part.preview.oemPartNumber ? (
-                <span className="font-mono">{part.preview.oemPartNumber}</span>
+              {oemPartNumber ? (
+                <span className="font-mono">{oemPartNumber}</span>
               ) : null}
-              {part.preview.oemPartNumber && leadFitment ? (
+              {oemPartNumber && leadFitment ? (
                 <span aria-hidden="true" className="text-muted-foreground/50">
                   {" · "}
                 </span>
@@ -216,6 +232,17 @@ export function SparePartCard({
                   ) : null}
                 </>
               ) : null}
+            </p>
+          ) : null}
+
+          {/* Brand and category, when Settings turns them on. One quiet line
+              under the facts rather than an eyebrow above the name, which is
+              the position the design note above explains they lost. */}
+          {labels.length > 0 || stockCount !== null ? (
+            <p className="line-clamp-1 text-xs text-muted-foreground">
+              {labels.join(" · ")}
+              {labels.length > 0 && stockCount !== null ? <span aria-hidden="true" className="text-muted-foreground/50">{" · "}</span> : null}
+              {stockCount !== null ? <span className="tabular">{stockCount} in stock</span> : null}
             </p>
           ) : null}
 

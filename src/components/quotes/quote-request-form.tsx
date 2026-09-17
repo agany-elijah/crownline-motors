@@ -19,9 +19,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { useSiteContact } from "@/components/shared/site-contact-provider"
+import { useSiteSettings } from "@/components/shared/site-settings-provider"
 import { WhatsAppGlyph } from "@/components/shared/whatsapp-glyph"
-import { siteConfig } from "@/config/site"
 import {
   submitQuoteRequestAction,
   type QuoteRequestState,
@@ -186,6 +185,10 @@ export function QuoteRequestForm({
     onSubmitted?.(state.quoteNumber)
   }, [state, onSubmitted])
 
+  // Settings → Business information → Default country. Read before any early
+  // return, so the hook order is the same on every render.
+  const { defaultCountry } = useSiteSettings()
+
   // After a rejection, put the cursor in the first field that needs fixing,
   // so a screen-reader user lands on the problem rather than on the button.
   React.useEffect(() => {
@@ -206,7 +209,7 @@ export function QuoteRequestForm({
     )
   }
 
-  const defaults = resolveDefaults(state.values, remembered)
+  const defaults = resolveDefaults(state.values, remembered, defaultCountry)
   const error = (name: string) => state.fieldErrors?.[name]?.[0]
 
   const source = subject.kind === "GENERAL" ? subject.source : SOURCE_BY_KIND[subject.kind]
@@ -396,15 +399,19 @@ interface ContactDefaults {
  */
 function resolveDefaults(
   echoed: Record<string, string> | undefined,
-  remembered: RememberedContact | null
+  remembered: RememberedContact | null,
+  /** Settings → Business information → Default country, when it is one we know. */
+  configuredCountry: string
 ): ContactDefaults {
+  const fallbackCountry = findDialCode(configuredCountry) ? configuredCountry : DEFAULT_DIAL_COUNTRY
+
   if (echoed) {
     return {
       fullName: echoed.fullName ?? "",
-      phoneCountry: echoed.phoneCountry ?? DEFAULT_DIAL_COUNTRY,
+      phoneCountry: echoed.phoneCountry ?? fallbackCountry,
       phone: echoed.phone ?? "",
       whatsappSameAsPhone: echoed.whatsappSameAsPhone === "on",
-      whatsappCountry: echoed.whatsappCountry ?? DEFAULT_DIAL_COUNTRY,
+      whatsappCountry: echoed.whatsappCountry ?? fallbackCountry,
       whatsapp: echoed.whatsapp ?? "",
       email: echoed.email ?? "",
       city: echoed.city ?? "",
@@ -413,10 +420,10 @@ function resolveDefaults(
 
   return {
     fullName: remembered?.fullName ?? "",
-    phoneCountry: remembered?.phoneCountry || DEFAULT_DIAL_COUNTRY,
+    phoneCountry: remembered?.phoneCountry || fallbackCountry,
     phone: remembered?.phone ?? "",
     whatsappSameAsPhone: remembered?.whatsappSameAsPhone ?? true,
-    whatsappCountry: remembered?.whatsappCountry || DEFAULT_DIAL_COUNTRY,
+    whatsappCountry: remembered?.whatsappCountry || fallbackCountry,
     whatsapp: remembered?.whatsapp ?? "",
     email: remembered?.email ?? "",
     city: remembered?.city ?? "",
@@ -1028,7 +1035,7 @@ function QuoteRequestConfirmation({
   onDone?: () => void
   className?: string
 }) {
-  const { whatsappNumber } = useSiteContact()
+  const { whatsappNumber, businessName } = useSiteSettings()
   const [copied, setCopied] = React.useState(false)
   const headingRef = React.useRef<HTMLHeadingElement>(null)
 
@@ -1047,7 +1054,7 @@ function QuoteRequestConfirmation({
   const followUpUrl = quoteNumber
     ? buildWhatsAppUrl({
         phoneNumber: whatsappNumber,
-        message: buildQuoteFollowUpWhatsAppMessage({ siteName: siteConfig.name, quoteNumber }),
+        message: buildQuoteFollowUpWhatsAppMessage({ siteName: businessName, quoteNumber }),
       })
     : null
 

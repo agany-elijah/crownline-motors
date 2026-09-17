@@ -55,6 +55,16 @@ vi.mock("@/lib/prisma", () => ({
   },
 }))
 
+/**
+ * Settings are read through a cached, tagged query that needs the Next.js
+ * runtime. The visibility switches are exercised in their own tests; here the
+ * defaults stand in, so these assertions stay about status and scope.
+ */
+vi.mock("@/lib/queries/settings.queries", async () => {
+  const { DEFAULT_CATALOG_DISPLAY } = await import("@/lib/settings/catalog-display")
+  return { getPublicSiteSettings: async () => ({ catalogDisplay: DEFAULT_CATALOG_DISPLAY }) }
+})
+
 vi.mock("@/lib/storage/spare-part-media", () => ({
   sparePartPhotoPublicUrl: (storagePath: string) =>
     `https://example.test/${storagePath}`,
@@ -119,7 +129,11 @@ describe("sparePartSearchWhere", () => {
       {
         OR: [
           { name: { contains: "33471", mode: "insensitive" } },
-          { oemPartNumber: { contains: "33471", mode: "insensitive" } },
+          {
+            oemPartNumber: { contains: "33471", mode: "insensitive" },
+            // A part that hides its number cannot be found by it.
+            NOT: { hiddenFields: { has: "partNumber" } },
+          },
           { referenceNumber: { contains: "33471", mode: "insensitive" } },
         ],
       },
@@ -199,20 +213,22 @@ describe("listPublishedSpareParts", () => {
 describe("listRelatedSpareParts", () => {
   it("pins the status, so a related strip cannot leak a draft", async () => {
     await listRelatedSpareParts({
-      categorySlug: "brakes",
       excludeSlug: "front-brake-pads-clm-sp-2026-000001",
     })
 
     expect(queries).toHaveLength(1)
     expect(queries[0].where).toMatchObject({
-      category: { slug: "brakes" },
+      // The category is found through the open part, which must itself be
+      // published — a draft's slug cannot be used to list its category.
+      category: {
+        parts: { some: { slug: "front-brake-pads-clm-sp-2026-000001", status: SparePartStatus.PUBLISHED } },
+      },
       status: SparePartStatus.PUBLISHED,
     })
   })
 
   it("excludes the part whose page it is rendered on", async () => {
     await listRelatedSpareParts({
-      categorySlug: "brakes",
       excludeSlug: "the-open-listing",
     })
 
@@ -227,7 +243,6 @@ describe("listRelatedSpareParts", () => {
     // `take: -1` is legal Prisma and means "walk backwards", which would
     // silently return the wrong end of the list rather than an error.
     await listRelatedSpareParts({
-      categorySlug: "brakes",
       excludeSlug: "x",
       limit: -5,
     })

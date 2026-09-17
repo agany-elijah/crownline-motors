@@ -1,4 +1,4 @@
-// Single source of truth: site name, WhatsApp number, contact info
+// Static site configuration and the fallbacks behind BusinessSettings
 import { mainNavLinks, type NavLink } from "@/lib/constants/nav-links"
 
 /**
@@ -38,22 +38,10 @@ export const siteConfig = {
   whatsappNumber: readWhatsAppNumber(),
   nav: mainNavLinks,
 
-  // TODO(client): placeholder contact details — replace with Crownline
-  // Motors' real information before launch (brief §14, Contact page).
-  contact: {
-    phone: "+211 900 000 000",
-    email: "info@crownlinemotors.com",
-    address: "Juba, South Sudan",
-    hours: "Mon – Sat: 8:00 AM – 6:00 PM",
-  },
-
-  // TODO(client): placeholder social profiles — replace or remove entries
-  // that don't apply once real accounts exist.
-  social: {
-    facebook: "https://facebook.com/crownlinemotors",
-    instagram: "https://instagram.com/crownlinemotors",
-    linkedin: "https://www.linkedin.com/company/crownlinemotors",
-  },
+  // Contact details, business hours and social links are not here: they are
+  // edited in Settings → Business information and read through
+  // getPublicSiteSettings(). The name, tagline and description below are the
+  // fallbacks used only when the settings row cannot be read.
 } as const
 
 export type { NavLink }

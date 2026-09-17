@@ -10,6 +10,7 @@ import { CatalogueMasthead } from "@/components/vehicles/catalogue-masthead"
 import { VehicleSearch } from "@/components/vehicles/vehicle-search"
 import { VehicleGrid } from "@/components/vehicles/vehicle-grid"
 import { siteConfig } from "@/config/site"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import {
   listPublishedVehicles,
   listVehicleFacets,
@@ -92,7 +93,7 @@ export async function generateMetadata({
     description: DESCRIPTION,
     alternates: { canonical: "/cars" },
     openGraph: {
-      title: `${title} | ${siteConfig.name}`,
+      title: `${title} | ${(await getPublicSiteSettings()).siteTitle}`,
       description: DESCRIPTION,
       url: `${siteConfig.url}/cars`,
       type: "website",

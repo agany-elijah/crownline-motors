@@ -7,9 +7,18 @@ import type { VehicleCondition } from "@/generated/prisma/enums"
 import { VehicleStatus } from "@/generated/prisma/enums"
 import { VEHICLE_YEAR_MIN, vehicleYearMax } from "@/lib/constants/vehicle-options"
 import { prisma } from "@/lib/prisma"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import { escapeLikePattern } from "@/lib/utils/like-pattern"
 import { vehiclePhotoPublicUrl } from "@/lib/storage/vehicle-media"
 import type { VehicleSearchCriteria } from "@/lib/validations/vehicle-search.schema"
+import {
+  DEFAULT_VEHICLE_VISIBILITY,
+  VEHICLE_INFO_FIELDS,
+  resolveVisibility,
+  shown,
+  type VehicleInfoField,
+  type Visibility,
+} from "@/lib/visibility/product-visibility"
 
 /**
  * Reads for the public vehicle marketplace.
@@ -34,6 +43,15 @@ import type { VehicleSearchCriteria } from "@/lib/validations/vehicle-search.sch
  * administrative — partly because they are nobody's business, and partly
  * because a component that cannot read a status cannot accidentally render
  * one.
+ *
+ * ── Facts an operator has hidden ──────────────────────────────────────
+ * Settings → Catalogue display hides a fact for every listing, and a
+ * listing's own `hiddenFields` hides it for that one (see
+ * `@/lib/visibility/product-visibility`). Both are applied *here*, while the
+ * DTO is built: a hidden value is null in the payload, so no component, page
+ * or metadata builder downstream can publish it by forgetting a check. The
+ * search and the filter options honour the same rule, because narrowing a
+ * result set by a fact reveals it just as surely as printing it.
  *
  * Decimals are converted to numbers here for the same reason they are in the
  * admin module: Prisma's Decimal is not serialisable across the
@@ -77,19 +95,28 @@ export function publicVehicleWhere(
   return { ...filters, status: PUBLIC_VEHICLE_STATUS }
 }
 
-/** A vehicle as the marketplace card shows it (brief §4). */
+/**
+ * A vehicle as the marketplace card shows it (brief §4).
+ *
+ * Every nullable fact is null when it is hidden — see the module note.
+ */
 export interface PublicVehicleCard {
   slug: string
   referenceNumber: string
   make: string
   model: string
-  year: number
-  price: number
-  mileageKm: number
-  fuelType: string
-  transmission: string
-  engineSize: string
-  countryOfOrigin: string
+  year: number | null
+  /** Null reads as "Price on request". */
+  price: number | null
+  mileageKm: number | null
+  fuelType: string | null
+  transmission: string | null
+  engineSize: string | null
+  countryOfOrigin: string | null
+  /** Where the vehicle is now. */
+  currentLocation: string | null
+  /** Whether the "Available" tag may be shown. */
+  showAvailability: boolean
   /** The main image, or null while a listing is published without one. */
   photoUrl: string | null
   photoAltText: string | null
@@ -134,6 +161,8 @@ const CARD_SELECT = {
   transmission: true,
   engineSize: true,
   countryOfOrigin: true,
+  currentLocation: true,
+  hiddenFields: true,
   photos: CARD_PHOTO,
 } as const
 
@@ -238,7 +267,9 @@ export function vehicleSearchTerms(
  * which is the "Toyota → Harrier → 2021" journey from the brief.
  */
 export function vehicleSearchWhere(
-  criteria: VehicleSearchCriteria
+  criteria: VehicleSearchCriteria,
+  /** Settings → Catalogue display. A year hidden site-wide is never searched. */
+  siteWide: Visibility<VehicleInfoField> = DEFAULT_VEHICLE_VISIBILITY
 ): PublicVehicleFilters {
   const where: PublicVehicleFilters = {}
 
@@ -249,7 +280,9 @@ export function vehicleSearchWhere(
       OR: [
         { make: { contains: pattern, mode: "insensitive" } },
         { model: { contains: pattern, mode: "insensitive" } },
-        ...(year === null ? [] : [{ year }]),
+        // A listing whose year is hidden must not be findable by it — the
+        // match would tell the customer the year.
+        ...(year === null || !siteWide.year ? [] : [{ year, ...YEAR_SHOWN }]),
       ],
     }))
   }
@@ -262,11 +295,22 @@ export function vehicleSearchWhere(
     where.model = { equals: criteria.model, mode: "insensitive" }
   }
 
-  if (criteria.year) {
+  // Ignored outright while the year is hidden site-wide: the filter is not
+  // offered, and a hand-edited URL must not become a way to probe for it.
+  if (criteria.year && siteWide.year) {
     where.year = criteria.year
+    where.NOT = YEAR_SHOWN.NOT
   }
 
   return where
+}
+
+/** Listings that have not hidden their own year. */
+const YEAR_SHOWN = { NOT: { hiddenFields: { has: "year" } } } satisfies PublicVehicleFilters
+
+/** Settings → Catalogue display → Vehicles. Cached with the rest of the settings. */
+async function siteWideVisibility(): Promise<Visibility<VehicleInfoField>> {
+  return (await getPublicSiteSettings()).catalogDisplay.vehicle
 }
 
 /** A page of live listings, in `CARD_ORDER_BY` order. */
@@ -281,6 +325,7 @@ export async function listPublishedVehicles(options?: {
   criteria?: VehicleSearchCriteria
 }): Promise<PublicVehicleListResult> {
   const page = Math.max(1, options?.page ?? 1)
+  const siteWide = await siteWideVisibility()
 
   /**
    * Composed through `AND` rather than by spreading both objects into one.
@@ -295,7 +340,7 @@ export async function listPublishedVehicles(options?: {
   const where = publicVehicleWhere({
     AND: [
       options?.filters ?? {},
-      options?.criteria ? vehicleSearchWhere(options.criteria) : {},
+      options?.criteria ? vehicleSearchWhere(options.criteria, siteWide) : {},
     ],
   })
 
@@ -344,7 +389,7 @@ export async function listPublishedVehicles(options?: {
     })
 
     return {
-      vehicles: lastPage.map(toCard),
+      vehicles: lastPage.map((row) => toCard(row, siteWide)),
       total,
       page: pageCount,
       pageCount,
@@ -352,7 +397,7 @@ export async function listPublishedVehicles(options?: {
   }
 
   return {
-    vehicles: rows.map(toCard),
+    vehicles: rows.map((row) => toCard(row, siteWide)),
     total,
     page,
     pageCount,
@@ -403,14 +448,17 @@ export async function listRelatedVehicles({
   excludeSlug: string
   limit?: number
 }): Promise<PublicVehicleCard[]> {
-  const rows = await prisma.vehicle.findMany({
-    where: publicVehicleWhere({ make, slug: { not: excludeSlug } }),
-    orderBy: CARD_ORDER_BY,
-    take: Math.max(0, limit),
-    select: CARD_SELECT,
-  })
+  const [rows, siteWide] = await Promise.all([
+    prisma.vehicle.findMany({
+      where: publicVehicleWhere({ make, slug: { not: excludeSlug } }),
+      orderBy: CARD_ORDER_BY,
+      take: Math.max(0, limit),
+      select: CARD_SELECT,
+    }),
+    siteWideVisibility(),
+  ])
 
-  return rows.map(toCard)
+  return rows.map((row) => toCard(row, siteWide))
 }
 
 /** A live listing by its public slug, or null. */
@@ -425,7 +473,7 @@ export const getPublishedVehicleBySlug = cache(
      * lookup means there is nothing to remember: an unpublished slug is
      * indistinguishable from one that does not exist.
      */
-    const vehicle = await prisma.vehicle.findFirst({
+    const [vehicle, siteWide] = await Promise.all([prisma.vehicle.findFirst({
       where: publicVehicleWhere({ slug }),
       select: {
         slug: true,
@@ -445,6 +493,7 @@ export const getPublishedVehicleBySlug = cache(
         currentLocation: true,
         condition: true,
         features: true,
+        hiddenFields: true,
         /**
          * `shippingEstimate`, `clearingEstimate` and `otherChargesEst` are
          * deliberately NOT selected. The vehicle page no longer publishes
@@ -476,13 +525,32 @@ export const getPublishedVehicleBySlug = cache(
           },
         },
       },
-    })
+    }), siteWideVisibility()])
 
     if (!vehicle) return null
 
+    const visible = resolveVisibility(VEHICLE_INFO_FIELDS, siteWide, vehicle.hiddenFields)
+
     return {
-      ...vehicle,
-      price: vehicle.price.toNumber(),
+      slug: vehicle.slug,
+      referenceNumber: vehicle.referenceNumber,
+      make: vehicle.make,
+      model: vehicle.model,
+      year: shown(visible.year, vehicle.year),
+      price: shown(visible.price, vehicle.price.toNumber()),
+      mileageKm: shown(visible.mileage, vehicle.mileageKm),
+      fuelType: shown(visible.fuelType, vehicle.fuelType),
+      transmission: shown(visible.transmission, vehicle.transmission),
+      engineSize: shown(visible.engine, vehicle.engineSize),
+      driveType: shown(visible.driveType, vehicle.driveType),
+      exteriorColor: shown(visible.exteriorColor, vehicle.exteriorColor),
+      interiorColor: shown(visible.interiorColor, vehicle.interiorColor),
+      countryOfOrigin: shown(visible.countryOfOrigin, vehicle.countryOfOrigin),
+      currentLocation: shown(visible.location, vehicle.currentLocation),
+      condition: shown(visible.condition, vehicle.condition),
+      showAvailability: visible.availability,
+      features: visible.features ? vehicle.features : [],
+      description: shown(visible.description, vehicle.description),
       photos: vehicle.photos.map((photo) => ({
         ...photo,
         url: vehiclePhotoPublicUrl(photo.storagePath),
@@ -491,26 +559,29 @@ export const getPublishedVehicleBySlug = cache(
   }
 )
 
+/** One listing. Every nullable fact is null when it is hidden — see the module note. */
 export interface PublicVehicleDetail {
   slug: string
   referenceNumber: string
   make: string
   model: string
-  year: number
-  price: number
-  mileageKm: number
-  fuelType: string
-  transmission: string
-  engineSize: string
-  driveType: string
-  exteriorColor: string
-  interiorColor: string
-  countryOfOrigin: string
-  currentLocation: string
-  condition: VehicleCondition
-  /** The equipment list, in the order the operator entered it. */
+  year: number | null
+  /** Null reads as "Price on request". */
+  price: number | null
+  mileageKm: number | null
+  fuelType: string | null
+  transmission: string | null
+  engineSize: string | null
+  driveType: string | null
+  exteriorColor: string | null
+  interiorColor: string | null
+  countryOfOrigin: string | null
+  currentLocation: string | null
+  condition: VehicleCondition | null
+  showAvailability: boolean
+  /** The equipment list, in the order the operator entered it. Empty when hidden. */
   features: string[]
-  description: string
+  description: string | null
   photos: {
     id: string
     url: string
@@ -534,24 +605,29 @@ interface CardRow {
   transmission: string
   engineSize: string
   countryOfOrigin: string
+  currentLocation: string
+  hiddenFields: string[]
   photos: { storagePath: string; altText: string | null }[]
 }
 
-function toCard(row: CardRow): PublicVehicleCard {
+function toCard(row: CardRow, siteWide: Visibility<VehicleInfoField>): PublicVehicleCard {
   const photo = row.photos[0] ?? null
+  const visible = resolveVisibility(VEHICLE_INFO_FIELDS, siteWide, row.hiddenFields)
 
   return {
     slug: row.slug,
     referenceNumber: row.referenceNumber,
     make: row.make,
     model: row.model,
-    year: row.year,
-    price: row.price.toNumber(),
-    mileageKm: row.mileageKm,
-    fuelType: row.fuelType,
-    transmission: row.transmission,
-    engineSize: row.engineSize,
-    countryOfOrigin: row.countryOfOrigin,
+    year: shown(visible.year, row.year),
+    price: shown(visible.price, row.price.toNumber()),
+    mileageKm: shown(visible.mileage, row.mileageKm),
+    fuelType: shown(visible.fuelType, row.fuelType),
+    transmission: shown(visible.transmission, row.transmission),
+    engineSize: shown(visible.engine, row.engineSize),
+    countryOfOrigin: shown(visible.countryOfOrigin, row.countryOfOrigin),
+    currentLocation: shown(visible.location, row.currentLocation),
+    showAvailability: visible.availability,
     photoUrl: photo ? vehiclePhotoPublicUrl(photo.storagePath) : null,
     photoAltText: photo?.altText ?? null,
   }
@@ -578,7 +654,8 @@ function toCard(row: CardRow): PublicVehicleCard {
 export interface VehicleFacet {
   make: string
   model: string
-  year: number
+  /** Null for listings whose year is hidden: they narrow by make and model only. */
+  year: number | null
 }
 
 /**
@@ -598,20 +675,41 @@ export interface VehicleFacet {
  * fetch models and years on demand per selection, not to denormalise this.
  */
 export const listVehicleFacets = cache(async (): Promise<VehicleFacet[]> => {
-  const rows = await prisma.vehicle.findMany({
-    where: publicVehicleWhere(),
-    // `distinct` collapses the duplicates that three vehicles of the same
-    // make, model and year would otherwise produce.
-    distinct: ["make", "model", "year"],
-    select: { make: true, model: true, year: true },
-    orderBy: [
-      { make: "asc" },
-      { model: "asc" },
-      // Newest year first within a model: someone shopping by year is
-      // almost always working downwards from the most recent.
-      { year: "desc" },
-    ],
-  })
+  const siteWide = await siteWideVisibility()
 
-  return rows
+  const [dated, undated] = await Promise.all([
+    siteWide.year
+      ? prisma.vehicle.findMany({
+          where: publicVehicleWhere(YEAR_SHOWN),
+          // `distinct` collapses the duplicates that three vehicles of the
+          // same make, model and year would otherwise produce.
+          distinct: ["make", "model", "year"],
+          select: { make: true, model: true, year: true },
+        })
+      : Promise.resolve([]),
+    /**
+     * Listings whose year may not be shown still belong under their make and
+     * model — just never under a year, or choosing that year would reveal it.
+     */
+    prisma.vehicle.findMany({
+      where: publicVehicleWhere(siteWide.year ? { hiddenFields: { has: "year" } } : {}),
+      distinct: ["make", "model"],
+      select: { make: true, model: true },
+    }),
+  ])
+
+  const facets: VehicleFacet[] = [
+    ...dated,
+    ...undated.map((row) => ({ make: row.make, model: row.model, year: null })),
+  ]
+
+  // Make and model alphabetically, then the newest year first within a model:
+  // someone shopping by year is almost always working downwards from the most
+  // recent.
+  return facets.sort(
+    (a, b) =>
+      a.make.localeCompare(b.make) ||
+      a.model.localeCompare(b.model) ||
+      (b.year ?? -Infinity) - (a.year ?? -Infinity)
+  )
 })

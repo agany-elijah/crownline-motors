@@ -3529,6 +3529,13 @@ Mirrors a Supabase `auth.users` row by primary key (the Supabase UID), but lives
 | `displayName` | For UI display ("Verified by John"). |
 | `role` | Enum: `SUPER_ADMIN`, `MANAGER`, `STAFF`. RBAC enforcement is application logic; this column just carries the data. |
 | `isActive` | **Admins are deactivated, never deleted.** All FKs to this table use `Restrict` for this reason. |
+| `twoFactorEnabledAt` | Null when 2FA is off. The TOTP factor itself lives in Supabase Auth; this column is set only after a code is verified server-side, and is what the DAL reads to require an `aal2` session. |
+
+### `AdminSession` and `AdminLoginEvent`
+
+`AdminSession` is Crownline's own record of each dashboard session, keyed by the `session_id` claim in the Supabase access token. The DAL (`src/lib/auth/dal.ts`) looks it up on every admin request and refuses a session that has been ended from another device or is older than `BusinessSettings.sessionTimeoutHours` — which is how session timeout and "sign out this device" are enforced, since Supabase alone cannot do either per session. A session never seen before is recorded on its first request rather than refused. Rows are ended (`endedAt` + `endReason`), never deleted; `AdminSession_end_consistency_check` keeps the two together.
+
+`AdminLoginEvent` is sign-in activity *about* an administrator (successful sign-ins, wrong passwords for their address, wrong 2FA codes, sign-outs) shown to them under Settings → Admin users & security. It is deliberately not `AuditLog`: a failed sign-in was not done by the account owner, so it cannot have them as the actor. Attempts against addresses that are not administrators are not recorded.
 
 ### `AuditLog`
 
@@ -3694,6 +3701,7 @@ Created exactly once, at the moment a `Quote` is accepted (`quoteId` is `@unique
 | `type` | `VEHICLE` \| `SPARE_PART`. Set once at creation from the accepted quote and never changed — it decides the milestone structure, the tracking timeline and the customer-facing wording, and an order that changed type mid-flight would be one whose customer agreed to one payment schedule and is held to another. Every `OrderItem` must agree with it; that is an application invariant, not a CHECK, because a constraint cannot see across a parent row to its children. |
 | `customerId` | Denormalized from `quote.customerId` on purpose — lets admin/customer-dashboard queries filter orders by customer directly without joining through `Quote` every time. Set once at creation, never changes. |
 | `shippingCost`, `clearingCost`, `otherCharges`, `totalAmount` | **Locked-in snapshots taken at the moment the quote is accepted.** These are deliberately independent from `Vehicle`'s live estimate fields — if the vehicle listing's shipping estimate changes later (e.g. freight rates move), it must never silently change what a customer already committed to and is paying against. |
+| `estimatedDeliveryDate`, `estimatedDeliveryLatest` | The expected delivery window a customer sees on Track My Order — "between 17 and 30 October". The first is the start (or a single-day estimate), the second the optional end. Set from the order's Tracking section; independent of the tracking events. `Order_delivery_window_check` requires a start for any end, and an end on or after the start. |
 | `status` | Vehicle: `PENDING_DEPOSIT → DEPOSIT_CONFIRMED → PROCESSING → AWAITING_FINAL_PAYMENT → COMPLETED` or `→ CANCELLED`. Parts: `AWAITING_PAYMENT → PROCESSING → COMPLETED` or `→ CANCELLED`. Coarse, list-view-friendly — the authoritative stage-by-stage detail lives in `PaymentMilestone` (what is owed) and `TrackingEvent` (where it is). A parts order opens at `AWAITING_PAYMENT` rather than `PENDING_DEPOSIT` because it is paid in full up front; reusing the vehicle value would tell an operator to chase a deposit that does not exist. **Never set by hand except `CANCELLED`:** every other move is derived by `deriveOrderStatus()` (`src/lib/orders/order-lifecycle.ts`) from the confirmed payments and the shipment's current status, and applied by `syncOrderStatus()` in the same transaction as the payment, tracking update or void that caused it. A vehicle order that completes marks its car `SOLD`; voiding the delivery reopens it and puts the car back to `RESERVED`. |
 
 **There is no `MIXED` order type.** A customer buying a car and a set of filters gets two orders. One order would need a payment schedule neither business rule describes — 50% of a basket whose vehicle half ships in six weeks and whose parts half ships on Thursday is not a rule anybody has written down. Quotations *can* span both, because a quotation commits no money. If mixed baskets ever become a real requirement, `MIXED` is an additive `ALTER TYPE ... ADD VALUE` plus a third milestone strategy — no table changes.
@@ -3763,6 +3771,18 @@ model BusinessSettings {
 
 Admin-configurable defaults for the deposit structure and the central WhatsApp number (so it's never hard-coded into individual pages/components). Percentages are **defaults only** — the source of truth for what a given order actually owes is `PaymentMilestone`, not this table.
 
+The row is also the single source of truth for everything under **Settings** in the dashboard (migration `20260916090000_settings_centre`, all additive): business identity and contact details, business hours and social links, site title, logos and favicon (storage paths in the public-read `branding-assets` bucket), the default dashboard theme, the tracking-number prefix and tracking-stage configuration, catalogue display switches, notification switches, SEO defaults and the security controls (`requireTwoFactor`, `allowPasswordRecovery`, `sessionTimeoutHours`). Json columns (`businessHours`, `trackingStages`, `catalogDisplay`, `sparePartDeliverySteps`) are validated with Zod on every read as well as on write.
+
+The `quoteValidityDays`, `quotePaymentInstructions` and `quoteTerms` columns remain but are no longer read or edited anywhere — the dealership removed quotation defaults from Settings; each quotation's own fields are the only source.
+
+**What customers can see of a listing** is decided by two switches that must both be on: `catalogDisplay.vehicle` / `catalogDisplay.sparePart` (site-wide, Settings → Catalogue display) and the listing's own `Vehicle.hiddenFields` / `SparePart.hiddenFields` (`TEXT[]`, migration `20260917090000_product_hidden_fields`, edited under "Customer visibility" on the listing form). The field keys live in `src/lib/visibility/product-visibility.ts`. The rule is enforced where the public DTOs are built (`public-vehicle.queries.ts`, `public-spare-part.queries.ts`, `public-spare-part-stock.queries.ts`): a hidden fact is null in the payload, and search, filters and facets do not match on it — so cards, listing pages, metadata, structured data and WhatsApp messages cannot publish it. A hidden price is represented exactly like a quoted one (`price: null`). Rows saved before this used `vehicleCard` / `sparePartCard`; `resolveCatalogDisplay` reads those when the new groups are absent.
+
+Reads go through `src/lib/queries/settings.queries.ts`: `getPublicSiteSettings()` for public surfaces and `getOperationalSettings()` for server-side switches, both cached under the `business-settings` tag that every settings action expires with `updateTag`. Never hard-code the business name, contact details or WhatsApp number in a component.
+
+**Tracking stages keep the payment rules intact.** Stages that carry a rule — `PURCHASED`, `ARRIVED_AT_MOMBASA`, `READY_FOR_COLLECTION`, `DELIVERED`; for parts `ORDER_CONFIRMED`, `PACKED`, `DELIVERED` — are fixed and always enabled; the stages between them can be renamed, hidden and reordered but never moved past a fixed one. Every journey rule compares a stage's position with a fixed stage's, so no accepted configuration can change a payment trigger or the paid-in-full requirement (`src/lib/settings/tracking-stages.ts`, proven in `tests/unit/tracking-stages.test.ts`).
+
+**Currency is not configurable.** No amount in the schema records its currency; switching the display currency would relabel every stored price, quote, order and payment without converting it. It waits for real multi-currency support (Phase 3).
+
 ⚠️ **The three percentages summing to 100 is validated in the Zod schema for the settings admin form, not enforced by a DB `CHECK` constraint** — Prisma's schema DSL doesn't express arbitrary cross-column checks.
 
 ### `PaymentMilestone`
@@ -3828,7 +3848,7 @@ model Shipment {
 }
 ```
 
-**A `Shipment` is not created at the same time as its `Order`.** Per the business requirement, tracking only activates once an order reaches the appropriate stage — an order can legitimately sit in `PENDING_DEPOSIT` with zero shipments. The relation is optional specifically so tracking can wait for the order: `trackingActivationProblem()` allows activation once a vehicle order's initial payment is settled, or a parts order is paid in full, and never on a cancelled or completed order — checked, together with "no shipment yet", under the order lock. The public page answers an order-number lookup with one neutral "no tracking to show yet" message whether the order is missing or simply not activated, because order numbers are sequential and distinguishing the two would reveal which orders exist.
+**A `Shipment` is not created at the same time as its `Order`.** Per the business requirement, tracking only activates once an order reaches the appropriate stage — an order can legitimately sit in `PENDING_DEPOSIT` with zero shipments. The relation is optional specifically so tracking can wait for the order: `trackingActivationProblem()` allows activation once a vehicle order's initial payment is settled, or a parts order is paid in full, and never on a cancelled or completed order — checked, together with "no shipment yet", under the order lock. Activation is automatic: `recordPaymentAction` calls `activateTrackingInTransaction()` (`src/lib/tracking/activate-tracking.ts`) in the same transaction as the payment that makes the order eligible, and the payment receipt email carries the new tracking number. `createShipmentAction` remains for activating by hand and uses the same helper. The public page answers an order-number lookup with one neutral "no tracking to show yet" message whether the order is missing or simply not activated, because order numbers are sequential and distinguishing the two would reveal which orders exist.
 
 `Order.shipments` is modeled as one-to-many even though Wave A only ever creates exactly one per order — this is intentional future-proofing for Wave B, where an order containing both a vehicle and spare parts might need separate shipments per product line. The Wave A server action simply always creates one.
 
@@ -3951,7 +3971,7 @@ Connection strings live in two separate places, using two separate Supabase conn
 
 ### What *is* enforced at the schema level
 
-Nine CHECK constraints live only in `20260904090000_add_spare_parts_domain/migration.sql`, because Prisma's schema DSL cannot express a cross-column check. This is safe — the migrate engine does not model CHECK constraints and therefore never proposes to drop one (verified: `prisma migrate diff --from-config-datasource` reports no drift with them in place) — but it means they are invisible to the Prisma schema.
+CHECK constraints live only in the migration SQL (`20260904090000_add_spare_parts_domain`, `20260916090000_settings_centre` and the quote migrations), because Prisma's schema DSL cannot express a cross-column check. This is safe — the migrate engine does not model CHECK constraints and therefore never proposes to drop one (verified: `prisma migrate diff --from-config-datasource` reports no drift with them in place) — but it means they are invisible to the Prisma schema.
 
 `npm run db:check` (`scripts/check-schema-constraints.ts`) exists for exactly that reason: it verifies every one of them, plus the `Restrict`/`Cascade`/`SetNull` behaviours, against a real database. It creates its own fixtures and ends in `ROLLBACK`, so it is safe to run anywhere including production. Run it after restoring a backup or provisioning a new environment.
 
@@ -3966,6 +3986,11 @@ Nine CHECK constraints live only in `20260904090000_add_spare_parts_domain/migra
 | `QuoteItem_at_most_one_product_check` | `num_nonnulls(vehicleId, sparePartId) <= 1` |
 | `QuoteItem_quantity_positive_check` | `quantity > 0` |
 | `QuoteItem_price_non_negative_check` | `quotedUnitPrice` is null or `>= 0` |
+| `BusinessSettings_tracking_prefix_check` | 2–6 capital letters, and never `CLMO`, `CLMV`, `CLMQ` or `CLMSP` — those would collide with order, listing and quote references once hyphens are dropped |
+| `BusinessSettings_session_timeout_check` | `sessionTimeoutHours` between 1 and 720 |
+| `BusinessSettings_default_country_check` | `defaultCountry` is a two-letter code |
+| `Order_delivery_window_check` | `estimatedDeliveryLatest` is null, or `estimatedDeliveryDate` is set and not after it |
+| `AdminSession_end_consistency_check` | `endedAt` and `endReason` are both null or both set |
 
 <!-- BEGIN:nextjs-agent-rules -->
 

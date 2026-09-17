@@ -1,5 +1,4 @@
 import { QuoteType } from "@/generated/prisma/enums"
-import { siteConfig } from "@/config/site"
 import { computeQuoteTotals, type PricedQuoteLine, type QuoteFees } from "@/lib/quotes/quote-pricing"
 
 /**
@@ -91,7 +90,8 @@ export function buildQuotationFilename(quoteNumber: string, customerName: string
   return `Quotation-${quoteNumber}-${safeName || "Customer"}.pdf`
 }
 
-export function buildQuotePdfData(source: QuotePdfSource): QuotePdfData {
+/** `siteName` is Settings → Business information → Business name, printed on the document. */
+export function buildQuotePdfData(source: QuotePdfSource, siteName: string): QuotePdfData {
   const priced: PricedQuoteLine[] = source.items.map((item) => ({
     kind: item.kind,
     quantity: item.quantity,
@@ -106,7 +106,7 @@ export function buildQuotePdfData(source: QuotePdfSource): QuotePdfData {
   const totals = computeQuoteTotals(priced, fees)
 
   return {
-    siteName: siteConfig.name,
+    siteName,
     quoteNumber: source.quoteNumber,
     issuedAt: source.createdAt,
     validUntil: source.validUntil,

@@ -18,6 +18,8 @@ import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
  */
 
 export const ADMIN_LOGIN_PATH = `${ADMIN_BASE_PATH}/login`
+/** Where a password-authenticated session gives its authenticator code. Under /login, so the proxy treats it as a sign-in screen. */
+export const ADMIN_TWO_FACTOR_CHALLENGE_PATH = `${ADMIN_BASE_PATH}/login/two-factor`
 export const ADMIN_FORBIDDEN_PATH = `${ADMIN_BASE_PATH}/forbidden`
 export const ADMIN_HOME_PATH = ADMIN_BASE_PATH
 

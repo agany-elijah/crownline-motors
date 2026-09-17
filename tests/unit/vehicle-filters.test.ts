@@ -228,6 +228,8 @@ describe("vehicleSearchWhere", () => {
       make: { equals: "Toyota", mode: "insensitive" },
       model: { equals: "Harrier", mode: "insensitive" },
       year: 2021,
+      // A listing that hides its year must not be findable by it.
+      NOT: { hiddenFields: { has: "year" } },
     })
     expect(where).not.toHaveProperty("OR")
   })
@@ -265,7 +267,7 @@ describe("vehicleSearchWhere", () => {
         OR: [
           { make: { contains: "2021", mode: "insensitive" } },
           { model: { contains: "2021", mode: "insensitive" } },
-          { year: 2021 },
+          { year: 2021, NOT: { hiddenFields: { has: "year" } } },
         ],
       },
     ])

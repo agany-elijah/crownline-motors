@@ -9,6 +9,8 @@ import {
   VehicleStatus,
 } from "@/generated/prisma/enums"
 import { VEHICLE_YEAR_MIN, vehicleYearMax } from "@/lib/constants/vehicle-options"
+import { hiddenFieldsField } from "@/lib/validations/hidden-fields.schema"
+import { VEHICLE_INFO_FIELDS } from "@/lib/visibility/product-visibility"
 
 /**
  * Validation for vehicle creation and editing.
@@ -237,6 +239,9 @@ const vehicleFields = {
   features: featuresField,
 
   isFeatured: checkboxField,
+
+  /** Facts withheld from customers on this listing — see product-visibility.ts. */
+  hiddenFields: hiddenFieldsField(VEHICLE_INFO_FIELDS),
 }
 
 /**

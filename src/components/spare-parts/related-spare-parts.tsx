@@ -28,7 +28,10 @@ interface RelatedSparePartsProps {
   parts: PublicSparePartCard[]
   /** The category these share, named in the eyebrow so the strip explains
    *  itself rather than presenting an unexplained row of products. */
-  categoryName: string
+  /** Null when the category is hidden; the strip then does not name it. */
+  categoryName: string | null
+  /** Units in hand by slug — present only while stock quantities are published. */
+  stock?: Record<string, number>
 }
 
 /**
@@ -47,7 +50,7 @@ const CARD_WIDTH = "w-[46%] shrink-0 snap-start sm:w-[15rem] lg:w-[17rem]"
  *  does not fetch a source built for a desktop column. */
 const CARD_IMAGE_SIZES = "(min-width: 1024px) 17rem, (min-width: 640px) 15rem, 46vw"
 
-export function RelatedSpareParts({ parts, categoryName }: RelatedSparePartsProps) {
+export function RelatedSpareParts({ parts, categoryName, stock }: RelatedSparePartsProps) {
   if (parts.length === 0) return null
 
   return (
@@ -68,12 +71,16 @@ export function RelatedSpareParts({ parts, categoryName }: RelatedSparePartsProp
       <div className="w-full">
         <Reveal>
           <CardCarousel
-            label={`More parts in ${categoryName}`}
+            label={categoryName ? `More parts in ${categoryName}` : "Related parts"}
             heading={
               <SectionHeading
-                eyebrow={`More in ${categoryName}`}
+                eyebrow={categoryName ? `More in ${categoryName}` : "Related parts"}
                 title="You may also like"
-                description="Other parts in the same category, sourced and imported on the same terms."
+                description={
+                  categoryName
+                    ? "Other parts in the same category, sourced and imported on the same terms."
+                    : "Similar parts, sourced and imported on the same terms."
+                }
               />
             }
           >
@@ -85,7 +92,7 @@ export function RelatedSpareParts({ parts, categoryName }: RelatedSparePartsProp
                   fold and eager-loading them would compete with the gallery
                   the customer is actually looking at.
                 */}
-                <SparePartCard part={part} sizes={CARD_IMAGE_SIZES} />
+                <SparePartCard part={part} sizes={CARD_IMAGE_SIZES} stockQuantity={stock?.[part.slug]} />
               </li>
             ))}
           </CardCarousel>

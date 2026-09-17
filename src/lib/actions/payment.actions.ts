@@ -25,6 +25,7 @@ import {
   milestoneToOpenAfterSettlement,
 } from "@/lib/orders/payment-recording"
 import { prisma } from "@/lib/prisma"
+import { activateTrackingInTransaction } from "@/lib/tracking/activate-tracking"
 import { formatCurrency } from "@/lib/utils/format-currency"
 import { recordPaymentSchema, reversePaymentSchema } from "@/lib/validations/payment.schema"
 
@@ -208,6 +209,7 @@ export async function recordPaymentAction(
       orderNumber: true,
       status: true,
       milestones: { where: { id: milestoneId }, select: { label: true } },
+      items: { orderBy: { id: "asc" }, select: { description: true } },
       ...ORDER_CONTACT_SELECT,
     },
   })
@@ -228,6 +230,7 @@ export async function recordPaymentAction(
   const effectiveDate = paymentDate ?? new Date()
   let paymentId: string
   let settled: SettledLedger
+  let tracking: { shipmentId: string; trackingNumber: string } | null = null
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -286,11 +289,41 @@ export async function recordPaymentAction(
         tx
       )
 
-      return { paymentId: payment.id, outcome }
+      /**
+       * Tracking starts with the payment that makes the order eligible — a
+       * vehicle's initial payment settled, a parts order paid in full — so the
+       * receipt below can hand the customer their tracking number. Same
+       * transaction, same lock: the payment and its shipment commit together.
+       * An order that is not yet eligible, or already tracked, is left as it is.
+       */
+      const activation = await activateTrackingInTransaction(tx, {
+        orderId,
+        actorId: auth.admin.id,
+        cause: "PAYMENT_RECORDED",
+      })
+
+      if (activation.activated) {
+        const afterActivation = await syncOrderStatus(tx, {
+          orderId,
+          actorId: auth.admin.id,
+          cause: "SHIPMENT_CREATED",
+        })
+        outcome.orderStatus = afterActivation.next
+        outcome.changedVehicles = [...outcome.changedVehicles, ...afterActivation.changedVehicles]
+      }
+
+      return {
+        paymentId: payment.id,
+        outcome,
+        tracking: activation.activated
+          ? { shipmentId: activation.shipmentId, trackingNumber: activation.trackingNumber }
+          : null,
+      }
     })
 
     paymentId = result.paymentId
     settled = result.outcome
+    tracking = result.tracking
   } catch (error) {
     if (error instanceof OverpaymentError) {
       const message =
@@ -325,6 +358,15 @@ export async function recordPaymentAction(
     totalPaid: settled.finance.amountPaid,
     balance: settled.finance.balance,
     next: next ? { label: next.label, amount: next.balance, dueNow: next.status === MilestoneStatus.DUE } : null,
+    tracking: tracking
+      ? {
+          trackingNumber: tracking.trackingNumber,
+          subject:
+            order.items.length > 1
+              ? `${order.items[0].description} and ${order.items.length - 1} more`
+              : (order.items[0]?.description ?? order.orderNumber),
+        }
+      : null,
   })
 
   const statusChange =
@@ -334,7 +376,9 @@ export async function recordPaymentAction(
 
   return {
     status: "success",
-    message: `Recorded ${formatCurrency(amount)} against ${stageLabel}.${statusChange} ${notificationNotice(emailOutcome)}`,
+    message: `Recorded ${formatCurrency(amount)} against ${stageLabel}.${statusChange}${
+      tracking ? ` Tracking started: ${tracking.trackingNumber} — included in the customer's receipt.` : ""
+    } ${notificationNotice(emailOutcome)}`,
   }
 }
 

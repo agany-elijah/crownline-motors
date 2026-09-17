@@ -20,7 +20,7 @@ import {
   FUEL_TYPE_LABELS,
   TRANSMISSION_LABELS,
 } from "@/lib/constants/vehicle-options"
-import { getWhatsAppNumber } from "@/lib/queries/settings.queries"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import {
   getPublishedVehicleBySlug,
   listRelatedVehicles,
@@ -110,9 +110,17 @@ interface PageProps {
   params: Promise<{ slug: string }>
 }
 
-/** `2021 Toyota Harrier` — the name used in titles, alt text and messages. */
+/**
+ * `2021 Toyota Harrier` — the name used in titles, alt text and messages.
+ * Without the year where the listing does not show it.
+ */
 function vehicleName(vehicle: Pick<PublicVehicleDetail, "year" | "make" | "model">) {
-  return `${vehicle.year} ${vehicle.make} ${vehicle.model}`
+  return vehicle.year === null ? `${vehicle.make} ${vehicle.model}` : `${vehicle.year} ${vehicle.make} ${vehicle.model}`
+}
+
+/** Enum values printed as the customer reads them; null stays null. */
+function label<T extends Record<string, string>>(labels: T, value: string | null): string | null {
+  return value === null ? null : (labels[value as keyof T] ?? value)
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -133,13 +141,23 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
    * A description assembled purely from keywords reads as spam to a person
    * and is treated as such by a search engine.
    */
-  const description = `${name} for sale in South Sudan. ${formatMileage(vehicle.mileageKm)}, ${
-    TRANSMISSION_LABELS[vehicle.transmission as keyof typeof TRANSMISSION_LABELS] ??
-    vehicle.transmission
-  }, ${vehicle.engineSize}. Imported from ${
-    COUNTRY_LABELS[vehicle.countryOfOrigin as keyof typeof COUNTRY_LABELS] ??
-    vehicle.countryOfOrigin
-  } and delivered to Juba. Reference ${vehicle.referenceNumber}.`
+  // Built only from the facts the listing shows: a hidden mileage must not
+  // reappear in a search result snippet.
+  const facts = [
+    vehicle.mileageKm === null ? null : formatMileage(vehicle.mileageKm),
+    label(TRANSMISSION_LABELS, vehicle.transmission),
+    vehicle.engineSize,
+  ].filter((fact) => fact !== null)
+  const country = label(COUNTRY_LABELS, vehicle.countryOfOrigin)
+
+  const description = [
+    `${name} for sale in South Sudan.`,
+    facts.length > 0 ? `${facts.join(", ")}.` : null,
+    country ? `Imported from ${country} and delivered to Juba.` : "Imported and delivered to Juba.",
+    `Reference ${vehicle.referenceNumber}.`,
+  ]
+    .filter((sentence) => sentence !== null)
+    .join(" ")
 
   const cover = vehicle.photos[0]
 
@@ -148,7 +166,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description,
     alternates: { canonical: `/cars/${vehicle.slug}` },
     openGraph: {
-      title: `${name} | ${siteConfig.name}`,
+      title: `${name} | ${(await getPublicSiteSettings()).siteTitle}`,
       description,
       url: `${siteConfig.url}/cars/${vehicle.slug}`,
       type: "website",
@@ -166,16 +184,13 @@ export default async function VehiclePage({ params }: PageProps) {
   const name = `${vehicle.make} ${vehicle.model}`
   const fullName = vehicleName(vehicle)
 
-  const fuel =
-    FUEL_TYPE_LABELS[vehicle.fuelType as keyof typeof FUEL_TYPE_LABELS] ?? vehicle.fuelType
-  const transmission =
-    TRANSMISSION_LABELS[vehicle.transmission as keyof typeof TRANSMISSION_LABELS] ??
-    vehicle.transmission
-  const drive =
-    DRIVE_TYPE_LABELS[vehicle.driveType as keyof typeof DRIVE_TYPE_LABELS] ?? vehicle.driveType
-  const country =
-    COUNTRY_LABELS[vehicle.countryOfOrigin as keyof typeof COUNTRY_LABELS] ??
-    vehicle.countryOfOrigin
+  // Every fact below is null when it is hidden — Settings → Catalogue display,
+  // or this listing's own hidden facts — and is then simply not rendered.
+  const fuel = label(FUEL_TYPE_LABELS, vehicle.fuelType)
+  const transmission = label(TRANSMISSION_LABELS, vehicle.transmission)
+  const drive = label(DRIVE_TYPE_LABELS, vehicle.driveType)
+  const country = label(COUNTRY_LABELS, vehicle.countryOfOrigin)
+  const mileage = vehicle.mileageKm === null ? null : formatMileage(vehicle.mileageKm)
 
   /**
    * The dealership's number comes from BusinessSettings, which is what the
@@ -189,19 +204,19 @@ export default async function VehiclePage({ params }: PageProps) {
    * rather than one after the other — a page that already waits on the
    * vehicle lookup should not then wait on two more round trips in series.
    */
-  const [whatsappNumber, relatedVehicles] = await Promise.all([
+  const [siteSettings, relatedVehicles] = await Promise.all([
     // `getWhatsAppNumber`, not `getBusinessSettings`: that one upserts the
     // singleton row, which is right for the admin screen and wrong on a page
     // anonymous traffic loads. It also already applies the env fallback, so
     // the `||` this used to carry lives in one place now.
-    getWhatsAppNumber(),
+    getPublicSiteSettings(),
     listRelatedVehicles({ make: vehicle.make, excludeSlug: vehicle.slug }),
   ])
 
   const whatsappUrl = buildWhatsAppUrl({
-    phoneNumber: whatsappNumber,
+    phoneNumber: siteSettings.contact.whatsappNumber,
     message: buildVehicleWhatsAppMessage({
-      siteName: siteConfig.name,
+      siteName: siteSettings.businessName,
       year: vehicle.year,
       make: vehicle.make,
       model: vehicle.model,
@@ -222,8 +237,8 @@ export default async function VehiclePage({ params }: PageProps) {
   }
 
   const specifications = [
-    { label: "Year", value: String(vehicle.year) },
-    { label: "Mileage", value: formatMileage(vehicle.mileageKm) },
+    { label: "Year", value: vehicle.year === null ? null : String(vehicle.year) },
+    { label: "Mileage", value: mileage },
     { label: "Engine", value: vehicle.engineSize },
     { label: "Transmission", value: transmission },
     { label: "Fuel", value: fuel },
@@ -232,7 +247,11 @@ export default async function VehiclePage({ params }: PageProps) {
     { label: "Interior", value: vehicle.interiorColor },
     { label: "Country of origin", value: country },
     { label: "Currently in", value: vehicle.currentLocation },
-  ]
+  ].flatMap((spec) => (spec.value ? [{ label: spec.label, value: spec.value }] : []))
+
+  const summaryFacts = [vehicle.year === null ? null : String(vehicle.year), country, mileage].filter(
+    (fact) => fact !== null
+  )
 
   return (
     <>
@@ -278,7 +297,7 @@ export default async function VehiclePage({ params }: PageProps) {
             aria-labelledby="summary-heading"
             className="flex flex-col gap-6 rounded-xl border border-border bg-card p-6 sm:p-8"
           >
-            <VehicleConditionTag condition={vehicle.condition} />
+            {vehicle.condition ? <VehicleConditionTag condition={vehicle.condition} /> : null}
 
             <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between md:gap-12">
               {/* Make and model carry the heading; the year, origin and
@@ -288,9 +307,9 @@ export default async function VehiclePage({ params }: PageProps) {
                 <h1 id="summary-heading" className="text-h1">
                   {name}
                 </h1>
-                <p className="tabular text-body text-muted-foreground">
-                  {vehicle.year} · {country} · {formatMileage(vehicle.mileageKm)}
-                </p>
+                {summaryFacts.length > 0 ? (
+                  <p className="tabular text-body text-muted-foreground">{summaryFacts.join(" · ")}</p>
+                ) : null}
               </div>
 
               <div className="flex shrink-0 flex-col gap-0.5 md:items-end md:text-right">
@@ -301,9 +320,13 @@ export default async function VehiclePage({ params }: PageProps) {
                     card — a customer arriving here from the grid should
                     recognise the same figure rather than meet a second
                     house style for money. */}
-                <span className="tabular font-sans text-h2 font-bold text-price">
-                  {formatCurrency(vehicle.price)}
-                </span>
+                {vehicle.price !== null ? (
+                  <span className="tabular font-sans text-h2 font-bold text-price">
+                    {formatCurrency(vehicle.price)}
+                  </span>
+                ) : (
+                  <span className="font-sans text-h3 font-semibold text-foreground">Price on request</span>
+                )}
               </div>
             </div>
 
@@ -326,11 +349,9 @@ export default async function VehiclePage({ params }: PageProps) {
                 to say which costs are still open and where they get closed.
               */}
               <p className="max-w-xl text-small text-muted-foreground">
-                This is the price of the vehicle itself. Shipping, clearing
-                and delivery depend on the vessel, the port and where in
-                South Sudan you are collecting, so we confirm your full
-                delivered cost on the quotation before you commit to
-                anything.
+                {vehicle.price !== null
+                  ? "This is the price of the vehicle itself. Shipping, clearing and delivery depend on the vessel, the port and where in South Sudan you are collecting, so we confirm your full delivered cost on the quotation before you commit to anything."
+                  : "Ask for a quotation and we will confirm the price of this vehicle and your full delivered cost — shipping, clearing and delivery — before you commit to anything."}
               </p>
 
               {/*
@@ -387,16 +408,16 @@ export default async function VehiclePage({ params }: PageProps) {
             section break has to be earned by a change of surface, which is
             what the muted description band below actually does.
           */}
-          <Reveal className="mt-4">
-            <VehicleDetailTabs
-              specifications={specifications}
-              features={vehicle.features}
-            />
-          </Reveal>
+          {specifications.length > 0 || vehicle.features.length > 0 ? (
+            <Reveal className="mt-4">
+              <VehicleDetailTabs specifications={specifications} features={vehicle.features} />
+            </Reveal>
+          ) : null}
         </div>
       </Section>
 
       {/* ── The part a specification table cannot say ─────────────── */}
+      {vehicle.description ? (
       <Section variant="muted" spacing="default" reveal>
         {/*
           A single column at a reading measure, not a text column with a
@@ -422,6 +443,7 @@ export default async function VehiclePage({ params }: PageProps) {
           </p>
         </section>
       </Section>
+      ) : null}
 
       {/* ── Other vehicles from the same make ─────────────────────── */}
       <RelatedVehicles vehicles={relatedVehicles} make={vehicle.make} />
@@ -433,7 +455,7 @@ export default async function VehiclePage({ params }: PageProps) {
       <div aria-hidden="true" className="action-bar-clearance lg:hidden" />
 
       <VehicleMobileActionBar {...quoteSubject} />
-      <VehicleStructuredData vehicle={vehicle} name={fullName} />
+      <VehicleStructuredData vehicle={vehicle} name={fullName} sellerName={siteSettings.businessName} />
     </>
   )
 }
@@ -464,41 +486,49 @@ export default async function VehiclePage({ params }: PageProps) {
  */
 function VehicleStructuredData({
   vehicle,
-  name,
-}: {
+  name, sellerName }: {
   vehicle: PublicVehicleDetail
   name: string
+  sellerName: string
 }) {
+  // A hidden fact is null on the DTO and is left out here too — structured
+  // data is published as surely as the page is.
+  const optional = <K extends string, V>(key: K, value: V | null) =>
+    value === null ? {} : ({ [key]: value } as Record<K, V>)
+
   const data = {
     "@context": "https://schema.org",
     "@type": "Car",
-    itemCondition:
-      vehicle.condition === "NEW"
-        ? "https://schema.org/NewCondition"
-        : "https://schema.org/UsedCondition",
+    ...optional(
+      "itemCondition",
+      vehicle.condition === null
+        ? null
+        : vehicle.condition === "NEW"
+          ? "https://schema.org/NewCondition"
+          : "https://schema.org/UsedCondition"
+    ),
     name,
-    description: vehicle.description,
+    ...optional("description", vehicle.description),
     sku: vehicle.referenceNumber,
     brand: { "@type": "Brand", name: vehicle.make },
     model: vehicle.model,
-    vehicleModelDate: String(vehicle.year),
-    mileageFromOdometer: {
-      "@type": "QuantitativeValue",
-      value: vehicle.mileageKm,
-      unitCode: "KMT",
-    },
-    fuelType: vehicle.fuelType,
-    vehicleTransmission: vehicle.transmission,
-    driveWheelConfiguration: vehicle.driveType,
-    color: vehicle.exteriorColor,
+    ...optional("vehicleModelDate", vehicle.year === null ? null : String(vehicle.year)),
+    ...optional(
+      "mileageFromOdometer",
+      vehicle.mileageKm === null ? null : { "@type": "QuantitativeValue", value: vehicle.mileageKm, unitCode: "KMT" }
+    ),
+    ...optional("fuelType", vehicle.fuelType),
+    ...optional("vehicleTransmission", vehicle.transmission),
+    ...optional("driveWheelConfiguration", vehicle.driveType),
+    ...optional("color", vehicle.exteriorColor),
     image: vehicle.photos.map((photo) => photo.url),
     offers: {
       "@type": "Offer",
       priceCurrency: "USD",
-      price: vehicle.price,
-      availability: "https://schema.org/InStock",
+      ...optional("price", vehicle.price),
+      ...optional("availability", vehicle.showAvailability ? "https://schema.org/InStock" : null),
       url: `${siteConfig.url}/cars/${vehicle.slug}`,
-      seller: { "@type": "AutoDealer", name: siteConfig.name },
+      seller: { "@type": "AutoDealer", name: sellerName },
     },
   }
 

@@ -1,6 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowRight, Bolt, Cog, Fuel, Gauge, ImageOff } from "lucide-react"
+import { ArrowRight, Bolt, Cog, Fuel, Gauge, ImageOff, MapPin } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -155,14 +155,28 @@ export function VehicleCard({
    * clever, so an unrecognised value falls through to itself rather than
    * to `undefined`.
    */
-  const transmission =
-    TRANSMISSION_LABELS[vehicle.transmission as keyof typeof TRANSMISSION_LABELS] ??
-    vehicle.transmission
-  const fuel =
-    FUEL_TYPE_LABELS[vehicle.fuelType as keyof typeof FUEL_TYPE_LABELS] ?? vehicle.fuelType
-  const country =
-    COUNTRY_LABELS[vehicle.countryOfOrigin as keyof typeof COUNTRY_LABELS] ??
-    vehicle.countryOfOrigin
+  const transmission = vehicle.transmission
+    ? (TRANSMISSION_LABELS[vehicle.transmission as keyof typeof TRANSMISSION_LABELS] ?? vehicle.transmission)
+    : null
+  const fuel = vehicle.fuelType
+    ? (FUEL_TYPE_LABELS[vehicle.fuelType as keyof typeof FUEL_TYPE_LABELS] ?? vehicle.fuelType)
+    : null
+  const country = vehicle.countryOfOrigin
+    ? (COUNTRY_LABELS[vehicle.countryOfOrigin as keyof typeof COUNTRY_LABELS] ?? vehicle.countryOfOrigin)
+    : null
+
+  /**
+   * The specification band, in its fixed order. A hidden fact arrives as null
+   * from the query layer (Settings → Catalogue display, or the listing's own
+   * hidden facts) and simply takes no cell.
+   */
+  const specs = [
+    transmission ? { icon: Cog, label: "Transmission", value: transmission } : null,
+    fuel ? { icon: Fuel, label: "Fuel", value: fuel } : null,
+    vehicle.engineSize ? { icon: Bolt, label: "Engine", value: vehicle.engineSize } : null,
+    vehicle.mileageKm !== null ? { icon: Gauge, label: "Mileage", value: formatMileage(vehicle.mileageKm) } : null,
+    vehicle.currentLocation ? { icon: MapPin, label: "Location", value: vehicle.currentLocation } : null,
+  ].filter((spec) => spec !== null)
 
   return (
     <Link
@@ -178,7 +192,9 @@ export function VehicleCard({
        * name rather than a separate line a screen reader meets out of
        * context — hence the explicit label.
        */
-      aria-label={`${vehicle.year} ${name} — ${formatCurrency(vehicle.price)}`}
+      aria-label={`${vehicle.year !== null ? `${vehicle.year} ` : ""}${name} — ${
+        vehicle.price !== null ? formatCurrency(vehicle.price) : "price on request"
+      }`}
     >
       <Card interactive className="h-full gap-0 py-0">
         {/* Fixed 16:10 crop, so a portrait phone photograph and a wide
@@ -189,7 +205,7 @@ export function VehicleCard({
           {vehicle.photoUrl ? (
             <Image
               src={vehicle.photoUrl}
-              alt={vehicle.photoAltText ?? `${vehicle.year} ${name}`}
+              alt={vehicle.photoAltText ?? (vehicle.year !== null ? `${vehicle.year} ${name}` : name)}
               fill
               sizes={sizes}
               priority={priority}
@@ -209,12 +225,23 @@ export function VehicleCard({
             </div>
           )}
 
-          <Badge
-            variant="secondary"
-            className="absolute top-3 left-3 bg-background/85 backdrop-blur-sm"
-          >
-            {country}
-          </Badge>
+          {country ? (
+            <Badge
+              variant="secondary"
+              className="absolute top-3 left-3 bg-background/85 backdrop-blur-sm"
+            >
+              {country}
+            </Badge>
+          ) : null}
+
+          {/* Every vehicle in this grid is published, so this is reassurance
+              rather than information; Settings can switch it off. */}
+          {vehicle.showAvailability ? (
+            <span className="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-background/85 px-2.5 py-1 text-xs font-medium text-foreground backdrop-blur-sm">
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
+              Available
+            </span>
+          ) : null}
         </div>
 
         {/*
@@ -265,14 +292,20 @@ export function VehicleCard({
               <h3 className="truncate font-sans text-title font-semibold text-foreground">
                 {name}
               </h3>
-              <span className="tabular text-body font-normal text-foreground/60">
-                {vehicle.year}
-              </span>
+              {vehicle.year !== null ? (
+                <span className="tabular text-body font-normal text-foreground/60">
+                  {vehicle.year}
+                </span>
+              ) : null}
             </div>
 
-            <span className="tabular shrink-0 text-title font-bold text-price">
-              {formatCurrency(vehicle.price)}
-            </span>
+            {vehicle.price !== null ? (
+              <span className="tabular shrink-0 text-title font-bold text-price">
+                {formatCurrency(vehicle.price)}
+              </span>
+            ) : (
+              <span className="shrink-0 text-small font-medium text-muted-foreground">Price on request</span>
+            )}
           </div>
 
           {/* ── Specifications ───────────────────────────────────────
@@ -325,14 +358,15 @@ export function VehicleCard({
               and re-run that sweep — the bands are only a few pixels wider
               than the text they have to hold.
             */}
-            <dl className="grid min-w-0 flex-1 grid-cols-[auto_auto] justify-start gap-x-6 gap-y-3 @max-[322px]:gap-x-2 @max-[322px]:gap-y-2.5">
-              <Spec icon={Cog} label="Transmission" value={transmission} />
-              <Spec icon={Fuel} label="Fuel" value={fuel} />
-              <Spec icon={Bolt} label="Engine" value={vehicle.engineSize} />
-              <Spec icon={Gauge} label="Mileage" value={formatMileage(vehicle.mileageKm)} />
-            </dl>
+            {specs.length > 0 ? (
+              <dl className="grid min-w-0 flex-1 grid-cols-[auto_auto] justify-start gap-x-6 gap-y-3 @max-[322px]:gap-x-2 @max-[322px]:gap-y-2.5">
+                {specs.map((spec) => (
+                  <Spec key={spec.label} icon={spec.icon} label={spec.label} value={spec.value} />
+                ))}
+              </dl>
+            ) : null}
 
-            <ExploreCue />
+            <ExploreCue className={specs.length === 0 ? "ml-auto" : undefined} />
           </div>
         </div>
       </Card>
@@ -361,11 +395,12 @@ export function VehicleCard({
  * and something that is gold at rest and *more* gold on hover reads as a
  * colour change rather than as an invitation.
  */
-function ExploreCue() {
+function ExploreCue({ className }: { className?: string }) {
   return (
     <span
       aria-hidden="true"
       className={cn(
+        className,
         "eyebrow inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5",
         "@max-[322px]:px-2",
         "bg-gold-bright text-gold-bright-foreground shadow-[var(--shadow-gold)]",

@@ -50,6 +50,11 @@ import {
   VEHICLE_PHOTO_BUCKET,
 } from "../src/lib/constants/vehicle-photo-options"
 import { SPARE_PART_PHOTO_BUCKET } from "../src/lib/constants/spare-part-photo-options"
+import {
+  BRANDING_BUCKET,
+  BRANDING_MIME_TYPES,
+  MAX_BRANDING_ASSET_BYTES,
+} from "../src/lib/constants/branding-options"
 
 interface BucketSpec {
   id: string
@@ -83,6 +88,16 @@ const BUCKETS: BucketSpec[] = [
     allowedMimeTypes: [...ACCEPTED_PHOTO_MIME_TYPES],
     fileSizeLimit: MAX_PHOTO_BYTES,
     purpose: "Spare-part listing photography (public read, server-only write)",
+  },
+  {
+    id: BRANDING_BUCKET,
+    public: true,
+    // Narrower than photography on purpose: no AVIF (favicons and email
+    // clients handle it poorly) and never SVG, which can carry script. See
+    // branding-options.ts.
+    allowedMimeTypes: [...BRANDING_MIME_TYPES],
+    fileSizeLimit: MAX_BRANDING_ASSET_BYTES,
+    purpose: "Logos, favicon and social sharing image (public read, server-only write)",
   },
 ]
 

@@ -30,7 +30,31 @@ export type AuditAction =
   | "ADMIN_SIGNED_OUT"
   | "ADMIN_PASSWORD_RESET_REQUESTED"
   | "ADMIN_PASSWORD_CHANGED"
+  // ── Administrator account and security ──────────────────────────────
+  | "ADMIN_PROFILE_UPDATED"
+  | "ADMIN_EMAIL_CHANGE_REQUESTED"
+  | "ADMIN_EMAIL_CHANGED"
+  | "ADMIN_TWO_FACTOR_ENABLED"
+  | "ADMIN_TWO_FACTOR_DISABLED"
+  // One other session ended from this one, or every other one at once, or
+  // every session including this one.
+  | "ADMIN_SESSION_REVOKED"
+  | "ADMIN_OTHER_SESSIONS_REVOKED"
+  | "ADMIN_ALL_SESSIONS_REVOKED"
+  // ── Settings ────────────────────────────────────────────────────────
+  // Written before Settings was split into sections; kept so older rows
+  // still name a known action.
   | "BUSINESS_SETTINGS_UPDATED"
+  | "SETTINGS_BUSINESS_INFORMATION_UPDATED"
+  | "SETTINGS_BRANDING_UPDATED"
+  | "SETTINGS_BRANDING_ASSET_UPDATED"
+  | "SETTINGS_BRANDING_ASSET_REMOVED"
+  | "SETTINGS_PAYMENT_SCHEDULE_UPDATED"
+  | "SETTINGS_ORDERS_TRACKING_UPDATED"
+  | "SETTINGS_CATALOG_DISPLAY_UPDATED"
+  | "SETTINGS_NOTIFICATIONS_UPDATED"
+  | "SETTINGS_SEO_UPDATED"
+  | "SETTINGS_SECURITY_UPDATED"
   | "VEHICLE_CREATED"
   | "VEHICLE_UPDATED"
   | "VEHICLE_STATUS_CHANGED"
@@ -91,6 +115,7 @@ export type AuditAction =
 
 export type AuditEntityType =
   | "AdminProfile"
+  | "AdminSession"
   | "BusinessSettings"
   | "Vehicle"
   | "SparePart"

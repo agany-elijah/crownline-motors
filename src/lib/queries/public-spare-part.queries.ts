@@ -6,11 +6,20 @@ import type { Prisma } from "@/generated/prisma/client"
 import type { SparePartAvailability } from "@/generated/prisma/enums"
 import { SparePartStatus } from "@/generated/prisma/enums"
 import { prisma } from "@/lib/prisma"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import { sparePartPhotoPublicUrl } from "@/lib/storage/spare-part-media"
 import { escapeLikePattern } from "@/lib/utils/like-pattern"
 import { describeFitment } from "@/lib/utils/spare-part-compatibility"
 import type { SparePartSearchCriteria } from "@/lib/validations/spare-part-search.schema"
 import type { SparePartPhotoDTO } from "@/types/spare-part-photo"
+import {
+  DEFAULT_SPARE_PART_VISIBILITY,
+  SPARE_PART_INFO_FIELDS,
+  resolveVisibility,
+  shown,
+  type SparePartInfoField,
+  type Visibility,
+} from "@/lib/visibility/product-visibility"
 
 /**
  * Reads for the public spare-parts catalogue.
@@ -48,6 +57,15 @@ import type { SparePartPhotoDTO } from "@/types/spare-part-photo"
  * on enquiry" — which is a fact about *this listing*, not the name of an
  * internal pricing strategy. There is nothing for a component to branch on
  * beyond the price it was given.
+ *
+ * ── Facts an operator has hidden ──────────────────────────────────────
+ * Settings → Catalogue display hides a fact for every part, and a part's own
+ * `hiddenFields` hides it for that one (see
+ * `@/lib/visibility/product-visibility`). Both are applied while the DTO is
+ * built, so a hidden value is null in the payload and nothing downstream can
+ * publish it. Search and the category filter honour the same rule, because
+ * narrowing results by a fact reveals it as surely as printing it. A hidden
+ * price is represented exactly like a quoted one: `price: null`.
  *
  * Decimals are converted to numbers here, as in every other query module:
  * Prisma's Decimal is not serialisable across the server/client boundary, and
@@ -155,11 +173,11 @@ export function buildExcerpt(
 }
 
 export interface SparePartPreview {
-  /** The manufacturer's number, when the listing carries one. */
+  /** The manufacturer's number, when the listing carries one and shows it. */
   oemPartNumber: string | null
-  /** A short opening of the description — never the whole of it. */
-  excerpt: string
-  /** Fitment, already rendered as the customer reads it. */
+  /** A short opening of the description — never the whole of it. Null when hidden. */
+  excerpt: string | null
+  /** Fitment, already rendered as the customer reads it. Empty when hidden. */
   fitment: string[]
   /** Whether the part has fitment rules beyond the ones carried here. */
   hasMoreFitment: boolean
@@ -185,6 +203,8 @@ export interface PublicSparePartCard {
   /** "Denso", "Genuine Toyota" — the second question every parts buyer asks,
    *  and the card's eyebrow. Null when the listing does not name one. */
   brand: string | null
+  /** The category's display name, or null when hidden. */
+  categoryName: string | null
   /** Null means the part is quoted on enquiry — see the module note. */
   price: number | null
   /**
@@ -193,9 +213,9 @@ export interface PublicSparePartCard {
    * Deliberately *not* the stock figure. `stockQuantity` stays internal — the
    * catalogue publishes a promise the business has chosen to make, not a
    * count it happens to hold, and the two are separate columns for exactly
-   * that reason. See `SparePartAvailability`.
+   * that reason. See `SparePartAvailability`. Null when hidden.
    */
-  availability: SparePartAvailability
+  availability: SparePartAvailability | null
   photoUrl: string | null
   photoAltText: string | null
   preview: SparePartPreview
@@ -273,10 +293,12 @@ const CARD_SELECT = {
   referenceNumber: true,
   name: true,
   brand: true,
+  category: { select: { name: true } },
   price: true,
   availability: true,
   oemPartNumber: true,
   description: true,
+  hiddenFields: true,
   photos: CARD_PHOTOS,
   compatibility: {
     orderBy: FITMENT_ORDER,
@@ -308,31 +330,43 @@ function toPhotoDto(photo: {
   }
 }
 
-function toCard(row: CardRow): PublicSparePartCard {
+function toCard(row: CardRow, siteWide: Visibility<SparePartInfoField>): PublicSparePartCard {
   const photos = row.photos.map(toPhotoDto)
   const cover = photos[0] ?? null
+  const visible = resolveVisibility(SPARE_PART_INFO_FIELDS, siteWide, row.hiddenFields)
 
-  const fitmentRows = row.compatibility.slice(0, PREVIEW_FITMENT_LIMIT)
+  const fitmentRows = visible.compatibility ? row.compatibility.slice(0, PREVIEW_FITMENT_LIMIT) : []
 
   return {
     slug: row.slug,
     referenceNumber: row.referenceNumber,
     name: row.name,
-    brand: row.brand,
+    brand: shown(visible.brand, row.brand),
+    categoryName: shown(visible.category, row.category.name),
     // Null is meaningful and must survive: it is how a quoted part says it has
     // no listed price, which is different from a price of zero.
-    price: row.price?.toNumber() ?? null,
-    availability: row.availability,
+    price: visible.price ? (row.price?.toNumber() ?? null) : null,
+    availability: shown(visible.availability, row.availability),
     photoUrl: cover?.url ?? null,
     photoAltText: cover?.altText ?? null,
     preview: {
-      oemPartNumber: row.oemPartNumber,
-      excerpt: buildExcerpt(row.description),
+      oemPartNumber: shown(visible.partNumber, row.oemPartNumber),
+      excerpt: shown(visible.description, buildExcerpt(row.description)),
       fitment: fitmentRows.map(describeFitment),
-      hasMoreFitment: row.compatibility.length > PREVIEW_FITMENT_LIMIT,
+      hasMoreFitment: visible.compatibility && row.compatibility.length > PREVIEW_FITMENT_LIMIT,
       photos,
     },
   }
+}
+
+/** Settings → Catalogue display → Spare parts. Cached with the rest of the settings. */
+async function siteWideVisibility(): Promise<Visibility<SparePartInfoField>> {
+  return (await getPublicSiteSettings()).catalogDisplay.sparePart
+}
+
+/** Parts that have not hidden `field` themselves. */
+function notHidden(field: SparePartInfoField): PublicSparePartFilters {
+  return { NOT: { hiddenFields: { has: field } } }
 }
 
 /**
@@ -369,7 +403,9 @@ const SEARCH_TERM_LIMIT = 6
  * retired.
  */
 export function sparePartSearchWhere(
-  criteria: SparePartSearchCriteria
+  criteria: SparePartSearchCriteria,
+  /** Settings → Catalogue display. A hidden part number is never searched. */
+  siteWide: Visibility<SparePartInfoField> = DEFAULT_SPARE_PART_VISIBILITY
 ): PublicSparePartFilters {
   const where: PublicSparePartFilters = {}
 
@@ -387,15 +423,21 @@ export function sparePartSearchWhere(
       return {
         OR: [
           { name: { contains: pattern, mode: "insensitive" as const } },
-          { oemPartNumber: { contains: pattern, mode: "insensitive" as const } },
+          // Matching a hidden number would confirm it to whoever typed it.
+          ...(siteWide.partNumber
+            ? [{ oemPartNumber: { contains: pattern, mode: "insensitive" as const }, ...notHidden("partNumber") }]
+            : []),
           { referenceNumber: { contains: pattern, mode: "insensitive" as const } },
         ],
       }
     })
   }
 
-  if (criteria.category) {
+  // A part whose category is hidden is not filed under it for the customer,
+  // and while categories are hidden site-wide the filter is not offered at all.
+  if (criteria.category && siteWide.category) {
     where.category = { slug: criteria.category }
+    where.NOT = notHidden("category").NOT
   }
 
   return where
@@ -412,9 +454,10 @@ export async function listPublishedSpareParts(options?: {
   criteria?: SparePartSearchCriteria
 }): Promise<PublicSparePartListResult> {
   const page = Math.max(1, options?.page ?? 1)
+  const siteWide = await siteWideVisibility()
 
   const where = publicSparePartWhere(
-    options?.criteria ? sparePartSearchWhere(options.criteria) : {}
+    options?.criteria ? sparePartSearchWhere(options.criteria, siteWide) : {}
   )
 
   // Count and page fetched in one round trip. Two awaits would be two round
@@ -454,10 +497,10 @@ export async function listPublishedSpareParts(options?: {
       select: CARD_SELECT,
     })
 
-    return { parts: lastPage.map(toCard), total, page: pageCount, pageCount }
+    return { parts: lastPage.map((row) => toCard(row, siteWide)), total, page: pageCount, pageCount }
   }
 
-  return { parts: rows.map(toCard), total, page, pageCount }
+  return { parts: rows.map((row) => toCard(row, siteWide)), total, page, pageCount }
 }
 
 /* ── The category rail ───────────────────────────────────────────── */
@@ -492,6 +535,9 @@ export interface PublicSparePartCategory {
  */
 export const listPublicSparePartCategories = cache(
   async (): Promise<PublicSparePartCategory[]> => {
+    // No rail at all while categories are hidden site-wide.
+    if (!(await siteWideVisibility()).category) return []
+
     const [categories, counts] = await Promise.all([
       prisma.sparePartCategory.findMany({
         where: { isActive: true },
@@ -500,7 +546,7 @@ export const listPublicSparePartCategories = cache(
       }),
       prisma.sparePart.groupBy({
         by: ["categoryId"],
-        where: { status: PUBLIC_SPARE_PART_STATUS },
+        where: publicSparePartWhere(notHidden("category")),
         _count: { _all: true },
       }),
     ])
@@ -529,11 +575,12 @@ export interface PublicSparePartDetail {
   brand: string | null
   price: number | null
   /** See the note on the card DTO — a published promise, not a stock count. */
-  availability: SparePartAvailability
-  description: string
-  categoryName: string
-  categorySlug: string
-  /** Fitment, already rendered as the customer reads it. The whole list. */
+  availability: SparePartAvailability | null
+  description: string | null
+  /** Null, with the slug, when the category is hidden. */
+  categoryName: string | null
+  categorySlug: string | null
+  /** Fitment, already rendered as the customer reads it. The whole list; empty when hidden. */
   fitment: string[]
   photos: SparePartPhotoDTO[]
 }
@@ -552,7 +599,7 @@ export interface PublicSparePartDetail {
  */
 export const getPublishedSparePartBySlug = cache(
   async (slug: string): Promise<PublicSparePartDetail | null> => {
-    const part = await prisma.sparePart.findFirst({
+    const [part, siteWide] = await Promise.all([prisma.sparePart.findFirst({
       where: publicSparePartWhere({ slug }),
       select: {
         slug: true,
@@ -563,6 +610,7 @@ export const getPublishedSparePartBySlug = cache(
         price: true,
         availability: true,
         description: true,
+        hiddenFields: true,
         category: { select: { name: true, slug: true } },
         photos: {
           where: { deletedAt: null },
@@ -581,22 +629,24 @@ export const getPublishedSparePartBySlug = cache(
           },
         },
       },
-    })
+    }), siteWideVisibility()])
 
     if (!part) return null
+
+    const visible = resolveVisibility(SPARE_PART_INFO_FIELDS, siteWide, part.hiddenFields)
 
     return {
       slug: part.slug,
       referenceNumber: part.referenceNumber,
       name: part.name,
-      oemPartNumber: part.oemPartNumber,
-      brand: part.brand,
-      price: part.price?.toNumber() ?? null,
-      availability: part.availability,
-      description: part.description,
-      categoryName: part.category.name,
-      categorySlug: part.category.slug,
-      fitment: part.compatibility.map(describeFitment),
+      oemPartNumber: shown(visible.partNumber, part.oemPartNumber),
+      brand: shown(visible.brand, part.brand),
+      price: visible.price ? (part.price?.toNumber() ?? null) : null,
+      availability: shown(visible.availability, part.availability),
+      description: shown(visible.description, part.description),
+      categoryName: shown(visible.category, part.category.name),
+      categorySlug: shown(visible.category, part.category.slug),
+      fitment: visible.compatibility ? part.compatibility.map(describeFitment) : [],
       photos: part.photos.map(toPhotoDto),
     }
   }
@@ -629,23 +679,31 @@ export const RELATED_SPARE_PARTS_LIMIT = 12
  * `excludeSlug` keeps the part out of its own suggestions.
  */
 export async function listRelatedSpareParts({
-  categorySlug,
   excludeSlug,
   limit = RELATED_SPARE_PARTS_LIMIT,
 }: {
-  categorySlug: string
+  /** The part whose page this strip sits on; its category decides the strip. */
   excludeSlug: string
   limit?: number
 }): Promise<PublicSparePartCard[]> {
-  const rows = await prisma.sparePart.findMany({
-    where: publicSparePartWhere({
-      category: { slug: categorySlug },
-      slug: { not: excludeSlug },
+  /**
+   * Looked up by the part's own slug rather than handed a category, so the
+   * strip still works — invisibly — on a part whose category is hidden and
+   * therefore absent from its public DTO. The grouping is ours; it names
+   * nothing on the page.
+   */
+  const [rows, siteWide] = await Promise.all([
+    prisma.sparePart.findMany({
+      where: publicSparePartWhere({
+        category: { parts: { some: { slug: excludeSlug, status: PUBLIC_SPARE_PART_STATUS } } },
+        slug: { not: excludeSlug },
+      }),
+      orderBy: CARD_ORDER_BY,
+      take: Math.max(0, limit),
+      select: CARD_SELECT,
     }),
-    orderBy: CARD_ORDER_BY,
-    take: Math.max(0, limit),
-    select: CARD_SELECT,
-  })
+    siteWideVisibility(),
+  ])
 
-  return rows.map(toCard)
+  return rows.map((row) => toCard(row, siteWide))
 }

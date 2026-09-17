@@ -24,7 +24,8 @@ export interface VehiclePhotoDTO {
 }
 
 export interface VehicleNaming {
-  year: number
+  /** Null where the year is hidden from customers. */
+  year: number | null
   make: string
   model: string
 }
@@ -49,7 +50,7 @@ export function describeVehiclePhoto(
 ): string {
   if (photo.altText) return photo.altText
 
-  const name = `${vehicle.year} ${vehicle.make} ${vehicle.model}`
+  const name = [vehicle.year, vehicle.make, vehicle.model].filter((part) => part !== null).join(" ")
 
   if (photo.isPrimary) return `${name} — main photograph`
 

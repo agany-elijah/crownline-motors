@@ -26,12 +26,22 @@ import {
   vehicleYearMax,
 } from "@/lib/constants/vehicle-options"
 import type { VehicleDetail } from "@/lib/queries/vehicle.queries"
+import { CustomerVisibilitySection } from "@/components/admin/visibility/customer-visibility-section"
+import { echoedHiddenFields } from "@/components/admin/visibility/echoed-hidden-fields"
+import {
+  VEHICLE_INFO_COPY,
+  VEHICLE_INFO_FIELDS,
+  type VehicleInfoField,
+  type Visibility,
+} from "@/lib/visibility/product-visibility"
 
 const INITIAL_STATE: VehicleFormState = { status: "idle" }
 
 interface VehicleFormProps {
   /** Absent when creating. */
   vehicle?: VehicleDetail
+  /** Settings → Catalogue display → Vehicles, so site-wide hidden facts show as locked. */
+  siteWideVisibility: Visibility<VehicleInfoField>
 }
 
 /**
@@ -61,7 +71,7 @@ interface VehicleFormProps {
  * field wired straight to `vehicle?.x` is a field that silently empties
  * itself on the next validation error.
  */
-export function VehicleForm({ vehicle }: VehicleFormProps) {
+export function VehicleForm({ vehicle, siteWideVisibility }: VehicleFormProps) {
   const isEdit = Boolean(vehicle)
 
   const [state, formAction, isPending] = useActionState(
@@ -506,6 +516,16 @@ export function VehicleForm({ vehicle }: VehicleFormProps) {
           <span className="text-small font-semibold">Feature on the homepage</span>
         </label>
       </FormSection>
+
+      <CustomerVisibilitySection
+        key={`visibility-${controlKey}`}
+        fields={VEHICLE_INFO_FIELDS}
+        copy={VEHICLE_INFO_COPY}
+        siteWide={siteWideVisibility}
+        hidden={echoedHiddenFields(state.values?.hiddenFields) ?? vehicle?.hiddenFields ?? []}
+        error={error("hiddenFields")}
+        noun="vehicle"
+      />
 
       {/*
         Photographs are part of this form only when creating.

@@ -8,7 +8,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header"
 import { QuoteStatusBadge } from "@/components/admin/quote-status-badge"
 import { StatusBadge } from "@/components/admin/status-badge"
 import { WhatsAppGlyph } from "@/components/shared/whatsapp-glyph"
-import { siteConfig } from "@/config/site"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import { requirePermission } from "@/lib/auth/admin-guard"
 import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONES } from "@/lib/constants/payment"
@@ -42,7 +42,7 @@ export default async function AdminCustomerDetailPage(props: PageProps<"/Ricky@2
   }
 
   const whatsappUrl = customer.whatsapp
-    ? buildWhatsAppUrl({ phoneNumber: customer.whatsapp, message: `Hello ${customer.fullName.split(" ")[0]}, this is ${siteConfig.name}.` })
+    ? buildWhatsAppUrl({ phoneNumber: customer.whatsapp, message: `Hello ${customer.fullName.split(" ")[0]}, this is ${(await getPublicSiteSettings()).businessName}.` })
     : null
 
   return (

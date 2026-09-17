@@ -1,36 +1,25 @@
 import type { Metadata } from "next"
 
-import { AdminPageHeader } from "@/components/admin/admin-page-header"
-import { BusinessSettingsForm } from "@/components/admin/business-settings-form"
+import { BusinessInformationForm } from "@/components/admin/settings/business-information-form"
 import { requirePermission } from "@/lib/auth/admin-guard"
+import { can } from "@/lib/auth/permissions"
 import { getBusinessSettings } from "@/lib/queries/settings.queries"
 
 export const metadata: Metadata = {
-  title: "Settings",
+  title: "Business information · Settings",
 }
 
-export default async function AdminSettingsPage() {
-  // Reading settings requires `settings:read`; saving them requires
-  // `settings:write`, checked separately inside the action. Splitting the
-  // two means a future role can be allowed to see the payment structure
-  // without being able to change what customers are charged.
-  await requirePermission("settings:read")
-
+/**
+ * Settings → Business information, the first section and the settings root.
+ *
+ * Reading requires `settings:read`; saving requires `settings:write`, checked
+ * again inside the action. Splitting the two means a future role can see the
+ * configuration without being able to change it — the form renders read-only
+ * for them rather than offering a save that would be refused.
+ */
+export default async function BusinessInformationSettingsPage() {
+  const admin = await requirePermission("settings:read")
   const settings = await getBusinessSettings()
 
-  const lastUpdated = new Intl.DateTimeFormat("en-GB", {
-    dateStyle: "long",
-    timeStyle: "short",
-    timeZone: "UTC",
-  }).format(settings.updatedAt)
-
-  return (
-    <div className="flex flex-col gap-8">
-      <AdminPageHeader title="Business settings" />
-
-      <BusinessSettingsForm settings={settings} />
-
-      <p className="text-small text-muted-foreground">Last updated {lastUpdated} UTC.</p>
-    </div>
-  )
+  return <BusinessInformationForm settings={settings} canEdit={can(admin.role, "settings:write")} />
 }

@@ -56,6 +56,16 @@ vi.mock("@/lib/prisma", () => ({
   },
 }))
 
+/**
+ * Settings are read through a cached, tagged query that needs the Next.js
+ * runtime. The visibility switches are exercised in their own tests; here the
+ * defaults stand in, so these assertions stay about status and scope.
+ */
+vi.mock("@/lib/queries/settings.queries", async () => {
+  const { DEFAULT_CATALOG_DISPLAY } = await import("@/lib/settings/catalog-display")
+  return { getPublicSiteSettings: async () => ({ catalogDisplay: DEFAULT_CATALOG_DISPLAY }) }
+})
+
 vi.mock("@/lib/storage/vehicle-media", () => ({
   vehiclePhotoPublicUrl: (storagePath: string) => `https://example.test/${storagePath}`,
 }))

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { GripVertical, Plus, Trash2 } from "lucide-react"
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -167,85 +167,66 @@ export function SparePartDeliveryStepsEditor({
         )}
       />
 
-      <ol className="flex flex-col gap-3">
+      <ol className="flex min-w-0 flex-col divide-y divide-border rounded-lg border border-border">
         {rows.map((row, index) => (
-          <li
-            key={row.key}
-            className="flex gap-3 rounded-lg border border-border bg-background p-4"
-          >
-            {/* The step's number as the customer will see it, so the operator
-                is editing the thing rather than a form row that happens to
-                produce it. */}
-            <div className="flex shrink-0 flex-col items-center gap-1.5 pt-1">
+          <li key={row.key} className="flex min-w-0 flex-col gap-2 px-3 py-3 sm:px-4">
+            {/* Number, title and the row's controls on one line; what
+                happens beneath at full width, where a sentence has room. */}
+            <div className="flex min-w-0 items-center gap-2.5">
               <span
                 aria-hidden="true"
-                className="tabular flex size-7 items-center justify-center rounded-full bg-foreground text-xs font-bold text-background"
+                className="tabular flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-bold text-background"
               >
                 {index + 1}
               </span>
-              <GripVertical
-                aria-hidden="true"
-                className="size-3.5 text-muted-foreground/50"
+              <Label htmlFor={`${baseId}-${index}-title`} className="sr-only">
+                Step {index + 1} title
+              </Label>
+              <Input
+                id={`${baseId}-${index}-title`}
+                value={row.title}
+                maxLength={SPARE_PART_DELIVERY_STEP_TITLE_MAX}
+                placeholder="We confirm and quote"
+                onChange={(event) => update(index, { title: event.target.value })}
+                className="h-9 min-w-0 flex-1 font-medium"
               />
-            </div>
-
-            <div className="flex min-w-0 flex-1 flex-col gap-3">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={`${baseId}-${index}-title`}>Step title</Label>
-                <Input
-                  id={`${baseId}-${index}-title`}
-                  value={row.title}
-                  maxLength={SPARE_PART_DELIVERY_STEP_TITLE_MAX}
-                  placeholder="We confirm and quote"
-                  onChange={(event) => update(index, { title: event.target.value })}
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={`${baseId}-${index}-description`}>What happens</Label>
-                <Textarea
-                  id={`${baseId}-${index}-description`}
-                  rows={2}
-                  value={row.description}
-                  maxLength={SPARE_PART_DELIVERY_STEP_DESCRIPTION_MAX}
-                  placeholder="We confirm availability and send a quote."
-                  onChange={(event) =>
-                    update(index, { description: event.target.value })
-                  }
-                />
-                <p className="text-xs text-muted-foreground tabular">
-                  {row.description.length}/
-                  {SPARE_PART_DELIVERY_STEP_DESCRIPTION_MAX}
-                </p>
+              <div className="flex shrink-0 items-center">
+                <RowButton label={`Move step ${index + 1} up`} disabled={index === 0} onClick={() => move(index, -1)}>
+                  <ArrowUp aria-hidden="true" className="size-4" />
+                </RowButton>
+                <RowButton
+                  label={`Move step ${index + 1} down`}
+                  disabled={index === rows.length - 1}
+                  onClick={() => move(index, 1)}
+                >
+                  <ArrowDown aria-hidden="true" className="size-4" />
+                </RowButton>
+                <RowButton
+                  label={`Remove step ${index + 1}`}
+                  onClick={() => setRows((current) => current.filter((_, position) => position !== index))}
+                  tone="destructive"
+                >
+                  <Trash2 aria-hidden="true" className="size-4" />
+                </RowButton>
               </div>
             </div>
 
-            <div className="flex shrink-0 flex-col gap-1">
-              <RowButton
-                label={`Move step ${index + 1} up`}
-                disabled={index === 0}
-                onClick={() => move(index, -1)}
-              >
-                ↑
-              </RowButton>
-              <RowButton
-                label={`Move step ${index + 1} down`}
-                disabled={index === rows.length - 1}
-                onClick={() => move(index, 1)}
-              >
-                ↓
-              </RowButton>
-              <RowButton
-                label={`Remove step ${index + 1}`}
-                onClick={() =>
-                  setRows((current) =>
-                    current.filter((_, position) => position !== index)
-                  )
-                }
-                tone="destructive"
-              >
-                <Trash2 aria-hidden="true" className="size-3.5" />
-              </RowButton>
+            <div className="flex min-w-0 flex-col gap-1 pl-[2.125rem]">
+              <Label htmlFor={`${baseId}-${index}-description`} className="sr-only">
+                Step {index + 1}: what happens
+              </Label>
+              <Textarea
+                id={`${baseId}-${index}-description`}
+                rows={2}
+                value={row.description}
+                maxLength={SPARE_PART_DELIVERY_STEP_DESCRIPTION_MAX}
+                placeholder="We confirm availability and send a quote."
+                onChange={(event) => update(index, { description: event.target.value })}
+                className="min-h-16"
+              />
+              <p className="text-right text-xs text-muted-foreground tabular">
+                {row.description.length}/{SPARE_PART_DELIVERY_STEP_DESCRIPTION_MAX}
+              </p>
             </div>
           </li>
         ))}
@@ -305,14 +286,14 @@ function RowButton({
       disabled={disabled}
       aria-label={label}
       className={cn(
-        "inline-flex size-8 items-center justify-center rounded-md border border-border",
+        "inline-flex size-8 items-center justify-center rounded-md",
         "text-small text-muted-foreground",
         "transition-colors duration-fast",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         "disabled:pointer-events-none disabled:opacity-40",
         tone === "destructive"
-          ? "hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
-          : "hover:border-foreground/30 hover:text-foreground"
+          ? "hover:bg-destructive/10 hover:text-destructive"
+          : "hover:bg-muted hover:text-foreground"
       )}
     >
       {children}

@@ -2,8 +2,9 @@ import { existsSync } from "node:fs"
 import { config } from "dotenv"
 import { expect, test as setup } from "@playwright/test"
 
-import { ADMIN_STORAGE_STATE, adminUrlPattern } from "./paths"
-import { ADMIN_BASE_PATH, adminPath } from "../../../src/lib/constants/admin-routes"
+import { ADMIN_STORAGE_STATE } from "./paths"
+import { signInAsAdmin } from "./sign-in"
+import { adminPath } from "../../../src/lib/constants/admin-routes"
 
 // Matches prisma.config.ts and the provisioning scripts: read .env.local when
 // it exists, otherwise rely on real environment variables (Codespaces, CI).
@@ -58,53 +59,7 @@ setup("authenticate as an administrator", async ({ page }) => {
    */
   await page.goto(adminPath("/login"), { timeout: 120_000 })
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const secretKey = process.env.SUPABASE_SECRET_KEY
-  const email = process.env.E2E_ADMIN_EMAIL
-
-  // The config only schedules this project when all three are present, so
-  // reaching here without them means the config and this file disagree —
-  // worth failing loudly rather than skipping into a false pass.
-  expect(
-    Boolean(supabaseUrl && secretKey && email),
-    "E2E_ADMIN_EMAIL, NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY are required"
-  ).toBe(true)
-
-  const response = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
-    method: "POST",
-    headers: {
-      apikey: secretKey!,
-      Authorization: `Bearer ${secretKey!}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ type: "recovery", email }),
-  })
-
-  expect(
-    response.ok,
-    `Supabase refused to generate a session link (${response.status}). ` +
-      `Check SUPABASE_SECRET_KEY, and that ${email} exists as an auth user.`
-  ).toBe(true)
-
-  const body = (await response.json()) as { hashed_token?: string }
-  expect(body.hashed_token, "Supabase returned no token").toBeTruthy()
-
-  /**
-   * Explicit timeout: this one navigation triggers two cold compiles in
-   * sequence — the /auth/confirm route handler, then the dashboard it
-   * forwards to — and neither was reached by the warm-up above, because an
-   * an unauthenticated dashboard request is redirected by the proxy before the page is
-   * ever built.
-   */
-  await page.goto(
-    `/auth/confirm?token_hash=${body.hashed_token}&type=recovery&next=${encodeURIComponent(ADMIN_BASE_PATH)}`,
-    { timeout: 120_000 }
-  )
-
-  // Landing on the dashboard is the proof. A failed exchange would leave us
-  // on the login page, and saving that state would hand every authenticated
-  // test a signed-out session that then fails in confusing ways.
-  await expect(page).toHaveURL(adminUrlPattern("", { exact: true }))
+  await signInAsAdmin(page)
   await expect(page.getByRole("navigation", { name: "Dashboard" })).toBeVisible()
 
   await page.context().storageState({ path: ADMIN_STORAGE_STATE })

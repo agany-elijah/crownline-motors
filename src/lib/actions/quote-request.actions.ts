@@ -19,6 +19,8 @@ import {
 import { prisma } from "@/lib/prisma"
 import { publicSparePartWhere } from "@/lib/queries/public-spare-part.queries"
 import { publicVehicleWhere } from "@/lib/queries/public-vehicle.queries"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
+import { VEHICLE_INFO_FIELDS, resolveVisibility, shown } from "@/lib/visibility/product-visibility"
 import { resolveCustomerForEnquiry } from "@/lib/quotes/customer-resolution"
 import {
   sparePartLineDescription,
@@ -150,20 +152,28 @@ interface PreparedSubject {
  */
 async function prepareSubject(input: QuoteRequestInput): Promise<PreparedSubject> {
   if (input.requestKind === "VEHICLE_LISTING") {
-    const vehicle = await prisma.vehicle.findFirst({
-      // `publicVehicleWhere`, so a slug that is no longer published — sold,
-      // reserved for another customer, withdrawn — cannot be requested.
-      where: publicVehicleWhere({ slug: input.vehicleSlug }),
-      select: {
-        id: true,
-        make: true,
-        model: true,
-        year: true,
-        transmission: true,
-      },
-    })
+    const [vehicle, { catalogDisplay }] = await Promise.all([
+      prisma.vehicle.findFirst({
+        // `publicVehicleWhere`, so a slug that is no longer published — sold,
+        // reserved for another customer, withdrawn — cannot be requested.
+        where: publicVehicleWhere({ slug: input.vehicleSlug }),
+        select: {
+          id: true,
+          make: true,
+          model: true,
+          year: true,
+          transmission: true,
+          hiddenFields: true,
+        },
+      }),
+      getPublicSiteSettings(),
+    ])
 
     if (!vehicle) throw new SubjectUnavailableError()
+
+    // The line is echoed straight back to the customer in the acknowledgement
+    // email, so it names the car only by what the listing shows them.
+    const visible = resolveVisibility(VEHICLE_INFO_FIELDS, catalogDisplay.vehicle, vehicle.hiddenFields)
 
     return {
       type: QuoteType.VEHICLE,
@@ -172,7 +182,12 @@ async function prepareSubject(input: QuoteRequestInput): Promise<PreparedSubject
         {
           kind: QuoteLineKind.ITEM,
           displayOrder: 0,
-          description: vehicleLineDescription(vehicle),
+          description: vehicleLineDescription({
+            make: vehicle.make,
+            model: vehicle.model,
+            year: shown(visible.year, vehicle.year),
+            transmission: shown(visible.transmission, vehicle.transmission),
+          }),
           // A vehicle is one physical unit.
           quantity: 1,
           vehicleId: vehicle.id,

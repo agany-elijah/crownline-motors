@@ -26,6 +26,14 @@ import type {
   SparePartCategoryOption,
   SparePartDetail,
 } from "@/lib/queries/spare-part.queries"
+import { CustomerVisibilitySection } from "@/components/admin/visibility/customer-visibility-section"
+import { echoedHiddenFields } from "@/components/admin/visibility/echoed-hidden-fields"
+import {
+  SPARE_PART_INFO_COPY,
+  SPARE_PART_INFO_FIELDS,
+  type SparePartInfoField,
+  type Visibility,
+} from "@/lib/visibility/product-visibility"
 
 const INITIAL_STATE: SparePartFormState = { status: "idle" }
 
@@ -34,6 +42,8 @@ interface SparePartFormProps {
   part?: SparePartDetail
   /** Categories this form may offer. See `listCategoryOptions`. */
   categories: SparePartCategoryOption[]
+  /** Settings → Catalogue display → Spare parts, so site-wide hidden facts show as locked. */
+  siteWideVisibility: Visibility<SparePartInfoField>
 }
 
 /**
@@ -63,7 +73,7 @@ interface SparePartFormProps {
  * The consequence when adding a field: read its default through `defaultOf`,
  * and add its name to SPARE_PART_FORM_FIELDS in the action.
  */
-export function SparePartForm({ part, categories }: SparePartFormProps) {
+export function SparePartForm({ part, categories, siteWideVisibility }: SparePartFormProps) {
   const isEdit = Boolean(part)
 
   const [state, formAction, isPending] = useActionState(
@@ -396,6 +406,16 @@ export function SparePartForm({ part, categories }: SparePartFormProps) {
           )}
         </Field>
       </FormSection>
+
+      <CustomerVisibilitySection
+        key={`visibility-${controlKey}`}
+        fields={SPARE_PART_INFO_FIELDS}
+        copy={SPARE_PART_INFO_COPY}
+        siteWide={siteWideVisibility}
+        hidden={echoedHiddenFields(state.values?.hiddenFields) ?? part?.hiddenFields ?? []}
+        error={error("hiddenFields")}
+        noun="part"
+      />
 
       {/*
         Photographs, and only when creating.

@@ -50,6 +50,55 @@ function findNavLink(href: string): NavLink {
   return link
 }
 
+/** A header entry that opens a small menu of related pages. */
+export interface NavGroup {
+  label: string
+  children: (NavLink & { description: string; icon: "track" | "quote" })[]
+}
+
+export type HeaderNavItem = NavLink | NavGroup
+
+export function isNavGroup(item: HeaderNavItem): item is NavGroup {
+  return "children" in item
+}
+
+/**
+ * The header's own arrangement of `mainNavLinks`.
+ *
+ * Track My Order and Get a Quote are services a customer uses once they know
+ * what they want, not places they browse, so they sit together under
+ * "Services" — which is also what lets the header carry one clear call to
+ * action (Browse inventory) instead of three competing buttons. The hrefs and
+ * labels still come from `mainNavLinks`, so the footer and the header cannot
+ * disagree about either.
+ */
+export const headerNavItems: HeaderNavItem[] = [
+  findNavLink("/"),
+  findNavLink("/cars"),
+  findNavLink("/spare-parts"),
+  findNavLink("/how-it-works"),
+  {
+    label: "Services",
+    children: [
+      {
+        ...findNavLink("/track-my-order"),
+        description: "Follow your vehicle or parts, stage by stage.",
+        icon: "track",
+      },
+      {
+        ...findNavLink("/get-a-quote"),
+        description: "Tell us what you need and we will source it.",
+        icon: "quote",
+      },
+    ],
+  },
+  findNavLink("/about-us"),
+  findNavLink("/contact"),
+]
+
+/** The header's primary call to action. */
+export const INVENTORY_CTA = { label: "Browse Inventory", href: "/cars" } as const
+
 export interface FooterLinkGroup {
   title: string
   links: NavLink[]

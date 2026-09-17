@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { requirePermission } from "@/lib/auth/admin-guard"
 import { listVehiclePhotos } from "@/lib/queries/vehicle-photo.queries"
 import { getVehicleById } from "@/lib/queries/vehicle.queries"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
 
 export async function generateMetadata(
@@ -45,7 +46,7 @@ export default async function AdminVehicleDetailPage(
     notFound()
   }
 
-  const photos = await listVehiclePhotos(id)
+  const [photos, siteSettings] = await Promise.all([listVehiclePhotos(id), getPublicSiteSettings()])
 
   const justCreated = searchParams.created === "1"
   /** The vehicle saved, but its photographs did not. See createVehicleAction
@@ -121,7 +122,7 @@ export default async function AdminVehicleDetailPage(
         own form instance, so vehicle B never opens showing vehicle A's
         rejected input.
       */}
-      <VehicleForm key={vehicle.id} vehicle={vehicle} />
+      <VehicleForm key={vehicle.id} vehicle={vehicle} siteWideVisibility={siteSettings.catalogDisplay.vehicle} />
 
       <VehiclePhotoBoard
         vehicleId={vehicle.id}

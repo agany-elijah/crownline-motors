@@ -21,7 +21,8 @@
     "db:check": "tsx scripts/check-schema-constraints.ts",
     "storage:setup": "NODE_OPTIONS=--experimental-websocket tsx scripts/create-storage-buckets.ts",
     "admin:create": "NODE_OPTIONS=--experimental-websocket tsx scripts/create-admin.ts",
-    "admin:reset-link": "NODE_OPTIONS=--experimental-websocket tsx scripts/admin-reset-link.ts"
+    "admin:reset-link": "NODE_OPTIONS=--experimental-websocket tsx scripts/admin-reset-link.ts",
+    "admin:reset-2fa": "NODE_OPTIONS=--experimental-websocket tsx scripts/admin-reset-2fa.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

@@ -8,6 +8,8 @@ import {
   SparePartStatus,
 } from "@/generated/prisma/enums"
 import { SPARE_PART_STOCK_MAX } from "@/lib/constants/spare-part-options"
+import { hiddenFieldsField } from "@/lib/validations/hidden-fields.schema"
+import { SPARE_PART_INFO_FIELDS } from "@/lib/visibility/product-visibility"
 
 /**
  * Validation for spare-part creation and editing.
@@ -181,6 +183,9 @@ const sparePartFields = {
     (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
     z.string().trim().max(2000, "Supplier notes are too long.").optional()
   ),
+
+  /** Facts withheld from customers on this listing — see product-visibility.ts. */
+  hiddenFields: hiddenFieldsField(SPARE_PART_INFO_FIELDS),
 }
 
 /**

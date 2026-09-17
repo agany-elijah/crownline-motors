@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { MenuIcon } from "lucide-react"
+import { ArrowRight, MenuIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { CartSummary } from "@/components/cart/cart-summary"
@@ -12,9 +12,10 @@ import { Container } from "@/components/layout/container"
 import { BrandMark } from "@/components/layout/brand-mark"
 import { MobileNav } from "@/components/layout/mobile-nav"
 import { NavLink } from "@/components/layout/nav-link"
+import { ServicesMenu } from "@/components/layout/services-menu"
 import { HERO_ANCHOR_ATTRIBUTE } from "@/components/layout/hero-anchor"
-import { isNavLinkAvailable } from "@/lib/constants/nav-links"
-import { siteConfig } from "@/config/site"
+import { useSiteSettings } from "@/components/shared/site-settings-provider"
+import { INVENTORY_CTA, headerNavItems, isNavGroup, isNavLinkAvailable } from "@/lib/constants/nav-links"
 
 /** Fallback header height used for the observer's top inset if the header
  *  cannot be measured for any reason. Matches the `h-16` mobile height. */
@@ -133,6 +134,7 @@ export function SiteHeader({ whatsappUrl }: SiteHeaderProps) {
   const hasHeroBehind = useHeroBehindHeader(headerRef)
   const isScrolled = useIsScrolled()
   const [mobileOpen, setMobileOpen] = React.useState(false)
+  const { businessName } = useSiteSettings()
 
   const isTransparent = hasHeroBehind
 
@@ -193,10 +195,10 @@ export function SiteHeader({ whatsappUrl }: SiteHeaderProps) {
 
             <Link
               href="/"
-              aria-label={`${siteConfig.name} — home`}
+              aria-label={`${businessName} — home`}
               className="shrink-0 transition-opacity duration-fast hover:opacity-80"
             >
-              <BrandMark />
+              <BrandMark tone={isTransparent ? "dark" : "light"} />
             </Link>
           </div>
 
@@ -204,44 +206,39 @@ export function SiteHeader({ whatsappUrl }: SiteHeaderProps) {
               measure past 1100px, so at lg they would crush together.
               Below xl the hamburger takes over. */}
           <ul className="hidden items-center gap-6 xl:flex 2xl:gap-7">
-            {siteConfig.nav.map((link) => (
-              <li key={link.href}>
-                <NavLink
-                  href={link.href}
-                  label={link.label}
-                  active={isLinkActive(pathname, link.href)}
-                  available={isNavLinkAvailable(link)}
-                  tone={isTransparent ? "dark" : "light"}
-                />
-              </li>
-            ))}
+            {headerNavItems.map((item) =>
+              isNavGroup(item) ? (
+                <li key={item.label}>
+                  <ServicesMenu group={item} pathname={pathname} tone={isTransparent ? "dark" : "light"} />
+                </li>
+              ) : (
+                <li key={item.href}>
+                  <NavLink
+                    href={item.href}
+                    label={item.label}
+                    active={isLinkActive(pathname, item.href)}
+                    available={isNavLinkAvailable(item)}
+                    tone={isTransparent ? "dark" : "light"}
+                  />
+                </li>
+              )
+            )}
           </ul>
 
-          <div className="hidden shrink-0 items-center gap-2.5 xl:flex">
-            {/* Secondary action stays outlined — the brief reserves the
-                solid gold fill for exactly one button in the header. Its
-                dark-surface treatment comes from the [data-tone="dark"]
-                rules in globals.css, not from classes threaded through
-                here.
-
-                Hidden below 2xl because eight nav items plus two buttons
-                genuinely do not fit at 1280px. Tracking is not lost at
-                those widths: "Track My Order" remains a main nav item, and
-                this button is a shortcut to it, not the only route. */}
+          {/* One call to action. Track My Order and Get a Quote live under
+              Services in the nav; the header's button sends a visitor to what
+              the business sells. The solid gold fill is reserved for exactly
+              this one button, per the brief. */}
+          <div className="hidden shrink-0 items-center xl:flex">
             <Link
-              href="/track-my-order"
-              className={cn(
-                buttonVariants({ variant: "outline", size: "default" }),
-                "hidden 2xl:inline-flex"
-              )}
+              href={INVENTORY_CTA.href}
+              className={cn(buttonVariants({ variant: "default", size: "default" }), "group/cta gap-1.5")}
             >
-              Track Order
-            </Link>
-            <Link
-              href="/get-a-quote"
-              className={buttonVariants({ variant: "default", size: "default" })}
-            >
-              Get a Quote
+              {INVENTORY_CTA.label}
+              <ArrowRight
+                aria-hidden="true"
+                className="size-3.5 transition-transform duration-fast ease-crownline group-hover/cta:translate-x-0.5"
+              />
             </Link>
           </div>
 

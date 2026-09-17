@@ -31,7 +31,7 @@ import { prisma } from "@/lib/prisma"
 import { buildQuoteMessage, defaultQuoteNote, type QuoteMessageInput } from "@/lib/quotes/quote-messages"
 import { UnknownListingReferenceError, resolveQuoteLines } from "@/lib/quotes/quote-line-resolution"
 import { computeQuoteTotals, lineTotalCents, quoteReadinessProblem } from "@/lib/quotes/quote-pricing"
-import { getBusinessSettings } from "@/lib/queries/settings.queries"
+import { getBusinessSettings, getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import { fromCents } from "@/lib/utils/money"
 import { isUniqueConstraintViolation } from "@/lib/utils/prisma-errors"
 import { buildWhatsAppUrl } from "@/lib/utils/whatsapp"
@@ -512,11 +512,13 @@ export async function sendQuoteDispatchAction(
       ),
     }))
 
+  const { businessName } = await getPublicSiteSettings()
+
   const messageInput: QuoteMessageInput = {
-    siteName: siteConfig.name,
+    siteName: businessName,
     customerName: quote.contactName ?? "Customer",
     quoteNumber: quote.quoteNumber,
-    note: note && note.length > 0 ? note : defaultQuoteNote(siteConfig.name),
+    note: note && note.length > 0 ? note : defaultQuoteNote(businessName),
     items: listedItems,
     itemsSubtotal: totals.itemsSubtotal,
     accessoriesTotal: totals.accessoriesTotal,
@@ -588,7 +590,7 @@ export async function sendQuoteDispatchAction(
 
       attachment = {
         filename: buildQuotationFilename(quote.quoteNumber, quote.contactName ?? "Customer"),
-        content: await renderQuotePdfBuffer(buildQuotePdfData(pdfSource)),
+        content: await renderQuotePdfBuffer(buildQuotePdfData(pdfSource, businessName)),
       }
     }
 

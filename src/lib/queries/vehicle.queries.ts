@@ -227,6 +227,8 @@ export interface VehicleDetail {
   otherChargesEst: number | null
   description: string
   features: string[]
+  /** Facts withheld from customers on this listing. */
+  hiddenFields: string[]
   status: VehicleStatus
   isFeatured: boolean
   createdAt: Date

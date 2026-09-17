@@ -72,18 +72,48 @@ const PREFIXES: Record<ReferenceKind, string> = {
 const SEQUENCE_PADDING = 6
 
 /**
+ * The letters a tracking prefix may be — the same rule the settings schema and
+ * the database CHECK apply. Re-checked here because this is where the value
+ * becomes a number printed on customer correspondence.
+ */
+const TRACKING_PREFIX_PATTERN = /^[A-Z]{2,6}$/
+
+/**
+ * The prefix for a reference of `kind`.
+ *
+ * Only a tracking number's prefix is configurable (Settings → Orders &
+ * tracking). The sequence behind it is not, and neither are the other
+ * references, whose prefixes are how an operator tells them apart.
+ */
+function prefixFor(kind: ReferenceKind, trackingPrefix?: string): string {
+  if (kind !== "TRACKING" || trackingPrefix === undefined) return PREFIXES[kind]
+
+  if (!TRACKING_PREFIX_PATTERN.test(trackingPrefix)) {
+    throw new RangeError(`"${trackingPrefix}" is not a valid tracking number prefix.`)
+  }
+
+  return trackingPrefix
+}
+
+/**
  * Allocates the next reference of `kind` for `year`.
  *
  * @param tx    A Prisma transaction client. Required — see above.
  * @param kind  Which sequence to draw from.
  * @param year  Defaults to the current year. Passed explicitly by tests so
  *              they do not depend on the calendar.
+ * @param options.trackingPrefix  The configured prefix, for TRACKING only.
+ *              The sequence key does not include it: changing the prefix
+ *              carries on counting rather than restarting at 000001, so two
+ *              numbers can never differ only by their letters.
  */
 export async function generateReference(
   tx: Prisma.TransactionClient,
   kind: ReferenceKind,
-  year: number = new Date().getFullYear()
+  year: number = new Date().getFullYear(),
+  options: { trackingPrefix?: string } = {}
 ): Promise<string> {
+  const prefix = prefixFor(kind, options.trackingPrefix)
   const sequenceKey = `${kind}-${year}`
 
   /**
@@ -101,7 +131,7 @@ export async function generateReference(
 
   const padded = String(sequence.lastValue).padStart(SEQUENCE_PADDING, "0")
 
-  return `${PREFIXES[kind]}-${year}-${padded}`
+  return `${prefix}-${year}-${padded}`
 }
 
 /**

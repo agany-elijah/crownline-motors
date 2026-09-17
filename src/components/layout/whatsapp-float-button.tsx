@@ -1,7 +1,6 @@
 import { WhatsAppGlyph } from "@/components/shared/whatsapp-glyph"
 import { cn } from "@/lib/utils"
-import { siteConfig } from "@/config/site"
-import { getWhatsAppNumber } from "@/lib/queries/settings.queries"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import { buildGeneralWhatsAppMessage, buildWhatsAppUrl } from "@/lib/utils/whatsapp"
 
 /**
@@ -11,34 +10,24 @@ import { buildGeneralWhatsAppMessage, buildWhatsAppUrl } from "@/lib/utils/whats
  * A general enquiry, because this button follows the customer everywhere —
  * the homepage, the catalogue, About, Contact — and on most of those pages
  * there is no single vehicle it could name. The pages that *do* have a
- * subject carry their own contextual action instead: the vehicle page's
- * "WhatsApp about this car" pre-fills the make, model and listing
- * reference, and the tracking page pre-fills the tracking number. This is
- * the fallback for everywhere else, not a duplicate of those.
+ * subject carry their own contextual action instead.
  *
- * ── The number ────────────────────────────────────────────────────────
- * From BusinessSettings, which an operator edits in the dashboard —
- * `getWhatsAppNumber` reads it through a tagged cache, so a change is live
- * on every public page as soon as it is saved and costs no query per
- * request. The brief is explicit that the number must be configurable
- * rather than hard-coded into individual pages.
+ * ── The number, and whether it appears at all ─────────────────────────
+ * Both from Settings: the number from Business information, and the switch
+ * from Catalogue display → Actions. `getPublicSiteSettings` returns an empty
+ * number when either says no, and `buildWhatsAppUrl` returns null for that,
+ * so this renders nothing — better than a button that opens a broken link.
  *
  * A plain anchor with no interactivity beyond CSS hover, so it stays a
  * server component and ships zero client JavaScript.
- *
- * The label expands on hover at desktop widths only. On a phone there is
- * no hover state and no spare width, so it stays a circular button — and
- * `bottom` respects the iOS safe-area inset so it never sits under the
- * Safari home indicator.
  */
 export async function WhatsAppFloatButton() {
+  const settings = await getPublicSiteSettings()
   const whatsappUrl = buildWhatsAppUrl({
-    phoneNumber: await getWhatsAppNumber(),
-    message: buildGeneralWhatsAppMessage(siteConfig.name),
+    phoneNumber: settings.contact.whatsappNumber,
+    message: buildGeneralWhatsAppMessage(settings.businessName),
   })
 
-  // Rendering nothing is the correct fallback for a missing/misconfigured
-  // number — better than a button that opens a broken wa.me URL.
   if (!whatsappUrl) {
     return null
   }
@@ -48,7 +37,7 @@ export async function WhatsAppFloatButton() {
       href={whatsappUrl}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label={`Chat with ${siteConfig.shortName} on WhatsApp`}
+      aria-label={`Chat with ${settings.businessName} on WhatsApp`}
       /**
        * The handle globals.css uses to lift this button above a page that
        * pins its own action bar to the bottom of a phone screen (see the

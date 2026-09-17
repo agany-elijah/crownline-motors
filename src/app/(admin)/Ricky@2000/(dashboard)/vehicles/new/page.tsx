@@ -6,6 +6,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header"
 import { VehicleForm } from "@/components/admin/vehicle-form"
 import { requirePermission } from "@/lib/auth/admin-guard"
 import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 
 export const metadata: Metadata = {
   title: "Add Vehicle",
@@ -13,6 +14,7 @@ export const metadata: Metadata = {
 
 export default async function AdminVehicleNewPage() {
   await requirePermission("vehicle:write")
+  const { catalogDisplay } = await getPublicSiteSettings()
 
   return (
     <div className="flex flex-col gap-8">
@@ -30,7 +32,7 @@ export default async function AdminVehicleNewPage() {
 
       <WorkflowTrail />
 
-      <VehicleForm />
+      <VehicleForm siteWideVisibility={catalogDisplay.vehicle} />
     </div>
   )
 }

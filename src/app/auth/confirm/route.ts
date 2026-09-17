@@ -1,6 +1,7 @@
 import type { EmailOtpType } from "@supabase/supabase-js"
 import { NextResponse, type NextRequest } from "next/server"
 
+import { syncAdminEmail } from "@/lib/auth/admin-account"
 import { ADMIN_LOGIN_PATH, resolveReturnPath } from "@/lib/auth/return-path"
 import { createClient } from "@/lib/supabase/server"
 
@@ -69,6 +70,9 @@ const ACCEPTED_OTP_TYPES: ReadonlySet<EmailOtpType> = new Set<EmailOtpType>([
   "recovery",
   "invite",
   "email",
+  // An administrator changing their own address from Settings → Admin users &
+  // security. The change itself is Supabase's; below, our copy follows it.
+  "email_change",
 ])
 
 function parseOtpType(value: string | null): EmailOtpType | null {
@@ -101,6 +105,14 @@ export async function GET(request: NextRequest) {
     // page renders one neutral message for this code; distinguishing the
     // cases would confirm to a stranger that a given token was once real.
     return redirectToPath(`${ADMIN_LOGIN_PATH}?error=invalid_link`)
+  }
+
+  if (type === "email_change") {
+    // `getUser()` asks Supabase, rather than trusting the cookie, which
+    // address the account now has. Our copy only follows once the change has
+    // actually been completed there; an administrator profile is required.
+    const { data } = await supabase.auth.getUser()
+    if (data.user?.email) await syncAdminEmail(data.user.id, data.user.email)
   }
 
   return redirectToPath(destination)

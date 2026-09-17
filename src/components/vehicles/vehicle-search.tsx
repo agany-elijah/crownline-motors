@@ -140,9 +140,10 @@ export function VehicleSearch({ facets, criteria }: VehicleSearchProps) {
 
     const inModel = model ? inMake.filter((facet) => facet.model === model) : inMake
 
-    const yearList = [...new Set(inModel.map((facet) => facet.year))].sort(
-      (a, b) => b - a
-    )
+    // Listings whose year is hidden carry no year, and offer none to choose.
+    const yearList = [
+      ...new Set(inModel.flatMap((facet) => (facet.year === null ? [] : [facet.year]))),
+    ].sort((a, b) => b - a)
 
     return {
       makes: makeList,
@@ -152,6 +153,8 @@ export function VehicleSearch({ facets, criteria }: VehicleSearchProps) {
       selectedModel: model,
     }
   }, [facets, criteria.make, criteria.model])
+
+  const offersYear = facets.some((facet) => facet.year !== null)
 
   /** How many dropdowns are narrowing the results — the badge on Filters. */
   const activeFilterCount =
@@ -285,6 +288,8 @@ export function VehicleSearch({ facets, criteria }: VehicleSearchProps) {
               onChange={(value) => apply({ model: value || undefined })}
             />
 
+            {/* Not offered at all when no published listing shows its year. */}
+            {offersYear ? (
             <FilterSelect
               id={yearId}
               name="year"
@@ -301,6 +306,7 @@ export function VehicleSearch({ facets, criteria }: VehicleSearchProps) {
               }))}
               onChange={(value) => apply({ year: value ? Number(value) : undefined })}
             />
+            ) : null}
           </FilterPanel>
         </form>
       </search>

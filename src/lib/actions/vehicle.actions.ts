@@ -99,6 +99,7 @@ const VEHICLE_FORM_FIELDS = [
   "description",
   "features",
   "isFeatured",
+  "hiddenFields",
 ] as const
 
 /** The longest description the schema accepts, with headroom. A value past
@@ -262,6 +263,7 @@ export async function createVehicleAction(
           description: input.description,
           features: input.features,
           isFeatured: input.isFeatured,
+          hiddenFields: input.hiddenFields,
           // Explicit rather than relying on the column default: a new
           // listing is never live until someone decides it is.
           status: VehicleStatus.DRAFT,
@@ -279,6 +281,7 @@ export async function createVehicleAction(
             referenceNumber: vehicle.referenceNumber,
             vehicle: `${input.year} ${input.make} ${input.model}`,
             photoCount: prepared.photos.length,
+            ...(input.hiddenFields.length > 0 ? { hiddenFields: input.hiddenFields } : {}),
           },
         },
         tx
@@ -368,7 +371,7 @@ export async function updateVehicleAction(
 
   const existing = await prisma.vehicle.findUnique({
     where: { id },
-    select: { id: true, referenceNumber: true, slug: true, price: true, status: true },
+    select: { id: true, referenceNumber: true, slug: true, price: true, status: true, hiddenFields: true },
   })
 
   if (!existing) {
@@ -439,6 +442,11 @@ export async function updateVehicleAction(
             referenceNumber: existing.referenceNumber,
             ...(previousPrice !== input.price
               ? { priceChangedFrom: previousPrice, priceChangedTo: input.price }
+              : {}),
+            // What customers can see is a publishing decision, so a change
+            // to it is recorded as plainly as a price change.
+            ...(existing.hiddenFields.join() !== input.hiddenFields.join()
+              ? { hiddenFieldsFrom: existing.hiddenFields, hiddenFieldsTo: input.hiddenFields }
               : {}),
           },
         },

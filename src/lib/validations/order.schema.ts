@@ -44,10 +44,34 @@ const deliveryDateField = z.preprocess(
     .optional()
 )
 
-export const orderDeliveryDateSchema = z.object({
-  orderId: orderIdField,
-  deliveryDate: deliveryDateField,
-})
+/**
+ * The expected delivery window: a first day, and optionally a last one —
+ * "between 17 and 30 October". A last day on its own is refused (a window
+ * needs a start), as is one before the first; the database holds the same
+ * rule in `Order_delivery_window_check`. A last day equal to the first is
+ * stored as no last day, so it reads as the single date it is.
+ */
+export const orderDeliveryDateSchema = z
+  .object({
+    orderId: orderIdField,
+    deliveryDate: deliveryDateField,
+    deliveryDateLatest: deliveryDateField,
+  })
+  .superRefine((value, ctx) => {
+    if (value.deliveryDateLatest && !value.deliveryDate) {
+      ctx.addIssue({ code: "custom", path: ["deliveryDate"], message: "Choose the first day of the window too." })
+    }
+    if (value.deliveryDate && value.deliveryDateLatest && value.deliveryDateLatest < value.deliveryDate) {
+      ctx.addIssue({ code: "custom", path: ["deliveryDateLatest"], message: "The last day cannot be before the first." })
+    }
+  })
+  .transform((value) => ({
+    ...value,
+    deliveryDateLatest:
+      value.deliveryDate && value.deliveryDateLatest && value.deliveryDateLatest.getTime() === value.deliveryDate.getTime()
+        ? undefined
+        : value.deliveryDateLatest,
+  }))
 
 export type OrderDeliveryDateInput = z.infer<typeof orderDeliveryDateSchema>
 

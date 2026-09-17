@@ -4,100 +4,116 @@ import { ClockIcon, MailIcon, MapPinIcon, PhoneIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Container } from "@/components/layout/container"
 import { BrandMark } from "@/components/layout/brand-mark"
-import { siteConfig } from "@/config/site"
+import { toTelHref } from "@/lib/utils/tel"
 import { footerLinkGroups, isNavLinkAvailable } from "@/lib/constants/nav-links"
-import { getWhatsAppNumber } from "@/lib/queries/settings.queries"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import { buildGeneralWhatsAppMessage, buildWhatsAppUrl } from "@/lib/utils/whatsapp"
+import type { SocialNetworkField } from "@/lib/validations/settings.schema"
 
-const socialLinks = [
-  { label: "Facebook", href: siteConfig.social.facebook, icon: "facebook" },
-  { label: "Instagram", href: siteConfig.social.instagram, icon: "instagram" },
-  { label: "LinkedIn", href: siteConfig.social.linkedin, icon: "linkedin" },
-] as const
-
-/** Sanitizes a display phone number down to a dialable tel: URI. Not a
- *  security boundary — just correctness, since the display string carries
- *  spaces and formatting a dialer would choke on. */
-function toTelHref(displayNumber: string): string {
-  return `tel:${displayNumber.replace(/[^\d+]/g, "")}`
+function SocialIcon({ network }: { network: SocialNetworkField }) {
+  switch (network) {
+    case "socialFacebook":
+      return (
+        <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true" fill="currentColor">
+          <path d="M14 8h3V4h-3c-3.3 0-5 1.7-5 5v3H6v4h3v4h4v-4h3l1-4h-4V9c0-.7.3-1 1-1Z" />
+        </svg>
+      )
+    case "socialInstagram":
+      return (
+        <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="3" width="18" height="18" rx="5" />
+          <circle cx="12" cy="12" r="4" />
+          <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+        </svg>
+      )
+    case "socialTiktok":
+      return (
+        <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true" fill="currentColor">
+          <path d="M16.6 3c.3 2.2 1.7 3.9 3.9 4.2v3.1a7 7 0 0 1-3.8-1.2v6.3a5.6 5.6 0 1 1-5.6-5.6c.3 0 .6 0 .9.1v3.2a2.5 2.5 0 1 0 1.6 2.3V3h3Z" />
+        </svg>
+      )
+    case "socialYoutube":
+      return (
+        <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true" fill="currentColor">
+          <path d="M22 8.2a3 3 0 0 0-2.1-2.1C18 5.6 12 5.6 12 5.6s-6 0-7.9.5A3 3 0 0 0 2 8.2 31 31 0 0 0 1.6 12c0 1.3.1 2.5.4 3.8a3 3 0 0 0 2.1 2.1c1.9.5 7.9.5 7.9.5s6 0 7.9-.5a3 3 0 0 0 2.1-2.1c.3-1.3.4-2.5.4-3.8s-.1-2.5-.4-3.8ZM10 15.1V8.9l5.2 3.1L10 15.1Z" />
+        </svg>
+      )
+    case "socialLinkedin":
+      return (
+        <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true" fill="currentColor">
+          <path d="M5 3.5A2.5 2.5 0 1 1 5 8.5a2.5 2.5 0 0 1 0-5ZM3 9h4v12H3V9Zm6 0h3.8v1.6h.1c.5-.9 1.7-2 3.6-2 3.9 0 4.5 2.6 4.5 6V21h-4v-5.7c0-1.4 0-3.2-2-3.2s-2.3 1.5-2.3 3.1V21H9V9Z" />
+        </svg>
+      )
+    case "socialX":
+      return (
+        <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true" fill="currentColor">
+          <path d="M17.8 3h3.1l-6.8 7.8L22 21h-6.2l-4.9-6.4L5.3 21H2.2l7.3-8.3L2 3h6.3l4.4 5.9L17.8 3Zm-1.1 16.2h1.7L7.4 4.7H5.6l11.1 14.5Z" />
+        </svg>
+      )
+  }
 }
 
-function SocialIcon({ name }: { name: (typeof socialLinks)[number]["icon"] }) {
-  if (name === "facebook") {
-    return (
-      <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true" fill="currentColor">
-        <path d="M14 8h3V4h-3c-3.3 0-5 1.7-5 5v3H6v4h3v4h4v-4h3l1-4h-4V9c0-.7.3-1 1-1Z" />
-      </svg>
-    )
-  }
-
-  if (name === "instagram") {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        className="size-4"
-        aria-hidden="true"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      >
-        <rect x="3" y="3" width="18" height="18" rx="5" />
-        <circle cx="12" cy="12" r="4" />
-        <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
-      </svg>
-    )
-  }
-
-  return (
-    <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true" fill="currentColor">
-      <path d="M5 3.5A2.5 2.5 0 1 1 5 8.5a2.5 2.5 0 0 1 0-5ZM3 9h4v12H3V9Zm6 0h3.8v1.6h.1c.5-.9 1.7-2 3.6-2 3.9 0 4.5 2.6 4.5 6V21h-4v-5.7c0-1.4 0-3.2-2-3.2s-2.3 1.5-2.3 3.1V21H9V9Z" />
-    </svg>
-  )
-}
-
+/**
+ * The footer, from Settings → Business information.
+ *
+ * Every contact line is optional: an empty value in Settings renders no row
+ * rather than a placeholder, and an unconfigured network has no icon. The
+ * phone number is a tap-to-call link only while "Call us" buttons are on.
+ */
 export async function SiteFooter() {
-  // The number comes from BusinessSettings, not from the env var, so the
-  // dealership can change it in the dashboard without a deploy (brief §13).
-  // `buildWhatsAppUrl` returns null when neither is configured, and the
-  // block below renders nothing rather than a broken wa.me link.
+  const settings = await getPublicSiteSettings()
+  const { contact } = settings
+
+  // Null when no number is configured or WhatsApp buttons are off, and the
+  // block below then renders nothing rather than a broken wa.me link.
   const whatsappUrl = buildWhatsAppUrl({
-    phoneNumber: await getWhatsAppNumber(),
-    message: buildGeneralWhatsAppMessage(siteConfig.name),
+    phoneNumber: contact.whatsappNumber,
+    message: buildGeneralWhatsAppMessage(settings.businessName),
   })
 
   const contactItems = [
-    { icon: MapPinIcon, content: siteConfig.contact.address },
-    { icon: ClockIcon, content: siteConfig.contact.hours },
-    {
-      icon: PhoneIcon,
-      content: (
-        <a
-          href={toTelHref(siteConfig.contact.phone)}
-          className="tabular transition-colors hover:text-gold-ink"
-        >
-          {siteConfig.contact.phone}
-        </a>
-      ),
-    },
-    {
-      icon: MailIcon,
-      content: (
-        <a
-          href={`mailto:${siteConfig.contact.email}`}
-          className="transition-colors hover:text-gold-ink"
-        >
-          {siteConfig.contact.email}
-        </a>
-      ),
-    },
-  ]
+    contact.address ? { key: "address", icon: MapPinIcon, content: contact.address } : null,
+    settings.hours
+      ? {
+          key: "hours",
+          icon: ClockIcon,
+          content: (
+            <span className="flex flex-col gap-0.5">
+              {settings.hours.map((line) => (
+                <span key={line}>{line}</span>
+              ))}
+            </span>
+          ),
+        }
+      : null,
+    contact.phone
+      ? {
+          key: "phone",
+          icon: PhoneIcon,
+          content: contact.callUsEnabled ? (
+            <a href={toTelHref(contact.phone)} className="tabular transition-colors hover:text-gold-ink">
+              {contact.phone}
+            </a>
+          ) : (
+            <span className="tabular">{contact.phone}</span>
+          ),
+        }
+      : null,
+    contact.email
+      ? {
+          key: "email",
+          icon: MailIcon,
+          content: (
+            <a href={`mailto:${contact.email}`} className="transition-colors hover:text-gold-ink">
+              {contact.email}
+            </a>
+          ),
+        }
+      : null,
+  ].filter((item) => item !== null)
 
   return (
-    <footer
-      data-slot="site-footer"
-      data-tone="dark"
-      className="bg-foreground text-background"
-    >
+    <footer data-slot="site-footer" data-tone="dark" className="bg-foreground text-background">
       {/* Hairline gold rule across the full width — the single strongest
           brand cue in the footer, and cheaper visually than a gold block. */}
       <div aria-hidden="true" className="h-px w-full bg-gradient-to-r from-transparent via-gold/45 to-transparent" />
@@ -108,22 +124,24 @@ export async function SiteFooter() {
           <div className="lg:col-span-5">
             <Link
               href="/"
-              aria-label={`${siteConfig.name} — home`}
+              aria-label={`${settings.businessName} — home`}
               className="inline-block transition-opacity duration-fast hover:opacity-80"
             >
-              <BrandMark size="lg" />
+              <BrandMark size="lg" tone="dark" />
             </Link>
 
-            <p className="mt-5 max-w-sm text-body text-background/65">{siteConfig.description}</p>
+            <p className="mt-5 max-w-sm text-body text-background/65">{settings.businessDescription}</p>
 
-            <ul className="mt-7 space-y-3.5 text-small text-background/80">
-              {contactItems.map(({ icon: Icon, content }, index) => (
-                <li key={index} className="flex items-start gap-3">
-                  <Icon className="mt-0.5 size-4 shrink-0 text-gold-ink" aria-hidden="true" />
-                  <span>{content}</span>
-                </li>
-              ))}
-            </ul>
+            {contactItems.length > 0 ? (
+              <ul className="mt-7 space-y-3.5 text-small text-background/80">
+                {contactItems.map(({ key, icon: Icon, content }) => (
+                  <li key={key} className="flex items-start gap-3">
+                    <Icon className="mt-0.5 size-4 shrink-0 text-gold-ink" aria-hidden="true" />
+                    <span>{content}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
 
           {/* Link groups */}
@@ -178,26 +196,28 @@ export async function SiteFooter() {
               </a>
             )}
 
-            <div className="mt-7 flex items-center gap-2.5">
-              {socialLinks.map(({ label, href, icon }) => (
-                <a
-                  key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={label}
-                  className="flex size-9 items-center justify-center rounded-full border border-white/15 text-background/70 transition-colors duration-fast hover:border-gold/60 hover:text-gold-ink"
-                >
-                  <SocialIcon name={icon} />
-                </a>
-              ))}
-            </div>
+            {settings.social.length > 0 ? (
+              <div className="mt-7 flex flex-wrap items-center gap-2.5">
+                {settings.social.map(({ network, label, url }) => (
+                  <a
+                    key={network}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={label}
+                    className="flex size-9 items-center justify-center rounded-full border border-white/15 text-background/70 transition-colors duration-fast hover:border-gold/60 hover:text-gold-ink"
+                  >
+                    <SocialIcon network={network} />
+                  </a>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
 
         <div className="mt-14 flex flex-col gap-3 border-t border-white/10 pt-8 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-small text-background/50">
-            © {new Date().getFullYear()} {siteConfig.name}. All rights reserved.
+            © {new Date().getFullYear()} {settings.businessName}. All rights reserved.
           </p>
           <p className="text-small text-background/50">
             Vehicles sourced from Japan &amp; South Korea · Delivered across South Sudan

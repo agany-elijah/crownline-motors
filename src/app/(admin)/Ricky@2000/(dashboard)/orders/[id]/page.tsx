@@ -15,6 +15,7 @@ import { requirePermission } from "@/lib/auth/admin-guard"
 import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
 import { trackingActivationProblem } from "@/lib/orders/order-lifecycle"
 import { getOrderById } from "@/lib/queries/order.queries"
+import { getOperationalSettings, getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import { firstNameOf } from "@/lib/quotes/quote-messages"
 import { trackingPagePath } from "@/lib/tracking/tracking-number"
 import { formatCurrency, formatCurrencyOrDash } from "@/lib/utils/format-currency"
@@ -57,7 +58,7 @@ export default async function AdminOrderDetailPage(props: PageProps<"/Ricky@2000
       ? buildWhatsAppUrl({
           phoneNumber: order.customerWhatsapp,
           message: buildTrackingNumberShareMessage({
-            siteName: siteConfig.name,
+            siteName: (await getPublicSiteSettings()).businessName,
             customerFirstName: firstNameOf(order.customerName),
             orderNumber: order.orderNumber,
             trackingNumber: order.shipment.trackingNumber,
@@ -178,6 +179,7 @@ export default async function AdminOrderDetailPage(props: PageProps<"/Ricky@2000
           <section className={PANEL}>
             <h2 className="font-heading text-h3 font-semibold">Tracking</h2>
             <OrderTrackingPanel
+              stages={(await getOperationalSettings()).trackingStages}
               orderId={order.id}
               shipment={order.shipment}
               customerEmail={order.customerEmail}
@@ -185,16 +187,16 @@ export default async function AdminOrderDetailPage(props: PageProps<"/Ricky@2000
               activationProblem={activationProblem}
               lockedReason={isCancelled ? "This order is cancelled, so its tracking can no longer be updated." : null}
             />
+            <OrderDeliveryDateForm
+              orderId={order.id}
+              deliveryDate={order.estimatedDeliveryDate}
+              deliveryDateLatest={order.estimatedDeliveryLatest}
+            />
           </section>
         </div>
 
         <div className="flex flex-col gap-6">
           <OrderFinanceSummaryCard finance={order.finance} />
-
-          <section className={PANEL}>
-            <h2 className="font-heading text-h3 font-semibold">Delivery</h2>
-            <OrderDeliveryDateForm orderId={order.id} deliveryDate={order.estimatedDeliveryDate} />
-          </section>
 
           <section className={PANEL}>
             <h2 className="font-heading text-h3 font-semibold">Customer</h2>

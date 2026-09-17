@@ -1,11 +1,20 @@
 "use server"
 
-import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 
+import { AdminLoginEventKind, AdminSessionEndReason } from "@/generated/prisma/enums"
 import { logSecurityEvent, recordAuditLogBestEffort, redactEmail } from "@/lib/audit"
+import {
+  currentDeviceLabel,
+  endAdminSession,
+  endAllAdminSessions,
+  recordAdminLoginEvent,
+  registerAdminSession,
+  sessionIdFromAccessToken,
+} from "@/lib/auth/admin-sessions"
 import { getClientIp } from "@/lib/auth/client-ip"
 import { getSessionUser } from "@/lib/auth/dal"
+import { getEmailLinkOrigin } from "@/lib/auth/email-link-origin"
 import {
   ADMIN_LOGIN_RATE_LIMITED_MESSAGE,
   PASSWORD_RESET_MAX_ATTEMPTS,
@@ -19,11 +28,12 @@ import {
 } from "@/lib/auth/rate-limit"
 import {
   ADMIN_LOGIN_PATH,
+  ADMIN_TWO_FACTOR_CHALLENGE_PATH,
   resolveReturnPath,
 } from "@/lib/auth/return-path"
 import { prisma } from "@/lib/prisma"
+import { getOperationalSettings } from "@/lib/queries/settings.queries"
 import { createClient } from "@/lib/supabase/server"
-import { siteConfig } from "@/config/site"
 import {
   passwordResetRequestSchema,
   signInSchema,
@@ -108,42 +118,6 @@ async function buildLoginRateLimitKeys(email: string): Promise<RateLimitKey[]> {
 }
 
 /**
- * Absolute origin for links embedded in authentication emails.
- *
- * NEXT_PUBLIC_SITE_URL wins whenever it is set, and in production it is the
- * only accepted source. Deriving the origin from the request's Host header
- * in production would allow password-reset poisoning: an attacker sends a
- * reset request with a forged Host, and the victim receives a genuine
- * Supabase email whose link points at the attacker's domain, carrying a
- * live recovery token.
- *
- * The header fallback exists so the flow is testable in a Codespace or on
- * localhost, where no fixed public URL exists. Supabase's redirect
- * allow-list remains the backstop in both cases.
- */
-async function getEmailLinkOrigin(): Promise<string> {
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
-  }
-
-  if (process.env.NODE_ENV === "production") {
-    // Falling back to the Host header here is the vulnerability described
-    // above, so refuse instead. A missing NEXT_PUBLIC_SITE_URL in
-    // production is a deployment misconfiguration, not a runtime condition
-    // to paper over.
-    throw new Error(
-      "NEXT_PUBLIC_SITE_URL must be set in production — authentication email links cannot be built from request headers."
-    )
-  }
-
-  const headerList = await headers()
-  const host = headerList.get("x-forwarded-host") ?? headerList.get("host")
-  const protocol = headerList.get("x-forwarded-proto") ?? "http"
-
-  return host ? `${protocol}://${host}` : siteConfig.url.replace(/\/$/, "")
-}
-
-/**
  * Signs an administrator in with email and password.
  *
  * Authenticating with Supabase is only half the check. Supabase answers
@@ -222,6 +196,14 @@ export async function signInAction(
     // an already-failing request is free, and never on the success path.
     await pruneExpiredAttempts()
 
+    // Shown to that administrator under Login & session security. Nothing is
+    // recorded for an address that is not an administrator's, and the
+    // response below is identical either way, so this reveals nothing.
+    const target = await prisma.adminProfile.findUnique({ where: { email }, select: { id: true, isActive: true } })
+    if (target?.isActive) {
+      await recordAdminLoginEvent({ adminId: target.id, kind: AdminLoginEventKind.SIGN_IN_FAILED })
+    }
+
     logSecurityEvent("admin_sign_in_failed", {
       email: redactEmail(email),
       reason: error?.code ?? "no_user",
@@ -232,7 +214,7 @@ export async function signInAction(
 
   const profile = await prisma.adminProfile.findUnique({
     where: { id: data.user.id },
-    select: { id: true, isActive: true },
+    select: { id: true, isActive: true, twoFactorEnabledAt: true },
   })
 
   if (!profile || !profile.isActive) {
@@ -268,17 +250,34 @@ export async function signInAction(
   // succeeds is one mistake away from a lockout for the rest of the window.
   await clearAttempts(rateLimitKeys)
 
+  // The session is recorded now, so the timeout counts from the password and
+  // the session appears in the administrator's list from its first request.
+  const authSessionId = data.session ? sessionIdFromAccessToken(data.session.access_token) : null
+  if (authSessionId) {
+    await registerAdminSession({ adminId: profile.id, authSessionId, deviceLabel: await currentDeviceLabel() })
+  }
+
+  // `next` came from a query string the caller controls, so it is re-checked
+  // here even though the login page already filtered it. Validating once, at
+  // the point of use, is what actually prevents the open redirect.
+  const destination = resolveReturnPath(next)
+
+  /**
+   * An administrator with two-factor authentication is not signed in yet.
+   * Their session is at AAL1, which the DAL refuses for them; the code page
+   * upgrades it, and records the sign-in when it does.
+   */
+  if (profile.twoFactorEnabledAt) {
+    redirect(`${ADMIN_TWO_FACTOR_CHALLENGE_PATH}?next=${encodeURIComponent(destination)}`)
+  }
+
   await recordAuditLogBestEffort({
     actorId: profile.id,
     action: "ADMIN_SIGNED_IN",
     entityType: "AdminProfile",
     entityId: profile.id,
   })
-
-  // `next` came from a query string the caller controls, so it is re-checked
-  // here even though the login page already filtered it. Validating once, at
-  // the point of use, is what actually prevents the open redirect.
-  const destination = resolveReturnPath(next)
+  await recordAdminLoginEvent({ adminId: profile.id, kind: AdminLoginEventKind.SIGN_IN_SUCCEEDED })
 
   // Outside the try/catch above on purpose: redirect() signals by throwing,
   // and catching it would turn a successful sign-in into a swallowed error.
@@ -303,6 +302,20 @@ export async function signOutAction(): Promise<void> {
         entityType: "AdminProfile",
         entityId: profile.id,
       })
+      await recordAdminLoginEvent({ adminId: profile.id, kind: AdminLoginEventKind.SIGNED_OUT })
+
+      if (user.sessionId) {
+        try {
+          await endAdminSession({
+            adminId: profile.id,
+            authSessionId: user.sessionId,
+            reason: AdminSessionEndReason.SIGNED_OUT,
+          })
+        } catch (error) {
+          // Supabase's sign-out below still revokes the session itself.
+          console.error("[auth] failed to record the end of a session", error)
+        }
+      }
     }
   }
 
@@ -389,6 +402,16 @@ export async function requestPasswordResetAction(
     })
 
     // Same message, same shape, no timing games worth playing at this scale.
+    return { notice: genericNotice }
+  }
+
+  /**
+   * Settings → Login & session security → "Allow password recovery", off.
+   * The same notice again: whether recovery is on is not something to
+   * confirm to whoever is typing addresses into this form.
+   */
+  if (!(await getOperationalSettings()).security.allowPasswordRecovery) {
+    logSecurityEvent("admin_password_reset_disabled", { email: redactEmail(email) })
     return { notice: genericNotice }
   }
 
@@ -508,6 +531,13 @@ export async function updatePasswordAction(
    * The cost is one extra sign-in immediately after a reset. That is a fair
    * price, and it is the moment the person is most prepared to pay it.
    */
+  try {
+    await endAllAdminSessions({ adminId: profile.id, reason: AdminSessionEndReason.PASSWORD_CHANGED })
+  } catch (error) {
+    // The global sign-out below still revokes every refresh token.
+    console.error("[auth] failed to end sessions after a password reset", error)
+  }
+
   await supabase.auth.signOut({ scope: "global" })
 
   // The notice is why this is not a mysterious bounce back to the login

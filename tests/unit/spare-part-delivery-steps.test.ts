@@ -7,7 +7,7 @@ import {
   SPARE_PART_DELIVERY_STEP_TITLE_MAX,
 } from "@/lib/constants/spare-part-delivery"
 import {
-  businessSettingsSchema,
+  ordersTrackingSettingsSchema,
   sparePartDeliveryStepsSchema,
 } from "@/lib/validations/settings.schema"
 
@@ -99,16 +99,11 @@ describe("sparePartDeliveryStepsSchema", () => {
   })
 })
 
-describe("businessSettingsSchema — the steps field", () => {
-  const valid = {
-    whatsappNumber: "+211900000000",
-    defaultInitialPercentage: "50",
-    defaultMombasaPercentage: "25",
-    defaultFinalPercentage: "25",
-  }
+describe("ordersTrackingSettingsSchema — the steps field", () => {
+  const valid = { trackingNumberPrefix: "CLM" }
 
   it("parses the JSON string the form submits", () => {
-    const parsed = businessSettingsSchema.safeParse({
+    const parsed = ordersTrackingSettingsSchema.safeParse({
       ...valid,
       sparePartDeliverySteps: JSON.stringify([step()]),
     })
@@ -118,51 +113,41 @@ describe("businessSettingsSchema — the steps field", () => {
   })
 
   it("reads an empty string as a deliberately cleared list", () => {
-    const parsed = businessSettingsSchema.safeParse({
-      ...valid,
-      sparePartDeliverySteps: "",
-    })
+    const parsed = ordersTrackingSettingsSchema.safeParse({ ...valid, sparePartDeliverySteps: "" })
 
     expect(parsed.data?.sparePartDeliverySteps).toEqual([])
   })
 
   it("treats an absent field as 'leave the stored steps alone'", () => {
     /**
-     * The security-relevant case, and the reason the field is optional rather
-     * than required.
-     *
-     * `FormData.get` returns null for a field that was not submitted, and a
-     * Server Action is a public POST endpoint — so a crafted request carrying
-     * only the payment percentages must not be able to wipe an operator's
-     * configured copy as a side effect. `undefined` reaches Prisma as "do not
-     * touch this column", which is exactly that.
+     * The security-relevant case. `FormData.get` returns null for a field that
+     * was not submitted, and a Server Action is a public POST endpoint — so a
+     * crafted request carrying only the prefix must not be able to wipe an
+     * operator's configured copy (or tracking stages) as a side effect.
+     * `undefined` reaches Prisma as "do not touch this column".
      */
     for (const missing of [null, undefined]) {
-      const parsed = businessSettingsSchema.safeParse({
+      const parsed = ordersTrackingSettingsSchema.safeParse({
         ...valid,
         sparePartDeliverySteps: missing,
+        trackingStages: missing,
       })
 
       expect(parsed.success).toBe(true)
       expect(parsed.data?.sparePartDeliverySteps).toBeUndefined()
+      expect(parsed.data?.trackingStages).toBeUndefined()
     }
   })
 
   it("rejects a string that is not JSON rather than throwing", () => {
-    const parsed = businessSettingsSchema.safeParse({
-      ...valid,
-      sparePartDeliverySteps: "{ not json",
-    })
+    const parsed = ordersTrackingSettingsSchema.safeParse({ ...valid, sparePartDeliverySteps: "{ not json" })
 
     expect(parsed.success).toBe(false)
   })
 
-  it("still enforces the payment split alongside the steps", () => {
-    // The steps must not become a way past the rule that actually matters on
-    // this form.
-    const parsed = businessSettingsSchema.safeParse({
-      ...valid,
-      defaultFinalPercentage: "30",
+  it("still enforces the prefix rule alongside the steps", () => {
+    const parsed = ordersTrackingSettingsSchema.safeParse({
+      trackingNumberPrefix: "CLMO",
       sparePartDeliverySteps: JSON.stringify([step()]),
     })
 

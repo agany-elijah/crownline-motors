@@ -1,22 +1,27 @@
 import type { MetadataRoute } from "next";
 
 import { siteConfig } from "@/config/site";
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries";
 
 /**
  * The site's static routes.
  *
  * Individual vehicle and spare-part pages are deliberately absent for now:
  * both are database-driven and both are individually indexable through the
- * catalogues that link them, and generating those entries means a database
- * read inside a route that Next renders at build time. That is Stage 34 work
- * and belongs with the rest of the technical SEO, done once for both product
- * domains rather than twice.
+ * catalogues that link them. Generating those entries is Stage 34 work and
+ * belongs with the rest of the technical SEO, done once for both domains.
  *
- * The two catalogue routes carry the highest priority after the homepage and
- * a daily change frequency, because they are the pages whose contents
- * actually change as stock moves.
+ * Settings → SEO & social can switch the sitemap off, or indexing off
+ * altogether; either publishes an empty sitemap, which is valid XML that
+ * lists nothing, and robots.txt stops advertising it.
  */
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const { seo } = await getPublicSiteSettings();
+
+  if (!seo.sitemapEnabled || !seo.indexingEnabled) {
+    return [];
+  }
+
   const catalogues = new Set(["/cars", "/spare-parts"]);
 
   const routes = [

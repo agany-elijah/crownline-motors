@@ -5,9 +5,7 @@ import { SiteHeader } from "@/components/layout/site-header"
 import { SiteFooter } from "@/components/layout/site-footer"
 import { SkipLink } from "@/components/layout/skip-link"
 import { WhatsAppFloatButton } from "@/components/layout/whatsapp-float-button"
-import { SiteContactProvider } from "@/components/shared/site-contact-provider"
-import { siteConfig } from "@/config/site"
-import { getWhatsAppNumber } from "@/lib/queries/settings.queries"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import { buildGeneralWhatsAppMessage, buildWhatsAppUrl } from "@/lib/utils/whatsapp"
 
 export default async function PublicLayout({
@@ -18,16 +16,15 @@ export default async function PublicLayout({
   /**
    * Built here, once, for the header's mobile drawer.
    *
-   * SiteHeader is a Client Component — it needs scroll and IntersectionObserver
-   * state — so it cannot read BusinessSettings itself. The footer and the
-   * floating button are server components and read the number directly; all
-   * three go through `getWhatsAppNumber`, which is cached per tag, so this is
-   * one database read shared across the request rather than three.
+   * SiteHeader is a Client Component, so the link is built on the server and
+   * passed down. The number and name come from Settings through the cached
+   * public settings read that the root layout, footer and floating button
+   * share — one database read per cache fill, not one per component.
    */
-  const whatsappNumber = await getWhatsAppNumber()
+  const settings = await getPublicSiteSettings()
   const whatsappUrl = buildWhatsAppUrl({
-    phoneNumber: whatsappNumber,
-    message: buildGeneralWhatsAppMessage(siteConfig.name),
+    phoneNumber: settings.contact.whatsappNumber,
+    message: buildGeneralWhatsAppMessage(settings.businessName),
   })
 
   return (
@@ -38,16 +35,11 @@ export default async function PublicLayout({
      * It has to outlive a navigation between the catalogue and a part page —
      * a provider mounted inside either segment would be torn down and
      * remounted on every move between them, and the basket would rebuild
-     * itself from storage on each one. Here it is mounted once, and the toast
-     * it renders can appear over whichever page the customer is on when they
-     * add something.
+     * itself from storage on each one.
      *
-     * The cost is one small client component on pages that never use it. It
-     * holds no state until storage is read and renders nothing but an empty
-     * live region, which is the price of the basket surviving the one
-     * navigation customers make most.
+     * The site settings (WhatsApp number, name, display switches) are provided
+     * by the root layout, above this one.
      */
-    <SiteContactProvider whatsappNumber={whatsappNumber}>
     <CartProvider>
       <div className="flex flex-1 flex-col">
         {/* First element in the tab order, so keyboard users can jump the
@@ -79,6 +71,5 @@ export default async function PublicLayout({
         <WhatsAppFloatButton />
       </div>
     </CartProvider>
-    </SiteContactProvider>
   )
 }

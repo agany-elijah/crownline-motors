@@ -2,9 +2,15 @@ import "server-only"
 
 import { redirect } from "next/navigation"
 
-import { getAdminProfile, type AdminProfileDTO } from "@/lib/auth/dal"
+import { getAdminAccess, type ActiveAdminSession, type AdminProfileDTO } from "@/lib/auth/dal"
 import { can, type AdminPermission } from "@/lib/auth/permissions"
-import { ADMIN_FORBIDDEN_PATH, loginPathWithReturn } from "@/lib/auth/return-path"
+import {
+  ADMIN_FORBIDDEN_PATH,
+  ADMIN_LOGIN_PATH,
+  ADMIN_TWO_FACTOR_CHALLENGE_PATH,
+  loginPathWithReturn,
+} from "@/lib/auth/return-path"
+import { TWO_FACTOR_SETTINGS_PATH } from "@/lib/constants/settings-nav"
 
 /**
  * Enforcement built on the DAL (src/lib/auth/dal.ts) and the permission
@@ -12,51 +18,53 @@ import { ADMIN_FORBIDDEN_PATH, loginPathWithReturn } from "@/lib/auth/return-pat
  *
  * Two families of guard, because pages and server actions fail differently:
  *
- *   require*   — for Server Components. Never returns when access is
- *                denied; it redirects. Correct for a page, wrong for an
- *                action, where a redirect thrown mid-mutation is
- *                indistinguishable from success to the caller.
- *
+ *   require*   — for Server Components. Never returns when access is denied;
+ *                it redirects to the place that resolves the refusal.
  *   authorize* — for Server Actions and Route Handlers. Returns a
- *                discriminated result the caller must narrow, so the
- *                type system forces the check to be handled rather than
- *                letting a missing `await` slip through.
+ *                discriminated result the caller must narrow.
  *
- * Every admin page calls a require*; every admin action calls an
- * authorize*. The admin layout may also call one, but never *only* the
- * layout — see the note at the top of dal.ts for why that is not a
- * boundary in the App Router.
+ * ── allowTwoFactorSetup ───────────────────────────────────────────────
+ * When Settings requires two-factor for everyone, an administrator without it
+ * may reach exactly the pages and actions that set it up (and the chrome
+ * around them). Everything else sends them there. The option is opt-in per
+ * call site, so a new page is locked until someone decides otherwise.
  */
 
-/**
- * Server Components: requires an active administrator, any role.
- *
- * Returns the profile so the caller does not need a second lookup — the
- * DAL's cache() makes it the same request either way, but returning it
- * keeps call sites to one line.
- */
-export async function requireAdmin(returnTo?: string): Promise<AdminProfileDTO> {
-  const admin = await getAdminProfile()
-
-  if (!admin) {
-    redirect(loginPathWithReturn(returnTo))
-  }
-
-  return admin
+export interface GuardOptions {
+  returnTo?: string
+  allowTwoFactorSetup?: boolean
 }
 
-/** Server Components: requires an active administrator holding `permission`. */
+/** Server Components: requires an administrator with full access, any role. */
+export async function requireAdmin(options: GuardOptions = {}): Promise<AdminProfileDTO> {
+  const access = await getAdminAccess()
+
+  switch (access.status) {
+    case "OK":
+      return access.admin
+    case "TWO_FACTOR_SETUP_REQUIRED":
+      if (options.allowTwoFactorSetup) return access.admin
+      redirect(`${TWO_FACTOR_SETTINGS_PATH}?required=1`)
+    case "TWO_FACTOR_REQUIRED":
+      redirect(ADMIN_TWO_FACTOR_CHALLENGE_PATH)
+    case "SESSION_ENDED":
+      redirect(`${ADMIN_LOGIN_PATH}?notice=${access.reason === "EXPIRED" ? "session_expired" : "session_ended"}`)
+    case "SIGNED_OUT":
+      redirect(loginPathWithReturn(options.returnTo))
+  }
+}
+
+/** Server Components: requires an administrator holding `permission`. */
 export async function requirePermission(
   permission: AdminPermission,
-  returnTo?: string
+  options: GuardOptions = {}
 ): Promise<AdminProfileDTO> {
-  const admin = await requireAdmin(returnTo)
+  const admin = await requireAdmin(options)
 
   if (!can(admin.role, permission)) {
-    // A signed-in admin who lacks a permission is a different situation
-    // from an anonymous visitor, and gets a different destination: bouncing
-    // them to the login page would read as "your session expired" and send
-    // them round a loop they can never complete.
+    // A signed-in admin who lacks a permission gets a different destination
+    // from an anonymous visitor: the login page would read as "your session
+    // expired" and send them round a loop they can never complete.
     redirect(ADMIN_FORBIDDEN_PATH)
   }
 
@@ -65,35 +73,45 @@ export async function requirePermission(
 
 /** The shape every authorize* guard returns. */
 export type AuthorizationResult =
-  | { ok: true; admin: AdminProfileDTO }
+  | { ok: true; admin: AdminProfileDTO; session: ActiveAdminSession }
   | { ok: false; reason: "UNAUTHENTICATED" | "FORBIDDEN"; message: string }
 
 /**
- * Server Actions / Route Handlers: requires an active administrator.
+ * Server Actions / Route Handlers: requires an administrator with full access.
  *
- * The messages are intentionally the ones that would be shown to the
- * caller — generic, with no detail about which check failed or whether the
- * account exists (SECURITY.MD §5.4, §37).
+ * The messages are intentionally generic, with no detail about which check
+ * failed (SECURITY.MD §5.4, §37).
  */
-export async function authorizeAdmin(): Promise<AuthorizationResult> {
-  const admin = await getAdminProfile()
+export async function authorizeAdmin(options: Pick<GuardOptions, "allowTwoFactorSetup"> = {}): Promise<AuthorizationResult> {
+  const access = await getAdminAccess()
 
-  if (!admin) {
-    return {
-      ok: false,
-      reason: "UNAUTHENTICATED",
-      message: "Your session has expired. Please sign in again.",
-    }
+  if (access.status === "OK") {
+    return { ok: true, admin: access.admin, session: access.session }
   }
 
-  return { ok: true, admin }
+  if (access.status === "TWO_FACTOR_SETUP_REQUIRED") {
+    return options.allowTwoFactorSetup
+      ? { ok: true, admin: access.admin, session: access.session }
+      : {
+          ok: false,
+          reason: "FORBIDDEN",
+          message: "Set up two-factor authentication for your account before continuing.",
+        }
+  }
+
+  return {
+    ok: false,
+    reason: "UNAUTHENTICATED",
+    message: "Your session has expired. Please sign in again.",
+  }
 }
 
 /** Server Actions / Route Handlers: requires an administrator holding `permission`. */
 export async function authorizePermission(
-  permission: AdminPermission
+  permission: AdminPermission,
+  options: Pick<GuardOptions, "allowTwoFactorSetup"> = {}
 ): Promise<AuthorizationResult> {
-  const result = await authorizeAdmin()
+  const result = await authorizeAdmin(options)
 
   if (!result.ok) {
     return result

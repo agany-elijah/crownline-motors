@@ -5,8 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Container } from "@/components/layout/container";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
-import { siteConfig } from "@/config/site";
-import { getWhatsAppNumber } from "@/lib/queries/settings.queries";
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries";
 import {
   buildGeneralWhatsAppMessage,
   buildWhatsAppUrl,
@@ -45,9 +44,10 @@ export default async function NotFound() {
   // the number lives in BusinessSettings, so the link is built here and
   // passed down. This page composes the shell itself, so it has to supply it
   // itself too.
+  const settings = await getPublicSiteSettings();
   const whatsappUrl = buildWhatsAppUrl({
-    phoneNumber: await getWhatsAppNumber(),
-    message: buildGeneralWhatsAppMessage(siteConfig.name),
+    phoneNumber: settings.contact.whatsappNumber,
+    message: buildGeneralWhatsAppMessage(settings.businessName),
   });
 
   return (
@@ -94,13 +94,17 @@ export default async function NotFound() {
               <div className="mt-6 border-t border-border pt-6">
                 <p className="text-small text-muted-foreground">
                   Looking for something specific?{" "}
-                  <Link
-                    href="/get-a-quote"
-                    className="text-foreground underline underline-offset-4 hover:text-gold-ink"
-                  >
-                    Request a vehicle
-                  </Link>{" "}
-                  or{" "}
+                  {settings.catalogDisplay.actions.getQuote ? (
+                    <>
+                      <Link
+                        href="/get-a-quote"
+                        className="text-foreground underline underline-offset-4 hover:text-gold-ink"
+                      >
+                        Request a vehicle
+                      </Link>{" "}
+                      or{" "}
+                    </>
+                  ) : null}
                   <Link
                     href="/contact"
                     className="text-foreground underline underline-offset-4 hover:text-gold-ink"

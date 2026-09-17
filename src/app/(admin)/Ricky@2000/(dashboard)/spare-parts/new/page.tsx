@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { requirePermission } from "@/lib/auth/admin-guard"
 import { listCategoryOptions } from "@/lib/queries/spare-part.queries"
 import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 
 export const metadata: Metadata = {
   title: "Add Spare Part",
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
 export default async function AdminSparePartNewPage() {
   await requirePermission("sparePart:write")
 
-  const categories = await listCategoryOptions()
+  const [categories, { catalogDisplay }] = await Promise.all([listCategoryOptions(), getPublicSiteSettings()])
 
   /**
    * A part must have a category, and the select can only offer what exists.
@@ -54,7 +55,7 @@ export default async function AdminSparePartNewPage() {
 
       <WorkflowTrail />
 
-      <SparePartForm categories={categories} />
+      <SparePartForm categories={categories} siteWideVisibility={catalogDisplay.sparePart} />
     </div>
   )
 }

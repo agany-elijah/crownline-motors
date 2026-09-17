@@ -92,12 +92,14 @@ export function buildVehicleWhatsAppMessage({
   referenceNumber,
 }: {
   siteName: string
-  year: number
+  /** Null where the listing does not show its year. */
+  year: number | null
   make: string
   model: string
   referenceNumber: string
 }): string {
-  return `Hello ${siteName}, I am interested in the ${make} ${model} ${year}, listing reference ${referenceNumber}.`
+  const vehicle = year === null ? `${make} ${model}` : `${make} ${model} ${year}`
+  return `Hello ${siteName}, I am interested in the ${vehicle}, listing reference ${referenceNumber}.`
 }
 
 /**

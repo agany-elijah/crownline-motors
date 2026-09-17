@@ -13,6 +13,8 @@ import { SparePartsBar } from "@/components/spare-parts/spare-parts-bar"
 import { SparePartsCatalogueBar } from "@/components/spare-parts/spare-parts-catalogue-bar"
 import { PriceEstimateNote } from "@/components/spare-parts/spare-part-price"
 import { siteConfig } from "@/config/site"
+import { getPublishedSparePartStock } from "@/lib/queries/public-spare-part-stock.queries"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import {
   listPublicSparePartCategories,
   listPublishedSpareParts,
@@ -125,7 +127,7 @@ export async function generateMetadata({
     description: DESCRIPTION,
     alternates: { canonical: "/spare-parts" },
     openGraph: {
-      title: `${title} | ${siteConfig.name}`,
+      title: `${title} | ${(await getPublicSiteSettings()).siteTitle}`,
       description: DESCRIPTION,
       url: `${siteConfig.url}/spare-parts`,
       type: "website",
@@ -157,6 +159,9 @@ export default async function SparePartsPage({
     listPublishedSpareParts({ page: requestedPage, criteria }),
     listPublicSparePartCategories(),
   ])
+
+  // Empty unless Settings publishes counts; see getPublishedSparePartStock.
+  const stock = await getPublishedSparePartStock(parts.map((part) => part.slug))
 
   /**
    * `page` is what the query actually served, not what the URL asked for —
@@ -238,7 +243,7 @@ export default async function SparePartsPage({
             </p>
           </div>
 
-          <SparePartGrid parts={parts} filtered={isFiltered} />
+          <SparePartGrid parts={parts} filtered={isFiltered} stock={stock} />
 
           {parts.length > 0 ? <PriceEstimateNote className="max-w-2xl" /> : null}
 

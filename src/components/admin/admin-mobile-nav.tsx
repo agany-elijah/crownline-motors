@@ -64,7 +64,7 @@ export function AdminMobileNav({ groups }: AdminMobileNavProps) {
           )}
         >
           <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
-            <DialogPrimitive.Title render={<BrandMark size="sm" />} />
+            <DialogPrimitive.Title render={<BrandMark size="sm" tone="dark" />} />
             <DialogPrimitive.Description className="sr-only">
               Dashboard navigation
             </DialogPrimitive.Description>

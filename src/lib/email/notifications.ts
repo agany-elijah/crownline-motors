@@ -1,8 +1,9 @@
 import "server-only"
 
 import { siteConfig } from "@/config/site"
+import { getOperationalSettings, getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import { adminPath } from "@/lib/constants/admin-routes"
-import { renderEmailHtml, renderEmailText, type EmailContent, type EmailDetail } from "@/lib/email/email-layout"
+import { renderEmailHtml, renderEmailText, type EmailBrand, type EmailContent, type EmailDetail } from "@/lib/email/email-layout"
 import { sendEmail } from "@/lib/email/send-email"
 import { prisma } from "@/lib/prisma"
 import { firstNameOf, formatQuoteDate } from "@/lib/quotes/quote-messages"
@@ -23,6 +24,14 @@ import { formatCurrency } from "@/lib/utils/format-currency"
  * in the dispatch dialog, because it is the one message whose content they
  * choose.
  *
+ * ── Switched by Settings → Notifications ──────────────────────────────
+ * Every customer email here is *automatic*, so all of them stop when
+ * "Automatic customer emails" is off. The staff alert needs both "New quote
+ * received" and "Admin email notifications". The check happens here, in the
+ * one function every email passes through, so no new notification can forget
+ * it. An operator sending a quotation from the dispatch dialog is not
+ * automatic and does not come through this file.
+ *
  * ── Never the source of truth ─────────────────────────────────────────
  * Every function runs after the database write it describes has committed,
  * and none of them throws. An unreachable mailbox must not roll back a
@@ -30,25 +39,42 @@ import { formatCurrency } from "@/lib/utils/format-currency"
  * say whether the customer was actually emailed.
  */
 
-export type NotificationOutcome = "SENT" | "NO_RECIPIENT" | "NOT_CONFIGURED" | "FAILED"
+export type NotificationOutcome = "SENT" | "NO_RECIPIENT" | "NOT_CONFIGURED" | "DISABLED" | "FAILED"
 
-const BRAND = { siteName: siteConfig.name, siteUrl: siteConfig.url }
+type Audience = "customer" | "admin"
+
+/** The sender's name as configured in Settings, and the public site's address. */
+async function emailBrand(): Promise<EmailBrand> {
+  return { siteName: (await getPublicSiteSettings()).businessName, siteUrl: siteConfig.url }
+}
+
+async function isAudienceEnabled(audience: Audience): Promise<boolean> {
+  const { notifications } = await getOperationalSettings()
+
+  return audience === "customer"
+    ? notifications.customerEmailsEnabled
+    : notifications.notifyAdminsOfNewQuotes && notifications.adminEmailNotificationsEnabled
+}
 
 async function deliver(
   kind: string,
+  audience: Audience,
   to: string | readonly string[] | null,
   subject: string,
-  content: EmailContent,
+  content: EmailContent | ((brand: EmailBrand) => EmailContent),
   idempotencyKey: string
 ): Promise<NotificationOutcome> {
+  if (!(await isAudienceEnabled(audience))) return "DISABLED"
   if (!to || to.length === 0) return "NO_RECIPIENT"
 
   try {
+    const brand = await emailBrand()
+    const body = typeof content === "function" ? content(brand) : content
     const result = await sendEmail({
       to,
       subject,
-      text: renderEmailText(content, BRAND),
-      html: renderEmailHtml(content, BRAND),
+      text: renderEmailText(body, brand),
+      html: renderEmailHtml(body, brand),
       idempotencyKey: `${kind}/${idempotencyKey}`,
     })
 
@@ -76,6 +102,8 @@ export function notificationNotice(outcome: NotificationOutcome): string {
       return "No email address is on file, so the customer was not emailed."
     case "NOT_CONFIGURED":
       return "Email is not configured yet (RESEND_API_KEY), so the customer was not emailed."
+    case "DISABLED":
+      return "Automatic customer emails are switched off in Settings, so the customer was not emailed."
     case "FAILED":
       return "The customer email could not be sent — let them know by WhatsApp or phone."
   }
@@ -120,21 +148,22 @@ export async function notifyCustomerQuoteReceived(input: {
 }): Promise<NotificationOutcome> {
   return deliver(
     "quote-received",
+    "customer",
     input.to,
     `We have received your request ${input.quoteNumber}`,
-    {
+    (brand) => ({
       preheader: `Reference ${input.quoteNumber} — we will be in touch with your quotation.`,
       heading: "We have received your request",
       greeting: greeting(input.customerName),
       paragraphs: [
-        `Thank you for contacting ${siteConfig.name}. Your request has reached our team, and we will check availability and pricing before sending you a quotation by email or WhatsApp.`,
+        `Thank you for contacting ${brand.siteName}. Your request has reached our team, and we will check availability and pricing before sending you a quotation by email or WhatsApp.`,
       ],
       details: [
         { label: "Reference", value: input.quoteNumber },
         { label: "Request", value: input.summary },
       ],
       closing: [`Please keep your reference handy — quote it whenever you contact us. ${CONTACT_CLOSING}`],
-    },
+    }),
     input.quoteNumber
   )
 }
@@ -151,6 +180,9 @@ export async function notifyAdminsOfQuoteRequest(input: {
   contactCity: string
   notes: string | null
 }): Promise<NotificationOutcome> {
+  // Checked before the administrator lookup, so a switched-off alert costs no query.
+  if (!(await isAudienceEnabled("admin"))) return "DISABLED"
+
   let recipients: string[]
 
   try {
@@ -174,6 +206,7 @@ export async function notifyAdminsOfQuoteRequest(input: {
 
   return deliver(
     "admin-quote-request",
+    "admin",
     recipients,
     `New quotation request ${input.quoteNumber} — ${input.contactName}`,
     {
@@ -212,6 +245,7 @@ export async function notifyCustomerOrderConfirmed(input: {
 
   return deliver(
     "order-confirmed",
+    "customer",
     input.to,
     `Your order ${input.orderNumber} is confirmed`,
     {
@@ -235,7 +269,9 @@ export async function notifyCustomerOrderConfirmed(input: {
         ...input.milestones.map((milestone) => ({ label: milestone.label, value: formatCurrency(milestone.amountDue) })),
       ],
       closing: [
-        "We will confirm every payment by email as soon as it is received, and send you a tracking number when your order starts its journey.",
+        input.isVehicle && input.milestones.length > 1
+          ? "We will confirm every payment by email as soon as it is received. Once your initial payment is confirmed, that email also carries your tracking number."
+          : "We will confirm your payment by email as soon as it is received, together with your tracking number.",
         CONTACT_CLOSING,
       ],
     },
@@ -256,6 +292,12 @@ export async function notifyCustomerPaymentConfirmed(input: {
   totalPaid: number
   balance: number
   next: { label: string; amount: number; dueNow: boolean } | null
+  /**
+   * Set when this payment started tracking. The receipt then carries the
+   * tracking number, so the customer gets it in the same email as the
+   * confirmation of the payment that earned it — not in a second message.
+   */
+  tracking?: { trackingNumber: string; subject: string } | null
 }): Promise<NotificationOutcome> {
   const nextSentence =
     input.balance <= 0
@@ -268,17 +310,28 @@ export async function notifyCustomerPaymentConfirmed(input: {
 
   return deliver(
     "payment-confirmed",
+    "customer",
     input.to,
-    `Payment received for order ${input.orderNumber}`,
+    input.tracking
+      ? `Payment received — your tracking number is ${input.tracking.trackingNumber}`
+      : `Payment received for order ${input.orderNumber}`,
     {
-      preheader: `We have confirmed your payment of ${formatCurrency(input.amount)}.`,
+      preheader: input.tracking
+        ? `We have confirmed your payment of ${formatCurrency(input.amount)}. Track your order with ${input.tracking.trackingNumber}.`
+        : `We have confirmed your payment of ${formatCurrency(input.amount)}.`,
       heading: "Payment received",
       greeting: greeting(input.customerName),
       paragraphs: [
         `We have received and confirmed your payment of ${formatCurrency(input.amount)} towards the ${input.milestoneLabel.toLowerCase()} for order ${input.orderNumber}.`,
+        ...(input.tracking
+          ? [
+              `Your order has now started its journey. Your tracking number is ${input.tracking.trackingNumber} — enter it on our Track My Order page at any time to see where your order is and when to expect it.`,
+            ]
+          : []),
         nextSentence,
       ],
       details: [
+        ...(input.tracking ? [{ label: "Tracking number", value: input.tracking.trackingNumber }] : []),
         { label: "Order number", value: input.orderNumber },
         { label: "Payment for", value: input.milestoneLabel },
         { label: "Amount", value: formatCurrency(input.amount) },
@@ -288,7 +341,15 @@ export async function notifyCustomerPaymentConfirmed(input: {
         { label: "Total paid", value: formatCurrency(input.totalPaid) },
         { label: "Remaining balance", value: formatCurrency(input.balance) },
       ],
-      closing: ["Please keep this email as your receipt.", CONTACT_CLOSING],
+      ...(input.tracking
+        ? { callToAction: { label: "Track my order", url: trackingUrl(input.tracking.trackingNumber) } }
+        : {}),
+      closing: [
+        input.tracking
+          ? "Please keep this email as your receipt. We will email you each time your order reaches a new stage."
+          : "Please keep this email as your receipt.",
+        CONTACT_CLOSING,
+      ],
     },
     input.paymentId
   )
@@ -304,6 +365,7 @@ export async function notifyCustomerPaymentRefunded(input: {
 }): Promise<NotificationOutcome> {
   return deliver(
     "payment-refunded",
+    "customer",
     input.to,
     `Refund recorded for order ${input.orderNumber}`,
     {
@@ -338,6 +400,7 @@ export async function notifyCustomerTrackingActivated(input: {
 }): Promise<NotificationOutcome> {
   return deliver(
     "tracking-activated",
+    "customer",
     input.to,
     `Your tracking number: ${input.trackingNumber}`,
     {
@@ -371,6 +434,7 @@ export async function notifyCustomerTrackingUpdate(input: {
 }): Promise<NotificationOutcome> {
   return deliver(
     "tracking-update",
+    "customer",
     input.to,
     `Tracking update: ${input.statusLabel} (${input.trackingNumber})`,
     {

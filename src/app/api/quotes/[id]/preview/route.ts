@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { authorizePermission } from "@/lib/auth/admin-guard"
 import { getQuoteForPdfById } from "@/lib/queries/quote.queries"
 import { buildQuotePdfData, buildQuotationFilename } from "@/lib/pdf/quote-pdf-data"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import { renderQuotePdfBuffer } from "@/lib/pdf/render-quote-pdf"
 
 /**
@@ -41,7 +42,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   let buffer: Buffer
 
   try {
-    buffer = await renderQuotePdfBuffer(buildQuotePdfData(quote))
+    buffer = await renderQuotePdfBuffer(buildQuotePdfData(quote, (await getPublicSiteSettings()).businessName))
   } catch (error) {
     console.error("[quote-preview] failed to render PDF", error)
     return new NextResponse("Could not generate this document. Please try again shortly.", {

@@ -75,6 +75,7 @@ export function SparePartQuickView({
   open,
   onOpenChange,
 }: SparePartQuickViewProps) {
+  // Settings → Catalogue display → Spare parts, as on the card that opened this.
   const { add } = useCart()
 
   const [added, setAdded] = React.useState(false)
@@ -197,7 +198,7 @@ export function SparePartQuickView({
               </DialogTitle>
 
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-                <SparePartAvailabilityTag availability={part.availability} />
+                {part.availability ? <SparePartAvailabilityTag availability={part.availability} /> : null}
 
                 {/*
                   The manufacturer's number, and only that — the number a
@@ -214,6 +215,10 @@ export function SparePartQuickView({
                 ) : null}
               </div>
             </div>
+
+            {part.brand ? (
+              <p className="text-small text-muted-foreground">By {part.brand}</p>
+            ) : null}
 
             <SparePartPrice price={part.price} size="panel" />
 
@@ -243,9 +248,11 @@ export function SparePartQuickView({
               part's opening line after its name rather than announcing an
               unlabelled modal.
             */}
-            <DialogDescription className="text-small">
-              {part.preview.excerpt}
-            </DialogDescription>
+            {part.preview.excerpt ? (
+              <DialogDescription className="text-small">{part.preview.excerpt}</DialogDescription>
+            ) : (
+              <DialogDescription className="sr-only">Preview of {part.name}</DialogDescription>
+            )}
 
             <div className="mt-auto flex flex-col gap-3 pt-1">
               <Button

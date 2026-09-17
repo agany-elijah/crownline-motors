@@ -5,7 +5,7 @@ import { AlertCircle, CheckCircle2, ExternalLink, Eye, Loader2, Mail, Send } fro
 
 import { QuoteDispatchChannel } from "@/generated/prisma/enums"
 import { sendQuoteDispatchAction, type QuoteDispatchState } from "@/lib/actions/quote.actions"
-import { siteConfig } from "@/config/site"
+import { useSiteSettings } from "@/components/shared/site-settings-provider"
 import { defaultQuoteNote } from "@/lib/quotes/quote-messages"
 import { useQuotePricing } from "@/lib/quotes/quote-pricing-context"
 import { cn } from "@/lib/utils"
@@ -99,7 +99,8 @@ export function QuoteDispatchDialog({
         ? QuoteDispatchChannel.EMAIL
         : QuoteDispatchChannel.WHATSAPP
   const [includeLink, setIncludeLink] = useState(true)
-  const [note, setNote] = useState(() => defaultQuoteNote(siteConfig.name))
+  const { businessName } = useSiteSettings()
+  const [note, setNote] = useState(() => defaultQuoteNote(businessName))
   const [instructions, setInstructions] = useState("")
   const [state, formAction, isPending] = useActionState(sendQuoteDispatchAction, INITIAL_STATE)
   const includeLinkId = useId()
@@ -266,7 +267,7 @@ export function QuoteDispatchDialog({
                   onChange={(event) => setNote(event.target.value)}
                   rows={3}
                   maxLength={2000}
-                  placeholder={defaultQuoteNote(siteConfig.name)}
+                  placeholder={defaultQuoteNote(businessName)}
                 />
               </div>
 

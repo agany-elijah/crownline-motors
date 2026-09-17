@@ -23,11 +23,12 @@ import { Label } from "@/components/ui/label"
 import { StatusBadge } from "@/components/admin/status-badge"
 import { WhatsAppGlyph } from "@/components/shared/whatsapp-glyph"
 import { Textarea } from "@/components/ui/textarea"
+import { TRACKING_STATUS_TONES } from "@/lib/constants/tracking-status"
 import {
-  TRACKING_STATUS_LABELS,
-  TRACKING_STATUS_TONES,
-  trackingTimelineFor,
-} from "@/lib/constants/tracking-status"
+  recordableTrackingStages,
+  trackingStageLabel,
+  type TrackingStageConfig,
+} from "@/lib/settings/tracking-stages"
 import type { OrderShipment, OrderTrackingEvent } from "@/lib/queries/order.queries"
 import { cn } from "@/lib/utils"
 
@@ -56,7 +57,10 @@ export function OrderTrackingPanel({
   shareUrl,
   activationProblem,
   lockedReason,
+  stages,
 }: {
+  /** Settings → Orders & tracking: stage names, order and which may be recorded. */
+  stages: TrackingStageConfig
   orderId: string
   shipment: OrderShipment | null
   customerEmail: string | null
@@ -117,7 +121,7 @@ export function OrderTrackingPanel({
             ) : null}
           </div>
           <StatusBadge tone={TRACKING_STATUS_TONES[shipment.currentStatus]}>
-            {TRACKING_STATUS_LABELS[shipment.currentStatus]}
+            {trackingStageLabel(stages, shipment.shipmentType, shipment.currentStatus)}
           </StatusBadge>
         </div>
 
@@ -143,13 +147,17 @@ export function OrderTrackingPanel({
       {lockedReason ? (
         <p className="border-t border-border/60 pt-4 text-small text-muted-foreground">{lockedReason}</p>
       ) : (
-        <AddTrackingEventForm shipmentId={shipment.id} shipmentType={shipment.shipmentType} />
+        <AddTrackingEventForm shipmentId={shipment.id} shipmentType={shipment.shipmentType} stages={stages} />
       )}
 
       {shipment.events.length > 0 ? (
         <ol className="flex flex-col gap-3">
           {shipment.events.map((event) => (
-            <TrackingEventRow key={event.id} event={event} />
+            <TrackingEventRow
+              key={event.id}
+              event={event}
+              label={trackingStageLabel(stages, shipment.shipmentType, event.status)}
+            />
           ))}
         </ol>
       ) : null}
@@ -192,16 +200,20 @@ function CopyTrackingNumber({ value }: { value: string }) {
 function AddTrackingEventForm({
   shipmentId,
   shipmentType,
+  stages,
 }: {
   shipmentId: string
   shipmentType: OrderShipment["shipmentType"]
+  stages: TrackingStageConfig
 }) {
   const [state, formAction, isPending] = useActionState(addTrackingEventAction, CREATE_INITIAL)
   const statusId = useId()
   const locationId = useId()
   const dateId = useId()
   const notesId = useId()
-  const timeline = trackingTimelineFor(shipmentType)
+  // Enabled stages only, in the configured order. The action refuses a
+  // turned-off stage too — this list is a convenience, not the rule.
+  const timeline = recordableTrackingStages(stages, shipmentType)
 
   return (
     <form action={formAction} className="flex flex-col gap-3 border-t border-border/60 pt-4">
@@ -240,9 +252,9 @@ function AddTrackingEventForm({
             <option value="" disabled>
               Choose a status…
             </option>
-            {timeline.map((status) => (
-              <option key={status} value={status}>
-                {TRACKING_STATUS_LABELS[status]}
+            {timeline.map((stage) => (
+              <option key={stage.status} value={stage.status}>
+                {stage.label}
               </option>
             ))}
           </select>
@@ -292,7 +304,7 @@ function AddTrackingEventForm({
   )
 }
 
-function TrackingEventRow({ event }: { event: OrderTrackingEvent }) {
+function TrackingEventRow({ event, label }: { event: OrderTrackingEvent; label: string }) {
   const [voidOpen, setVoidOpen] = useState(false)
   const [voidState, voidAction, isVoiding] = useActionState(voidTrackingEventAction, CREATE_INITIAL)
   const reasonId = useId()
@@ -306,7 +318,7 @@ function TrackingEventRow({ event }: { event: OrderTrackingEvent }) {
     >
       <div className="flex flex-col gap-0.5">
         <p className={cn("text-small font-medium", event.isVoided && "line-through")}>
-          {TRACKING_STATUS_LABELS[event.status]}
+          {label}
         </p>
         <p className="text-xs text-muted-foreground">
           {EVENT_DATE_FORMAT.format(event.eventDate)}

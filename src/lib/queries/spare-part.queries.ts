@@ -252,6 +252,8 @@ export interface SparePartDetail {
   isFeatured: boolean
   supplierName: string | null
   supplierNotes: string | null
+  /** Facts withheld from customers on this listing. */
+  hiddenFields: string[]
   photoCount: number
   fitmentCount: number
   createdAt: Date
@@ -302,6 +304,7 @@ export const getSparePartById = cache(
       isFeatured: part.isFeatured,
       supplierName: part.supplierName,
       supplierNotes: part.supplierNotes,
+      hiddenFields: part.hiddenFields,
       photoCount: part._count.photos,
       fitmentCount: part._count.compatibility,
       createdAt: part.createdAt,

@@ -2,30 +2,27 @@
 
 import { revalidatePath } from "next/cache"
 
-import { OrderStatus, OrderType, ShipmentType } from "@/generated/prisma/enums"
+import { OrderStatus } from "@/generated/prisma/enums"
 import { recordAuditLog } from "@/lib/audit"
 import { authorizePermission } from "@/lib/auth/admin-guard"
 import { revalidateVehicleSurfaces } from "@/lib/cache/vehicle-surfaces"
 import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
-import {
-  TRACKING_STATUS_LABELS,
-  initialTrackingStatusFor,
-  trackingTimelineFor,
-} from "@/lib/constants/tracking-status"
+import { trackingTimelineFor } from "@/lib/constants/tracking-status"
 import {
   notificationNotice,
   notifyCustomerTrackingActivated,
   notifyCustomerTrackingUpdate,
   resolveOrderContact,
 } from "@/lib/email/notifications"
-import { ledgerFinance, ledgerStages, lockOrderLedger } from "@/lib/orders/order-ledger"
-import { trackingActivationProblem } from "@/lib/orders/order-lifecycle"
+import { ledgerFinance, lockOrderLedger } from "@/lib/orders/order-ledger"
 import { syncOrderStatus, type OrderStatusSync } from "@/lib/orders/order-status-sync"
 import { prisma } from "@/lib/prisma"
+import { getOperationalSettings } from "@/lib/queries/settings.queries"
+import { recordableTrackingStages, trackingStageLabel } from "@/lib/settings/tracking-stages"
 import { requiresFullPayment } from "@/lib/tracking/journey-rules"
+import { activateTrackingInTransaction } from "@/lib/tracking/activate-tracking"
 import { syncJourney, type JourneySync } from "@/lib/tracking/journey-sync"
 import { formatCurrency } from "@/lib/utils/format-currency"
-import { generateReference } from "@/lib/utils/generate-reference"
 import {
   addTrackingEventSchema,
   createShipmentSchema,
@@ -55,10 +52,6 @@ interface TrackingActionState {
 /** A refusal whose message is written for the operator. */
 class TrackingRefusal extends Error {}
 
-function shipmentTypeFor(orderType: OrderType): ShipmentType {
-  return orderType === OrderType.VEHICLE ? ShipmentType.VEHICLE : ShipmentType.SPARE_PART
-}
-
 function revalidateOrderSurfaces(orderId: string, order: OrderStatusSync): void {
   revalidatePath(`${ADMIN_BASE_PATH}/orders`)
   revalidatePath(`${ADMIN_BASE_PATH}/orders/${orderId}`)
@@ -73,8 +66,12 @@ function orderStatusNotice(order: OrderStatusSync): string {
 }
 
 /**
- * Activates tracking for an order: creates its `Shipment` with a
+ * Activates tracking for an order by hand: creates its `Shipment` with a
  * system-generated tracking number, at the opening status for its type.
+ *
+ * Tracking normally starts on its own, with the payment that makes the order
+ * eligible (see activate-tracking.ts). This remains for an order that became
+ * eligible before that was automatic, or whose activation needs retrying.
  *
  * Per the schema documentation, a shipment is deliberately not created at
  * the same time as the order — tracking starts once the business has
@@ -117,48 +114,18 @@ export async function createShipmentAction(
     return { status: "error", message: "That order no longer exists." }
   }
 
-  const shipmentType = shipmentTypeFor(order.type)
-
   let created: { shipmentId: string; trackingNumber: string; order: OrderStatusSync }
 
   try {
     created = await prisma.$transaction(async (tx) => {
-      const ledger = await lockOrderLedger(tx, order.id)
+      await lockOrderLedger(tx, order.id)
 
-      const problem = trackingActivationProblem({
-        type: ledger.orderType,
-        status: ledger.orderStatus,
-        stages: ledgerStages(ledger),
+      const activation = await activateTrackingInTransaction(tx, {
+        orderId: order.id,
+        actorId: auth.admin.id,
+        cause: "MANUAL",
       })
-      if (problem) throw new TrackingRefusal(problem)
-
-      if (ledger.shipmentStatus !== null) {
-        throw new TrackingRefusal("This order already has a shipment.")
-      }
-
-      const trackingNumber = await generateReference(tx, "TRACKING")
-
-      const shipment = await tx.shipment.create({
-        data: {
-          trackingNumber,
-          orderId: order.id,
-          vehicleId: shipmentType === ShipmentType.VEHICLE ? (order.items[0]?.vehicleId ?? null) : null,
-          shipmentType,
-          currentStatus: initialTrackingStatusFor(shipmentType),
-        },
-        select: { id: true },
-      })
-
-      await recordAuditLog(
-        {
-          actorId: auth.admin.id,
-          action: "SHIPMENT_CREATED",
-          entityType: "Shipment",
-          entityId: shipment.id,
-          metadata: { orderId: order.id, trackingNumber },
-        },
-        tx
-      )
+      if (!activation.activated) throw new TrackingRefusal(activation.reason)
 
       const orderSync = await syncOrderStatus(tx, {
         orderId: order.id,
@@ -166,7 +133,7 @@ export async function createShipmentAction(
         cause: "SHIPMENT_CREATED",
       })
 
-      return { shipmentId: shipment.id, trackingNumber, order: orderSync }
+      return { shipmentId: activation.shipmentId, trackingNumber: activation.trackingNumber, order: orderSync }
     })
   } catch (error) {
     if (error instanceof TrackingRefusal) {
@@ -260,6 +227,16 @@ export async function addTrackingEventAction(
     return { status: "error", message: "That status does not apply to this shipment." }
   }
 
+  // A stage switched off in Settings → Orders & tracking cannot be recorded.
+  // Refused here rather than only left out of the dropdown, for the same
+  // reason as the check above.
+  const { trackingStages } = await getOperationalSettings()
+  const label = (value: typeof status) => trackingStageLabel(trackingStages, shipment.shipmentType, value)
+
+  if (!recordableTrackingStages(trackingStages, shipment.shipmentType).some((stage) => stage.status === status)) {
+    return { status: "error", message: `"${label(status)}" is turned off in Settings, so it cannot be recorded.` }
+  }
+
   const effectiveDate = eventDate ?? new Date()
   let recorded: { eventId: string; journey: JourneySync }
 
@@ -276,7 +253,7 @@ export async function addTrackingEventAction(
 
         if (balance > 0) {
           throw new TrackingRefusal(
-            `"${TRACKING_STATUS_LABELS[status]}" can only be recorded once the order is paid in full — ${formatCurrency(balance)} is still owed.`
+            `"${label(status)}" can only be recorded once the order is paid in full — ${formatCurrency(balance)} is still owed.`
           )
         }
       }
@@ -337,7 +314,7 @@ export async function addTrackingEventAction(
   const dueStage = journey.openedStages[0] ?? null
   const historyNotice = becameCurrent
     ? ""
-    : ` It is dated before the latest update, so tracking still shows "${TRACKING_STATUS_LABELS[journey.currentStatus]}".`
+    : ` It is dated before the latest update, so tracking still shows "${label(journey.currentStatus)}".`
   const dueNotice = dueStage
     ? ` The ${dueStage.label.toLowerCase()} (${formatCurrency(dueStage.amountDue)}) is now due.`
     : ""
@@ -359,7 +336,7 @@ export async function addTrackingEventAction(
     trackingNumber: shipment.trackingNumber,
     // Always where the shipment is now: an email about a backdated step that
     // opened a payment must not tell the customer their car moved backwards.
-    statusLabel: TRACKING_STATUS_LABELS[journey.currentStatus],
+    statusLabel: label(journey.currentStatus),
     location: journey.currentLocation,
     eventDate: becameCurrent ? effectiveDate : new Date(),
     paymentNowDue: dueStage ? { label: dueStage.label, amount: dueStage.amountDue } : null,
@@ -472,6 +449,7 @@ export async function voidTrackingEventAction(
 
   revalidateOrderSurfaces(shipment.orderId, journey.order)
 
+  const { trackingStages } = await getOperationalSettings()
   const closed = journey.closedStageIds.length
   const closedNotice =
     closed === 0
@@ -482,6 +460,6 @@ export async function voidTrackingEventAction(
 
   return {
     status: "success",
-    message: `Event voided. Tracking now shows "${TRACKING_STATUS_LABELS[journey.currentStatus]}".${closedNotice}${orderStatusNotice(journey.order)}`,
+    message: `Event voided. Tracking now shows "${trackingStageLabel(trackingStages, shipment.shipmentType, journey.currentStatus)}".${closedNotice}${orderStatusNotice(journey.order)}`,
   }
 }

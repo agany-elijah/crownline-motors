@@ -43,10 +43,11 @@ export async function updateOrderDeliveryDateAction(
   const parsed = orderDeliveryDateSchema.safeParse({
     orderId: formData.get("orderId"),
     deliveryDate: formData.get("deliveryDate"),
+    deliveryDateLatest: formData.get("deliveryDateLatest"),
   })
 
   if (!parsed.success) {
-    return { status: "error", message: "That is not a valid date." }
+    return { status: "error", message: parsed.error.issues[0]?.message ?? "That is not a valid date." }
   }
 
   const auth = await authorizePermission("order:write")
@@ -54,7 +55,7 @@ export async function updateOrderDeliveryDateAction(
     return { status: "error", message: auth.message }
   }
 
-  const { orderId, deliveryDate } = parsed.data
+  const { orderId, deliveryDate, deliveryDateLatest } = parsed.data
 
   const existing = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true } })
   if (!existing) {
@@ -65,7 +66,10 @@ export async function updateOrderDeliveryDateAction(
     await prisma.$transaction(async (tx) => {
       await tx.order.update({
         where: { id: orderId },
-        data: { estimatedDeliveryDate: deliveryDate ?? null },
+        data: {
+          estimatedDeliveryDate: deliveryDate ?? null,
+          estimatedDeliveryLatest: deliveryDateLatest ?? null,
+        },
       })
 
       await recordAuditLog(
@@ -74,7 +78,10 @@ export async function updateOrderDeliveryDateAction(
           action: "ORDER_DELIVERY_DATE_UPDATED",
           entityType: "Order",
           entityId: orderId,
-          metadata: { deliveryDate: deliveryDate ? deliveryDate.toISOString() : null },
+          metadata: {
+            deliveryDate: deliveryDate ? deliveryDate.toISOString() : null,
+            deliveryDateLatest: deliveryDateLatest ? deliveryDateLatest.toISOString() : null,
+          },
         },
         tx
       )
@@ -88,7 +95,11 @@ export async function updateOrderDeliveryDateAction(
 
   return {
     status: "success",
-    message: deliveryDate ? "Delivery date saved." : "Delivery date cleared.",
+    message: deliveryDate
+      ? deliveryDateLatest
+        ? "Expected delivery window saved. Customers see it on Track My Order."
+        : "Expected delivery date saved. Customers see it on Track My Order."
+      : "Expected delivery cleared.",
   }
 }
 

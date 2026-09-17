@@ -399,10 +399,23 @@ model AdminProfile {
   role        AdminRole @default(ADMIN)
   isActive    Boolean   @default(true)
 
+  /// When this administrator's authenticator app was verified, or null when
+  /// two-factor authentication is off for them.
+  ///
+  /// The factor itself lives in Supabase Auth — its secret never touches this
+  /// database. This column is what the DAL reads to decide whether a session
+  /// must be at AAL2: a value the application wrote after verifying a code
+  /// server-side, checked against the `aal` claim of a signature-verified
+  /// JWT. Neither half alone is enough — the claim says what the session
+  /// proved, and this says what it was required to prove.
+  twoFactorEnabledAt DateTime?
+
   verifiedPayments      Payment[]
-  trackingEventsCreated TrackingEvent[] @relation("TrackingEventCreatedBy")
-  trackingEventsVoided  TrackingEvent[] @relation("TrackingEventVoidedBy")
+  trackingEventsCreated TrackingEvent[]   @relation("TrackingEventCreatedBy")
+  trackingEventsVoided  TrackingEvent[]   @relation("TrackingEventVoidedBy")
   auditLogs             AuditLog[]
+  sessions              AdminSession[]
+  loginEvents           AdminLoginEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -489,6 +502,14 @@ model Vehicle {
   // a curated vocabulary, not this column promoted; a Postgres text[] can
   // be GIN-indexed in the meantime if a contains-search is ever needed.
   features String[] @default([])
+
+  /// Facts about this listing an operator has chosen not to publish — for
+  /// instance a mileage they are not sure of. Values are field keys from
+  /// src/lib/visibility/product-visibility.ts. The public query layer removes
+  /// each one from what it returns (card, detail page, metadata, structured
+  /// data and search filters), on top of the site-wide switches in
+  /// Settings → Catalogue display. Unknown keys are ignored on read.
+  hiddenFields String[] @default([])
 
   photos     VehiclePhoto[]
   quotes     Quote[]
@@ -710,6 +731,14 @@ model SparePart {
   /// somewhere to write down where the part came from.
   supplierName  String?
   supplierNotes String? @db.Text
+
+  /// Facts about this listing an operator has chosen not to publish — for
+  /// instance a brand they cannot confirm. Values are field keys from
+  /// src/lib/visibility/product-visibility.ts. The public query layer removes
+  /// each one from what it returns (card, detail page, metadata, structured
+  /// data and search filters), on top of the site-wide switches in
+  /// Settings → Catalogue display. Unknown keys are ignored on read.
+  hiddenFields String[] @default([])
 
   photos        SparePartPhoto[]
   compatibility SparePartCompatibility[]
@@ -1155,6 +1184,11 @@ model Order {
   /// customer a date well before that, and revise it as freight schedules
   /// firm up. Null means "no estimate given yet".
   estimatedDeliveryDate DateTime?
+  /// The end of the expected delivery window — "between 17 and 30 October" —
+  /// with `estimatedDeliveryDate` as its start. Null means the estimate is a
+  /// single day. Shown to the customer on Track My Order. Never before the
+  /// start (`Order_delivery_window_check`), and never set without one.
+  estimatedDeliveryLatest DateTime?
 
   items     OrderItem[]
   payments  Payment[]
@@ -1378,6 +1412,97 @@ model BusinessSettings {
   /// The standard terms printed under every quotation.
   quoteTerms               String? @db.Text
 
+  /// ── Business identity ───────────────────────────────────────────────
+  /// The one place the company's name is written. Header, footer, page
+  /// titles, emails, quotation PDFs and every WhatsApp message read it, so a
+  /// rename is a settings change rather than a hunt through the codebase.
+  businessName        String @default("Crownline Motors")
+  businessDescription String @default("Quality vehicles sourced from Japan and Korea and delivered to South Sudan.") @db.Text
+  /// ISO 3166-1 alpha-2. The dial code a customer's phone number is assumed
+  /// to start from on public forms. A CHECK keeps it two capital letters;
+  /// the application restricts it further to the dial codes it knows.
+  defaultCountry      String @default("SS")
+
+  /// ── Contact ─────────────────────────────────────────────────────────
+  /// Empty string means "not published" — every surface that renders one of
+  /// these renders nothing for an empty value rather than a placeholder.
+  primaryPhone    String @default("")
+  businessEmail   String @default("")
+  businessAddress String @default("")
+  /// Seven `{ day, closed, opensAt, closesAt }` entries, Monday first.
+  /// Null means never configured, and the hours are then not published.
+  /// Validated with Zod on every read — see `resolveBusinessHours`.
+  businessHours   Json?
+
+  /// Full https URLs. Null hides the network's icon.
+  socialFacebook  String?
+  socialInstagram String?
+  socialTiktok    String?
+  socialYoutube   String?
+  socialLinkedin  String?
+  socialX         String?
+
+  /// ── Website & branding ──────────────────────────────────────────────
+  /// The suffix on every browser tab title. Null falls back to businessName.
+  siteTitle             String?
+  /// Storage paths in the branding bucket. Two logos because the site paints
+  /// on both a warm-white and a deep-black surface, and a mark drawn for one
+  /// is usually illegible on the other. Either alone is used on both.
+  logoLightStoragePath  String?
+  logoDarkStoragePath   String?
+  faviconStoragePath    String?
+  /// What the dashboard opens in before an administrator picks for themselves.
+  defaultDashboardTheme AdminTheme @default(LIGHT)
+
+  /// ── Orders & tracking ───────────────────────────────────────────────
+  /// The letters before the year on a tracking number — `CLM` in
+  /// `CLM-2026-000125`. The sequence after it is system-controlled and is
+  /// not configurable. A CHECK keeps it to 2–6 capital letters and away from
+  /// the prefixes of the other references (CLM-O, CLM-V, CLM-Q, CLM-SP),
+  /// which would otherwise be indistinguishable once a customer drops the
+  /// hyphens. Numbers already issued keep their old prefix and still resolve.
+  trackingNumberPrefix String @default("CLM")
+  /// Per shipment type: the customer-facing name, description, enabled flag
+  /// and display order of each TrackingStatus. Null means the built-in
+  /// timeline. See src/lib/settings/tracking-stages.ts for why the
+  /// rule-bearing stages cannot be moved or disabled.
+  trackingStages       Json?
+
+  /// ── Catalogue display ───────────────────────────────────────────────
+  /// Which facts the public cards show and which calls to action appear.
+  /// Validated and merged over defaults on every read, so a key added later
+  /// falls back to its default instead of to `undefined`.
+  catalogDisplay Json?
+
+  /// ── Notifications ───────────────────────────────────────────────────
+  /// `notifyAdminsOfNewQuotes` is the event; the two channel flags decide
+  /// how it reaches staff. `customerEmailsEnabled` gates every *automatic*
+  /// customer email — an operator sending a quotation is not automatic and
+  /// is never gated by it.
+  notifyAdminsOfNewQuotes        Boolean @default(true)
+  customerEmailsEnabled          Boolean @default(true)
+  adminEmailNotificationsEnabled Boolean @default(true)
+  dashboardNotificationsEnabled  Boolean @default(true)
+
+  /// ── SEO & social ────────────────────────────────────────────────────
+  seoDefaultTitle       String?
+  seoDefaultDescription String? @db.Text
+  ogImageStoragePath    String?
+  sitemapEnabled        Boolean @default(true)
+  /// Off sends `noindex` on every page and disallows everything in
+  /// robots.txt — for a staging copy, or a site not ready to be found.
+  searchIndexingEnabled Boolean @default(true)
+
+  /// ── Security ────────────────────────────────────────────────────────
+  /// Every administrator must have 2FA before using the dashboard.
+  requireTwoFactor      Boolean @default(false)
+  /// Off stops the "forgotten your password" email from being sent. The
+  /// response to the form stays identical either way.
+  allowPasswordRecovery Boolean @default(true)
+  /// Absolute lifetime of a dashboard session, from sign-in. Enforced by the
+  /// DAL against AdminSession.createdAt, bounded 1–720 by a CHECK.
+  sessionTimeoutHours   Int     @default(24)
+
   updatedAt DateTime @updatedAt
 }
 
@@ -1470,4 +1595,96 @@ model LoginAttempt {
   @@index([scope, identifierHash, createdAt])
   /// Supports the housekeeping delete that drops rows past every window.
   @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────
+// ADMIN SESSIONS, SIGN-IN ACTIVITY, APPEARANCE
+// ─────────────────────────────────────────────
+
+/// The dashboard's light or dark appearance.
+enum AdminTheme {
+  LIGHT
+  DARK
+}
+
+enum AdminSessionEndReason {
+  /// The administrator pressed Sign out on this device.
+  SIGNED_OUT
+  /// Ended from another session ("sign out other sessions", or one row).
+  REVOKED
+  /// Older than BusinessSettings.sessionTimeoutHours.
+  EXPIRED
+  /// Every session ends when the password changes (SECURITY.MD §42).
+  PASSWORD_CHANGED
+}
+
+enum AdminLoginEventKind {
+  SIGN_IN_SUCCEEDED
+  /// A wrong password for an address that belongs to this administrator.
+  SIGN_IN_FAILED
+  /// The password was right and the authenticator code was not.
+  TWO_FACTOR_FAILED
+  SIGNED_OUT
+}
+
+/// One signed-in dashboard session, keyed by the `session_id` claim Supabase
+/// puts in every access token.
+///
+/// ── Why the application keeps its own record ──────────────────────────
+/// Supabase knows a session exists; it cannot enforce Crownline's timeout,
+/// list sessions to the person who owns them, or revoke one of them from
+/// another device. The DAL looks this row up on every request (one indexed
+/// read, cached per request) and refuses a session that has ended or aged
+/// past the configured timeout — so ending a row here takes effect on that
+/// device's very next request, whatever its refresh token still says.
+///
+/// ── Why a row can be created lazily ───────────────────────────────────
+/// A session that existed before this table did, or whose sign-in write
+/// failed, is recorded the first time the DAL sees it rather than being
+/// thrown out. Refusing it would sign every administrator out on deploy.
+model AdminSession {
+  id      String       @id @default(cuid())
+  adminId String
+  admin   AdminProfile @relation(fields: [adminId], references: [id], onDelete: Restrict)
+
+  /// Supabase's `session_id` claim — read from a signature-verified token,
+  /// never from anything the client can set.
+  authSessionId String @unique
+
+  /// "Chrome on Windows". Coarse on purpose: enough for a person to recognise
+  /// their own device, and nothing a stolen table could fingerprint with.
+  deviceLabel String?
+
+  createdAt  DateTime               @default(now())
+  /// Touched at most every few minutes, not on every request.
+  lastSeenAt DateTime               @default(now())
+  endedAt    DateTime?
+  endReason  AdminSessionEndReason?
+
+  @@index([adminId, endedAt])
+}
+
+/// Sign-in activity for one administrator, shown to them under Login &
+/// Session Security.
+///
+/// Not the AuditLog. AuditLog records what an administrator *did*, and its
+/// actor must be the person acting — a failed sign-in against an account was
+/// not done by that account's owner, and attributing it to them would corrupt
+/// the one table whose value is being trustworthy (see src/lib/audit.ts).
+/// Here the administrator is the *subject*, which is honest for both.
+///
+/// Attempts against addresses that are not administrators are not recorded
+/// at all: there is no one to show them to, and a table of strangers' email
+/// addresses is a liability.
+model AdminLoginEvent {
+  id      String       @id @default(cuid())
+  adminId String
+  admin   AdminProfile @relation(fields: [adminId], references: [id], onDelete: Restrict)
+
+  kind        AdminLoginEventKind
+  deviceLabel String?
+
+  createdAt DateTime @default(now())
+
+  @@index([adminId, createdAt])
 }

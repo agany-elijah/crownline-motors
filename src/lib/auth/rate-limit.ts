@@ -87,7 +87,21 @@ export const RATE_LIMIT_SCOPES = {
   quoteRequestPhone: "quote-request:phone",
   quotationPdfIp: "quotation-pdf:ip",
   trackingLookupIp: "tracking-lookup:ip",
+  // Confirming the current password before a sensitive account change —
+  // keyed by administrator, so a stolen session cannot guess the password
+  // behind it at leisure.
+  reauthAdmin: "reauth:admin",
+  // Authenticator codes: six digits is a million guesses, which a limit turns
+  // from minutes into years. Keyed by administrator and by host.
+  twoFactorAdmin: "two-factor:admin",
+  twoFactorIp: "two-factor:ip",
 } as const
+
+/** Password confirmations per administrator inside the sign-in window. */
+export const REAUTH_MAX_ATTEMPTS = 5
+
+/** Authenticator codes per administrator or host inside the sign-in window. */
+export const TWO_FACTOR_MAX_ATTEMPTS = 5
 
 /** Quotation PDF reads per host inside the window. Generous: a customer may
  *  reload the page, forward the link, and reopen it themselves. */

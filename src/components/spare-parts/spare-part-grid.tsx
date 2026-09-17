@@ -53,6 +53,8 @@ interface SparePartGridProps {
    * out.
    */
   filtered?: boolean
+  /** Units in hand by slug — present only while stock quantities are published. */
+  stock?: Record<string, number>
 }
 
 /** Cards per row at the widest breakpoint. Also the stagger's wrap point. */
@@ -62,6 +64,7 @@ export function SparePartGrid({
   parts,
   priorityCount = COLUMNS,
   filtered = false,
+  stock,
 }: SparePartGridProps) {
   if (parts.length === 0) {
     /**
@@ -106,7 +109,7 @@ export function SparePartGrid({
       {parts.map((part, index) => (
         <li key={part.slug} className="flex">
           <Reveal delay={(index % COLUMNS) * 60} className="flex w-full">
-            <SparePartCard part={part} priority={index < priorityCount} />
+            <SparePartCard part={part} priority={index < priorityCount} stockQuantity={stock?.[part.slug]} />
           </Reveal>
         </li>
       ))}

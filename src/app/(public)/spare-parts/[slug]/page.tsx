@@ -30,8 +30,9 @@ import {
 } from "@/lib/queries/public-spare-part.queries"
 import {
   getSparePartDeliverySteps,
-  getWhatsAppNumber,
+  getPublicSiteSettings,
 } from "@/lib/queries/settings.queries"
+import { getPublishedSparePartStock } from "@/lib/queries/public-spare-part-stock.queries"
 import { serializeJsonLd } from "@/lib/utils/json-ld"
 import { buildSparePartWhatsAppMessage, buildWhatsAppUrl } from "@/lib/utils/whatsapp"
 
@@ -121,7 +122,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description,
     alternates: { canonical: `/spare-parts/${part.slug}` },
     openGraph: {
-      title: `${part.name} | ${siteConfig.name}`,
+      title: `${part.name} | ${(await getPublicSiteSettings()).siteTitle}`,
       description,
       url: `${siteConfig.url}/spare-parts/${part.slug}`,
       type: "website",
@@ -145,17 +146,19 @@ export default async function SparePartPage({ params }: PageProps) {
    * singleton row, which is right for the admin screen and wrong on a page
    * anonymous traffic loads. It also already applies the env fallback.
    */
-  const [whatsappNumber, relatedParts, deliverySteps] = await Promise.all([
-    getWhatsAppNumber(),
-    listRelatedSpareParts({
-      categorySlug: part.categorySlug,
-      excludeSlug: part.slug,
-    }),
+  const [siteSettings, relatedParts, deliverySteps] = await Promise.all([
+    getPublicSiteSettings(),
+    listRelatedSpareParts({ excludeSlug: part.slug }),
     // Cached under the business-settings tag, so this is not a database round
     // trip on most requests — and an operator's edit still appears
     // immediately rather than at the next deploy.
     getSparePartDeliverySteps(),
   ])
+
+  // Units in hand for this part and the strip — empty unless Settings
+  // publishes counts and neither listing has hidden its own.
+  const stock = await getPublishedSparePartStock([part.slug, ...relatedParts.map((related) => related.slug)])
+  const stockQuantity = stock[part.slug]
 
   /**
    * Built once and handed to both Add controls — the one in the action row
@@ -172,9 +175,9 @@ export default async function SparePartPage({ params }: PageProps) {
   }
 
   const whatsappUrl = buildWhatsAppUrl({
-    phoneNumber: whatsappNumber,
+    phoneNumber: siteSettings.contact.whatsappNumber,
     message: buildSparePartWhatsAppMessage({
-      siteName: siteConfig.name,
+      siteName: siteSettings.businessName,
       partName: part.name,
       // Our own reference, not the manufacturer's. It is the one identifier
       // guaranteed to name exactly this listing — an OEM number legitimately
@@ -245,6 +248,7 @@ export default async function SparePartPage({ params }: PageProps) {
                   </div>
                 ) : null}
 
+                {part.categoryName && part.categorySlug ? (
                 <div className="flex items-center gap-1.5">
                   <dt className="text-muted-foreground">Category:</dt>
                   <dd className="font-medium text-foreground">
@@ -260,6 +264,7 @@ export default async function SparePartPage({ params }: PageProps) {
                     </Link>
                   </dd>
                 </div>
+                ) : null}
 
                 {/*
                   The manufacturer's number, and only that. It is what a
@@ -290,10 +295,12 @@ export default async function SparePartPage({ params }: PageProps) {
                 {/* Only where there is a figure to qualify. "Price on enquiry"
                     is already its own answer and needs no caution beside it. */}
                 {part.price !== null ? <PriceEstimateTag /> : null}
-                <SparePartAvailabilityTag
-                  availability={part.availability}
-                  size="detail"
-                />
+                {part.availability ? (
+                  <SparePartAvailabilityTag availability={part.availability} size="detail" />
+                ) : null}
+                {stockQuantity ? (
+                  <span className="tabular text-small text-muted-foreground">{stockQuantity} in stock</span>
+                ) : null}
               </div>
               {part.price !== null ? (
                 <PriceEstimateNote className="max-w-md" />
@@ -385,6 +392,7 @@ export default async function SparePartPage({ params }: PageProps) {
             {/* ── The part a fitment list cannot say ──────────────
                 In this column rather than in a band of its own below, so the
                 gallery is still on screen while it is read. */}
+            {part.description ? (
             <section
               aria-labelledby="description-heading"
               className="flex flex-col gap-3 border-t border-border pt-6"
@@ -402,6 +410,7 @@ export default async function SparePartPage({ params }: PageProps) {
                 {part.description}
               </p>
             </section>
+            ) : null}
 
             {/* ── How it gets here ────────────────────────────────
                 Last in the column, because it is reassurance rather than
@@ -418,7 +427,7 @@ export default async function SparePartPage({ params }: PageProps) {
           section supplies the reveal, so it is not wrapped in another one —
           a nested Reveal would animate an empty div on exactly the listings
           that have no strip to show. */}
-      <RelatedSpareParts parts={relatedParts} categoryName={part.categoryName} />
+      <RelatedSpareParts parts={relatedParts} categoryName={part.categoryName} stock={stock} />
 
       {/*
         The customer's own trail back, below the suggestions.
@@ -445,7 +454,7 @@ export default async function SparePartPage({ params }: PageProps) {
         imageUrl={part.photos[0]?.url ?? null}
       />
 
-      <SparePartStructuredData part={part} />
+      <SparePartStructuredData part={part} sellerName={siteSettings.businessName} />
 
       {/*
         The pinned phone action, last in the tree and outside every Section so
@@ -484,16 +493,16 @@ export default async function SparePartPage({ params }: PageProps) {
  * close the script element early. Every value here is operator-entered, but
  * a part name containing `</script>` would otherwise break out of it.
  */
-function SparePartStructuredData({ part }: { part: PublicSparePartDetail }) {
+function SparePartStructuredData({ part, sellerName }: { part: PublicSparePartDetail; sellerName: string }) {
   const data = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: part.name,
-    description: part.description,
+    ...(part.description ? { description: part.description } : {}),
     sku: part.referenceNumber,
     ...(part.oemPartNumber ? { mpn: part.oemPartNumber } : {}),
     ...(part.brand ? { brand: { "@type": "Brand", name: part.brand } } : {}),
-    category: part.categoryName,
+    ...(part.categoryName ? { category: part.categoryName } : {}),
     image: part.photos.map((photo) => photo.url),
     ...(part.price === null
       ? {}
@@ -503,7 +512,7 @@ function SparePartStructuredData({ part }: { part: PublicSparePartDetail }) {
             priceCurrency: "USD",
             price: part.price,
             url: `${siteConfig.url}/spare-parts/${part.slug}`,
-            seller: { "@type": "AutoDealer", name: siteConfig.name },
+            seller: { "@type": "AutoDealer", name: sellerName },
           },
         }),
   }

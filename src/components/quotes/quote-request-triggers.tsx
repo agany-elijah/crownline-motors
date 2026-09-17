@@ -5,6 +5,7 @@ import { MessageSquareText } from "lucide-react"
 
 import { QuoteType } from "@/generated/prisma/enums"
 import { QuoteRequestButton } from "@/components/quotes/quote-request-dialog"
+import { useSiteSettings } from "@/components/shared/site-settings-provider"
 
 /**
  * The quote buttons each surface places, with their words decided once.
@@ -90,6 +91,11 @@ export function VehicleCatalogueQuoteButton({
   size,
   className,
 }: TriggerProps) {
+  // A general "get a quote" prompt: hidden by Settings → Catalogue display.
+  // Requesting a specific listing (VehicleQuoteButton) is never hidden.
+  const { catalogDisplay } = useSiteSettings()
+  if (!catalogDisplay.actions.getQuote) return null
+
   return (
     <QuoteRequestButton
       subject={{ kind: "GENERAL", source: "VEHICLE_CATALOGUE", domain: QuoteType.VEHICLE }}
@@ -116,6 +122,9 @@ export function PartsCatalogueQuoteButton({
   size,
   className,
 }: TriggerProps) {
+  const { catalogDisplay } = useSiteSettings()
+  if (!catalogDisplay.actions.getQuote) return null
+
   return (
     <QuoteRequestButton
       subject={{ kind: "GENERAL", source: "SPARE_PART_CATALOGUE", domain: QuoteType.SPARE_PART }}

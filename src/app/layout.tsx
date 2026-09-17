@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
 
+import { SiteSettingsProvider } from "@/components/shared/site-settings-provider";
 import { siteConfig } from "@/config/site";
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries";
 
 /**
  * Two families, deliberately.
@@ -33,48 +35,71 @@ const inter = Inter({
 });
 
 /**
- * Global metadata baseline (brief §18, Stage 4 "global metadata structure").
+ * Global metadata baseline (brief §18), from Settings → Website & branding
+ * and SEO & social.
  *
  * `metadataBase` is what lets every child page emit *absolute* canonical
- * and Open Graph URLs while only declaring relative ones — without it,
- * Next.js warns and OG tags ship with relative paths that crawlers and
- * social scrapers can't resolve.
+ * and Open Graph URLs while only declaring relative ones.
  *
  * The title `template` means individual pages set only their own title
- * (e.g. "Toyota Harrier 2021") and get the brand suffix appended
- * automatically. `default` is used by pages that set no title at all.
+ * (e.g. "Toyota Harrier 2021") and get the configured site title appended.
+ * `default` is used by pages that set no title at all.
+ *
+ * `robots` follows the indexing switch. A page that sets its own `robots`
+ * replaces this one — every page that does so today sets `noindex`, so
+ * switching indexing off can never be undone by a child page.
+ *
+ * The read is cached under the business-settings tag, so this does not opt
+ * public pages into dynamic rendering, and a save in Settings is live on the
+ * next request.
  */
-export const metadata: Metadata = {
-  metadataBase: new URL(siteConfig.url),
-  title: {
-    default: `${siteConfig.name} — ${siteConfig.tagline}`,
-    template: `%s | ${siteConfig.name}`,
-  },
-  description: siteConfig.description,
-  applicationName: siteConfig.name,
-  alternates: {
-    canonical: "/",
-  },
-  openGraph: {
-    type: "website",
-    siteName: siteConfig.name,
-    title: `${siteConfig.name} — ${siteConfig.tagline}`,
-    description: siteConfig.description,
-    url: "/",
-    locale: "en_GB",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${siteConfig.name} — ${siteConfig.tagline}`,
-    description: siteConfig.description,
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getPublicSiteSettings();
+  const ogImages = settings.seo.ogImageUrl
+    ? [{ url: settings.seo.ogImageUrl, width: 1200, height: 630, alt: settings.businessName }]
+    : undefined;
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+  return {
+    metadataBase: new URL(siteConfig.url),
+    title: {
+      default: settings.seo.title,
+      template: `%s | ${settings.siteTitle}`,
+    },
+    description: settings.seo.description,
+    applicationName: settings.siteTitle,
+    alternates: {
+      canonical: "/",
+    },
+    openGraph: {
+      type: "website",
+      siteName: settings.siteTitle,
+      title: settings.seo.title,
+      description: settings.seo.description,
+      url: "/",
+      locale: "en_GB",
+      images: ogImages,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: settings.seo.title,
+      description: settings.seo.description,
+      images: ogImages,
+    },
+    robots: settings.seo.indexingEnabled
+      ? { index: true, follow: true }
+      : { index: false, follow: false },
+    icons: settings.branding.faviconUrl
+      ? {
+          icon: [{ url: settings.branding.faviconUrl, type: "image/png" }],
+          apple: [{ url: settings.branding.faviconUrl, type: "image/png" }],
+        }
+      : undefined,
+  };
+}
+
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const settings = await getPublicSiteSettings();
+
   return (
     <html
       lang="en"
@@ -85,20 +110,33 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       data-scroll-behavior="smooth"
       // Browser extensions commonly stamp attributes onto <html> before
       // React hydrates — password managers, dark-mode and proxy add-ons all
-      // do it (`data-dm-proxy-injected`, `data-lt-installed`, and similar).
-      // React sees markup it did not render and logs a hydration mismatch
-      // that no application change can prevent, because the mutation happens
-      // in the user's browser.
-      //
-      // This suppresses the warning for THIS ELEMENT'S OWN attributes only —
-      // it is one level deep, not a tree-wide switch, so a genuine mismatch
-      // anywhere inside the page still reports normally. That narrowness is
-      // why it is the right tool here and would be the wrong one further
-      // down the tree.
+      // do it. This suppresses the warning for THIS ELEMENT'S OWN attributes
+      // only — one level deep, not a tree-wide switch. The dashboard's own
+      // dark class is applied to <html> after hydration for the same reason.
       suppressHydrationWarning
       className={`${manrope.variable} ${inter.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {/*
+          One provider for the whole application — public site, dashboard and
+          the 404 page alike — so the wordmark and every client component
+          reads the same configured name, number and display switches.
+        */}
+        <SiteSettingsProvider
+          value={{
+            businessName: settings.businessName,
+            whatsappNumber: settings.contact.whatsappNumber,
+            defaultCountry: settings.defaultCountry,
+            phone: settings.contact.phone,
+            callUsEnabled: settings.contact.callUsEnabled,
+            logoLightUrl: settings.branding.logoLightUrl,
+            logoDarkUrl: settings.branding.logoDarkUrl,
+            catalogDisplay: settings.catalogDisplay,
+          }}
+        >
+          {children}
+        </SiteSettingsProvider>
+      </body>
     </html>
   );
 }

@@ -18,6 +18,7 @@ import {
   listSparePartFitment,
 } from "@/lib/queries/spare-part.queries"
 import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
+import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 
 export async function generateMetadata(
   props: PageProps<"/Ricky@2000/spare-parts/[id]">
@@ -53,10 +54,11 @@ export default async function AdminSparePartDetailPage(
    * Both reads go out together: they are independent, and a page that already
    * waited on the part lookup should not then wait on two more in series.
    */
-  const [categories, photos, fitment] = await Promise.all([
+  const [categories, photos, fitment, siteSettings] = await Promise.all([
     listCategoryOptions(part.categoryId),
     listSparePartPhotos(part.id),
     listSparePartFitment(part.id),
+    getPublicSiteSettings(),
   ])
 
   const justCreated = searchParams.created === "1"
@@ -147,7 +149,12 @@ export default async function AdminSparePartDetailPage(
         at the same position in the tree. The key makes each part its own form
         instance, so part B never opens showing part A's rejected input.
       */}
-      <SparePartForm key={part.id} part={part} categories={categories} />
+      <SparePartForm
+        key={part.id}
+        part={part}
+        categories={categories}
+        siteWideVisibility={siteSettings.catalogDisplay.sparePart}
+      />
 
       {/*
         Keyed by part id for the same reason the form is: `useActionState`

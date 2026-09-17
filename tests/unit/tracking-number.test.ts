@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { parseTrackingLookup, trackingPagePath } from "@/lib/tracking/tracking-number"
+import { exampleTrackingNumber, parseTrackingLookup, trackingPagePath } from "@/lib/tracking/tracking-number"
 
 describe("parseTrackingLookup", () => {
   it("accepts a tracking number exactly as issued", () => {
@@ -25,6 +25,25 @@ describe("parseTrackingLookup", () => {
 
   it("refuses overly long input before parsing it", () => {
     expect(parseTrackingLookup(`CLM-2026-000125${" ".repeat(40)}`)).toBeNull()
+  })
+
+  it("accepts a number issued under a configured prefix, and ones issued before it changed", () => {
+    // The prefix is configurable and numbers keep the prefix they were issued
+    // with, so both must still resolve after a change.
+    expect(parseTrackingLookup("cmx 2026 000126")).toEqual({ kind: "TRACKING", value: "CMX-2026-000126" })
+    expect(parseTrackingLookup("CLM-2025-000900")).toEqual({ kind: "TRACKING", value: "CLM-2025-000900" })
+  })
+
+  it("never reads another reference's prefix as a tracking prefix", () => {
+    for (const typed of ["CLM-SP-2026-000045", "CLMV2026000123", "clmq2026000045"]) {
+      expect(parseTrackingLookup(typed), typed).toBeNull()
+    }
+  })
+})
+
+describe("exampleTrackingNumber", () => {
+  it("shows the configured prefix in the issued format", () => {
+    expect(exampleTrackingNumber("CMX", 2026)).toBe("CMX-2026-000125")
   })
 })
 

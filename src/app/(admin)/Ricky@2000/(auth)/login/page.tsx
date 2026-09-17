@@ -6,8 +6,9 @@ import { AlertCircle, CheckCircle2 } from "lucide-react"
 import { AdminAuthShell } from "@/components/admin/admin-auth-shell"
 import { AdminLoginForm } from "@/components/admin/admin-login-form"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { getAdminProfile } from "@/lib/auth/dal"
-import { isSafeReturnPath } from "@/lib/auth/return-path"
+import { getAdminAccess } from "@/lib/auth/dal"
+import { ADMIN_TWO_FACTOR_CHALLENGE_PATH, isSafeReturnPath } from "@/lib/auth/return-path"
+import { TWO_FACTOR_SETTINGS_PATH } from "@/lib/constants/settings-nav"
 import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
 
 export const metadata: Metadata = {
@@ -31,10 +32,11 @@ export default async function AdminLoginPage(props: PageProps<"/Ricky@2000/login
   // Already signed in and still an active administrator? There is nothing to
   // do here. Leaving the form reachable invites an admin to re-authenticate
   // needlessly, which is a small phishing-training hazard of its own.
-  const admin = await getAdminProfile()
-  if (admin) {
-    redirect(ADMIN_BASE_PATH)
-  }
+  const access = await getAdminAccess()
+  if (access.status === "OK") redirect(ADMIN_BASE_PATH)
+  // Password already accepted: the next step is the code, not this form.
+  if (access.status === "TWO_FACTOR_REQUIRED") redirect(ADMIN_TWO_FACTOR_CHALLENGE_PATH)
+  if (access.status === "TWO_FACTOR_SETUP_REQUIRED") redirect(`${TWO_FACTOR_SETTINGS_PATH}?required=1`)
 
   const rawNext = typeof searchParams.next === "string" ? searchParams.next : undefined
   // Filtered here as well as in the action. The action's check is the one
@@ -49,6 +51,16 @@ export default async function AdminLoginPage(props: PageProps<"/Ricky@2000/login
   // land on a bare login form seconds after setting a password and
   // reasonably conclude it had not worked.
   const passwordUpdated = searchParams.notice === "password_updated"
+
+  // Why an administrator is back here without having signed out themselves.
+  const sessionNotice =
+    searchParams.notice === "session_expired"
+      ? "Your session reached its time limit. Sign in again to continue."
+      : searchParams.notice === "session_ended"
+        ? "This session was signed out from another device. Sign in again to continue."
+        : searchParams.notice === "signed_out_everywhere"
+          ? "You have been signed out of every session."
+          : null
 
   return (
     <AdminAuthShell
@@ -68,6 +80,13 @@ export default async function AdminLoginPage(props: PageProps<"/Ricky@2000/login
           <AlertDescription>
             Password updated. Sign in with your new password.
           </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {sessionNotice ? (
+        <Alert className="mb-5">
+          <CheckCircle2 aria-hidden="true" className="text-gold-ink" />
+          <AlertDescription>{sessionNotice}</AlertDescription>
         </Alert>
       ) : null}
 

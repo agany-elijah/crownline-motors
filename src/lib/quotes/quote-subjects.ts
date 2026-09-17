@@ -18,8 +18,10 @@ export const QUOTE_LINE_DESCRIPTION_MAX = 300
 export interface VehicleSubject {
   make: string
   model: string
-  year: number
-  transmission: string
+  /** Null where the listing does not show its year to customers. */
+  year: number | null
+  /** Null where the listing does not show its transmission to customers. */
+  transmission: string | null
 }
 
 export interface SparePartLineSubject {
@@ -43,9 +45,14 @@ function clamp(text: string): string {
  * one ("Harrier XGL"), which is why there is no separate trim field to add.
  */
 export function vehicleSubjectLabel(vehicle: VehicleSubject): string {
-  return `${vehicle.make} ${vehicle.model} ${vehicle.year} ${transmissionLabel(
-    vehicle.transmission
-  )}`
+  return [
+    vehicle.make,
+    vehicle.model,
+    vehicle.year,
+    vehicle.transmission ? transmissionLabel(vehicle.transmission) : null,
+  ]
+    .filter((part) => part !== null)
+    .join(" ")
 }
 
 /**

@@ -2,6 +2,8 @@ import "server-only"
 
 import type { ShipmentType, TrackingStatus } from "@/generated/prisma/enums"
 import { prisma } from "@/lib/prisma"
+import { sparePartPhotoPublicUrl } from "@/lib/storage/spare-part-media"
+import { vehiclePhotoPublicUrl } from "@/lib/storage/vehicle-media"
 import type { TrackingLookup } from "@/lib/tracking/tracking-number"
 
 /**
@@ -14,6 +16,10 @@ import type { TrackingLookup } from "@/lib/tracking/tracking-number"
  * person: no name, contact detail, price, balance or order number. Staff
  * notes on tracking events are internal and never selected, and voided
  * events never appear. The page that calls this also rate-limits lookups.
+ *
+ * The expected delivery window and the main photograph are journey facts in
+ * the same sense: when it should arrive, and a picture of what is coming —
+ * the listing photograph, which the catalogue already published.
  */
 
 export interface PublicTrackingEvent {
@@ -32,6 +38,10 @@ export interface PublicTrackingResult {
   /** Oldest first. */
   events: PublicTrackingEvent[]
   lastUpdated: Date
+  /** The main photograph of the vehicle, or of the first part, when there is one. */
+  imageUrl: string | null
+  /** When staff expect it to arrive — a single day when `latest` is null. Null when not given. */
+  expectedDelivery: { earliest: Date; latest: Date | null } | null
 }
 
 export type PublicTrackingOutcome =
@@ -45,6 +55,13 @@ export type PublicTrackingOutcome =
   | { kind: "ORDER_UNTRACKED"; orderNumber: string }
   | { kind: "NOT_FOUND" }
 
+/** The main photograph only — one row, never the gallery. */
+const PRIMARY_PHOTO = {
+  where: { deletedAt: null, isPrimary: true },
+  select: { storagePath: true },
+  take: 1,
+} as const
+
 async function findShipment(trackingNumber: string): Promise<PublicTrackingResult | null> {
   const shipment = await prisma.shipment.findUnique({
     where: { trackingNumber },
@@ -54,8 +71,24 @@ async function findShipment(trackingNumber: string): Promise<PublicTrackingResul
       currentStatus: true,
       currentLocation: true,
       updatedAt: true,
-      vehicle: { select: { year: true, make: true, model: true } },
-      order: { select: { items: { select: { description: true } } } },
+      vehicle: {
+        select: {
+          year: true,
+          make: true,
+          model: true,
+          photos: PRIMARY_PHOTO,
+        },
+      },
+      order: {
+        select: {
+          estimatedDeliveryDate: true,
+          estimatedDeliveryLatest: true,
+          items: {
+            orderBy: { id: "asc" },
+            select: { description: true, sparePart: { select: { photos: PRIMARY_PHOTO } } },
+          },
+        },
+      },
       events: {
         where: { isVoided: false },
         orderBy: { eventDate: "asc" },
@@ -75,6 +108,10 @@ async function findShipment(trackingNumber: string): Promise<PublicTrackingResul
 
   const latestEvent = shipment.events[shipment.events.length - 1]
 
+  const vehiclePhoto = shipment.vehicle?.photos[0]
+  const partPhoto = items.find((item) => item.sparePart?.photos[0])?.sparePart?.photos[0]
+  const { estimatedDeliveryDate, estimatedDeliveryLatest } = shipment.order
+
   return {
     kind: "FOUND",
     trackingNumber: shipment.trackingNumber,
@@ -85,6 +122,14 @@ async function findShipment(trackingNumber: string): Promise<PublicTrackingResul
     events: shipment.events,
     lastUpdated:
       latestEvent && latestEvent.eventDate > shipment.updatedAt ? latestEvent.eventDate : shipment.updatedAt,
+    imageUrl: vehiclePhoto
+      ? vehiclePhotoPublicUrl(vehiclePhoto.storagePath)
+      : partPhoto
+        ? sparePartPhotoPublicUrl(partPhoto.storagePath)
+        : null,
+    expectedDelivery: estimatedDeliveryDate
+      ? { earliest: estimatedDeliveryDate, latest: estimatedDeliveryLatest }
+      : null,
   }
 }
 

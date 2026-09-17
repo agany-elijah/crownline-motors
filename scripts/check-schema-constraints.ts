@@ -247,6 +247,20 @@ async function main() {
     `)
     record("an order can be typed SPARE_PART and opened AWAITING_PAYMENT", true)
 
+    section("A delivery window has a start and never ends before it")
+    await mustAccept(
+      "a window from the 17th to the 30th",
+      `UPDATE "Order" SET "estimatedDeliveryDate" = '2026-10-17', "estimatedDeliveryLatest" = '2026-10-30' WHERE id = 'chk-order'`
+    )
+    await mustReject(
+      "a window that ends before it starts",
+      `UPDATE "Order" SET "estimatedDeliveryDate" = '2026-10-30', "estimatedDeliveryLatest" = '2026-10-17' WHERE id = 'chk-order'`
+    )
+    await mustReject(
+      "a window with an end but no start",
+      `UPDATE "Order" SET "estimatedDeliveryDate" = NULL, "estimatedDeliveryLatest" = '2026-10-30' WHERE id = 'chk-order'`
+    )
+
     await mustAccept(
       "a line naming a spare part",
       `INSERT INTO "OrderItem" (id,"orderId","sparePartId",description,"unitPrice",quantity,"lineTotal")
@@ -434,9 +448,52 @@ async function main() {
       )
     }
 
+    section("Settings keep tracking numbers unambiguous and sessions bounded")
+    // The singleton may be absent in a fresh environment; created inside this
+    // transaction so the checks have a row to act on, and rolled back with it.
+    await client.query(
+      `INSERT INTO "BusinessSettings" (id, "whatsappNumber", "updatedAt") VALUES (1, '', NOW()) ON CONFLICT (id) DO NOTHING`
+    )
+    await mustAccept(
+      "a tracking prefix of 2–6 capital letters",
+      `UPDATE "BusinessSettings" SET "trackingNumberPrefix" = 'CMX' WHERE id = 1`
+    )
+    for (const prefix of ["CLMO", "CLMV", "CLMQ", "CLMSP", "C", "clm", "CL1"]) {
+      await mustReject(
+        `the tracking prefix ${prefix}`,
+        `UPDATE "BusinessSettings" SET "trackingNumberPrefix" = $1 WHERE id = 1`,
+        [prefix]
+      )
+    }
+    await mustReject(
+      "a session timeout of zero hours",
+      `UPDATE "BusinessSettings" SET "sessionTimeoutHours" = 0 WHERE id = 1`
+    )
+    await mustReject(
+      "a session timeout past thirty days",
+      `UPDATE "BusinessSettings" SET "sessionTimeoutHours" = 721 WHERE id = 1`
+    )
+    await mustReject(
+      "a default country that is not a two-letter code",
+      `UPDATE "BusinessSettings" SET "defaultCountry" = 'SSD' WHERE id = 1`
+    )
+    await mustAccept(
+      "an open dashboard session",
+      `INSERT INTO "AdminSession" (id,"adminId","authSessionId") VALUES ('s-open','chk-admin','chk-session-open')`
+    )
+    await mustReject(
+      "a session with an end reason but no end time",
+      `INSERT INTO "AdminSession" (id,"adminId","authSessionId","endReason") VALUES ('s-bad','chk-admin','chk-session-bad','REVOKED')`
+    )
+
     section("The objects the catalogue depends on are installed")
     const expectedConstraints = [
+      "AdminSession_end_consistency_check",
+      "BusinessSettings_default_country_check",
       "BusinessSettings_quote_validity_check",
+      "BusinessSettings_session_timeout_check",
+      "BusinessSettings_tracking_prefix_check",
+      "Order_delivery_window_check",
       "Order_import_duty_non_negative_check",
       "OrderItem_exactly_one_product_check",
       "OrderItem_quantity_positive_check",

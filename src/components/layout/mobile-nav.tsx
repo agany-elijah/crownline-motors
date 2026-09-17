@@ -3,13 +3,20 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-import { ArrowUpRightIcon, XIcon } from "lucide-react"
+import { ArrowUpRightIcon, PhoneIcon, XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 import { BrandMark } from "@/components/layout/brand-mark"
-import { isNavLinkAvailable } from "@/lib/constants/nav-links"
-import { siteConfig } from "@/config/site"
+import { useSiteSettings } from "@/components/shared/site-settings-provider"
+import { toTelHref } from "@/lib/utils/tel"
+import {
+  INVENTORY_CTA,
+  headerNavItems,
+  isNavGroup,
+  isNavLinkAvailable,
+  type NavLink,
+} from "@/lib/constants/nav-links"
 
 interface MobileNavProps {
   open: boolean
@@ -53,6 +60,93 @@ function isLinkActive(pathname: string, href: string): boolean {
  */
 export function MobileNav({ open, onOpenChange, whatsappUrl }: MobileNavProps) {
   const pathname = usePathname()
+  const { phone, callUsEnabled } = useSiteSettings()
+
+  function renderLink(link: NavLink, index: number, nested: boolean) {
+    const active = isLinkActive(pathname, link.href)
+    const entranceDelay = { animationDelay: `${60 + index * 35}ms` }
+
+    // Not yet routable — shown as plain text with a "Soon"
+    // marker rather than a link into a 404. Same reasoning as
+    // the desktop NavLink; see nav-links.ts.
+    if (!isNavLinkAvailable(link)) {
+      return (
+        <li key={link.href}>
+          <span
+            style={entranceDelay}
+            className={cn(
+              "flex items-center justify-between gap-4",
+              nested ? "py-3 pl-7 text-base" : "border-b border-white/5 py-4 pl-4 text-lg",
+              "font-heading font-semibold tracking-tight text-background/35",
+              "animate-in fade-in-0 slide-in-from-left-4 fill-mode-backwards"
+            )}
+          >
+            {link.label}
+            <span className="rounded-4xl border border-white/20 px-2 py-0.5 text-[0.625rem] font-semibold tracking-[0.08em] text-background/50 uppercase">
+              Soon
+            </span>
+          </span>
+        </li>
+      )
+    }
+
+    return (
+      <li key={link.href}>
+        {/*
+          A plain Link that closes the drawer on click, rather
+          than a Dialog.Close rendering a Link. These items
+          navigate, so they must keep link semantics — screen
+          readers should announce "link", and cmd/ctrl-click
+          and "open in new tab" must keep working. Routing a
+          Link through Dialog.Close gives it button semantics
+          and loses all of that.
+        */}
+        <Link
+          href={link.href}
+          aria-current={active ? "page" : undefined}
+          onClick={() => onOpenChange(false)}
+          style={entranceDelay}
+          className={cn(
+            "group/item relative flex items-center justify-between gap-4",
+            // Pages under a heading (Services) sit indented and a size down,
+            // so the group reads as one entry with its pages inside it.
+            nested ? "py-3 pl-7 text-base" : "border-b border-white/5 py-4 pl-4 text-lg",
+            "font-heading font-semibold tracking-tight",
+            "transition-colors duration-fast ease-crownline",
+            // Gold edge marker that grows out from the left rail.
+            // The desktop nav answers a hover with a gold rule
+            // underneath the label; on a stacked drawer the
+            // equivalent gesture runs down the side, so the two
+            // read as the same idea at two orientations rather
+            // than as two unrelated effects.
+            "before:absolute before:top-1/2 before:left-0 before:w-0.5",
+            "before:-translate-y-1/2 before:rounded-full before:bg-gold",
+            "before:transition-[height] before:duration-fast before:ease-crownline",
+            active ? "before:h-7" : "before:h-0 hover:before:h-7",
+            // Staggered entrance. The global reduced-motion
+            // rule collapses these to ~0ms, so the delays
+            // above never strand content for anyone who has
+            // asked for less movement.
+            "animate-in fade-in-0 slide-in-from-left-4 fill-mode-backwards",
+            active ? "text-gold" : "text-background/80 hover:text-background"
+          )}
+        >
+          <span className="transition-transform duration-fast ease-crownline group-hover/item:translate-x-1">
+            {link.label}
+          </span>
+          <ArrowUpRightIcon
+            aria-hidden="true"
+            className={cn(
+              "size-4 transition-all duration-fast ease-crownline",
+              active
+                ? "text-gold opacity-100"
+                : "opacity-0 group-hover/item:translate-x-0.5 group-hover/item:text-gold group-hover/item:opacity-100"
+            )}
+          />
+        </Link>
+      </li>
+    )
+  }
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -101,7 +195,7 @@ export function MobileNav({ open, onOpenChange, whatsappUrl }: MobileNavProps) {
           )}
         >
           <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
-            <DialogPrimitive.Title render={<BrandMark size="sm" />} />
+            <DialogPrimitive.Title render={<BrandMark size="sm" tone="dark" />} />
             <DialogPrimitive.Description className="sr-only">
               Site navigation
             </DialogPrimitive.Description>
@@ -115,88 +209,26 @@ export function MobileNav({ open, onOpenChange, whatsappUrl }: MobileNavProps) {
 
           <nav aria-label="Mobile" className="flex-1 overflow-y-auto px-5 py-6">
             <ul className="flex flex-col">
-              {siteConfig.nav.map((link, index) => {
-                const active = isLinkActive(pathname, link.href)
-                const entranceDelay = { animationDelay: `${60 + index * 35}ms` }
-
-                // Not yet routable — shown as plain text with a "Soon"
-                // marker rather than a link into a 404. Same reasoning as
-                // the desktop NavLink; see nav-links.ts.
-                if (!isNavLinkAvailable(link)) {
+              {headerNavItems.map((item, index) => {
+                // Services opens a menu on a desktop; in a drawer there is room
+                // to list its pages under a quiet heading instead.
+                if (isNavGroup(item)) {
                   return (
-                    <li key={link.href}>
+                    <li key={item.label} className="border-b border-white/5 pt-4 pb-1">
                       <span
-                        style={entranceDelay}
-                        className={cn(
-                          "flex items-center justify-between gap-4",
-                          "border-b border-white/5 py-4 pl-4",
-                          "font-heading text-lg font-semibold tracking-tight text-background/35",
-                          "animate-in fade-in-0 slide-in-from-left-4 fill-mode-backwards"
-                        )}
+                        style={{ animationDelay: `${60 + index * 35}ms` }}
+                        className="eyebrow block pl-4 text-background/45 animate-in fade-in-0 slide-in-from-left-4 fill-mode-backwards"
                       >
-                        {link.label}
-                        <span className="rounded-4xl border border-white/20 px-2 py-0.5 text-[0.625rem] font-semibold tracking-[0.08em] text-background/50 uppercase">
-                          Soon
-                        </span>
+                        {item.label}
                       </span>
+                      <ul className="flex flex-col">
+                        {item.children.map((child) => renderLink(child, index, true))}
+                      </ul>
                     </li>
                   )
                 }
 
-                return (
-                  <li key={link.href}>
-                    {/*
-                      A plain Link that closes the drawer on click, rather
-                      than a Dialog.Close rendering a Link. These items
-                      navigate, so they must keep link semantics — screen
-                      readers should announce "link", and cmd/ctrl-click
-                      and "open in new tab" must keep working. Routing a
-                      Link through Dialog.Close gives it button semantics
-                      and loses all of that.
-                    */}
-                    <Link
-                      href={link.href}
-                      aria-current={active ? "page" : undefined}
-                      onClick={() => onOpenChange(false)}
-                      style={entranceDelay}
-                      className={cn(
-                        "group/item relative flex items-center justify-between gap-4",
-                        "border-b border-white/5 py-4 pl-4",
-                        "font-heading text-lg font-semibold tracking-tight",
-                        "transition-colors duration-fast ease-crownline",
-                        // Gold edge marker that grows out from the left rail.
-                        // The desktop nav answers a hover with a gold rule
-                        // underneath the label; on a stacked drawer the
-                        // equivalent gesture runs down the side, so the two
-                        // read as the same idea at two orientations rather
-                        // than as two unrelated effects.
-                        "before:absolute before:top-1/2 before:left-0 before:w-0.5",
-                        "before:-translate-y-1/2 before:rounded-full before:bg-gold",
-                        "before:transition-[height] before:duration-fast before:ease-crownline",
-                        active ? "before:h-7" : "before:h-0 hover:before:h-7",
-                        // Staggered entrance. The global reduced-motion
-                        // rule collapses these to ~0ms, so the delays
-                        // above never strand content for anyone who has
-                        // asked for less movement.
-                        "animate-in fade-in-0 slide-in-from-left-4 fill-mode-backwards",
-                        active ? "text-gold" : "text-background/80 hover:text-background"
-                      )}
-                    >
-                      <span className="transition-transform duration-fast ease-crownline group-hover/item:translate-x-1">
-                        {link.label}
-                      </span>
-                      <ArrowUpRightIcon
-                        aria-hidden="true"
-                        className={cn(
-                          "size-4 transition-all duration-fast ease-crownline",
-                          active
-                            ? "text-gold opacity-100"
-                            : "opacity-0 group-hover/item:translate-x-0.5 group-hover/item:text-gold group-hover/item:opacity-100"
-                        )}
-                      />
-                    </Link>
-                  </li>
-                )
+                return renderLink(item, index, false)
               })}
             </ul>
           </nav>
@@ -230,20 +262,31 @@ export function MobileNav({ open, onOpenChange, whatsappUrl }: MobileNavProps) {
                 WhatsApp Us
               </a>
             )}
+            {/* Tap-to-call — the brief's mobile requirement (§16). Shown only
+                while "Call us" buttons are on and a number is configured. */}
+            {callUsEnabled ? (
+              <a
+                href={toTelHref(phone)}
+                onClick={() => onOpenChange(false)}
+                data-slot="button"
+                data-variant="outline"
+                className={cn(buttonVariants({ variant: "outline", size: "lg" }), "w-full")}
+              >
+                <PhoneIcon aria-hidden="true" />
+                Call Us
+              </a>
+            ) : null}
             {/* Same reasoning as the nav items above — a link, styled as a
-                button, that also dismisses the drawer. */}
+                button, that also dismisses the drawer. The one gold action,
+                matching the header's. */}
             <Link
-              href="/get-a-quote"
+              href={INVENTORY_CTA.href}
               onClick={() => onOpenChange(false)}
-              // Same markers, for the same reason. The gold fill needs no
-              // dark-surface override, but tagging only one of the two
-              // buttons is how the next person concludes the attributes
-              // are optional.
               data-slot="button"
               data-variant="default"
               className={cn(buttonVariants({ variant: "default", size: "lg" }), "w-full")}
             >
-              Get a Quote
+              {INVENTORY_CTA.label}
             </Link>
           </div>
         </DialogPrimitive.Popup>

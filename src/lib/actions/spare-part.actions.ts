@@ -87,6 +87,7 @@ const SPARE_PART_FORM_FIELDS = [
   "isFeatured",
   "supplierName",
   "supplierNotes",
+  "hiddenFields",
 ] as const
 
 /** The longest description the schema accepts, with headroom. A value past
@@ -286,6 +287,7 @@ export async function createSparePartAction(
           isFeatured: input.isFeatured,
           supplierName: input.supplierName ?? null,
           supplierNotes: input.supplierNotes ?? null,
+          hiddenFields: input.hiddenFields,
           // Explicit rather than relying on the column default: a new
           // listing is never live until someone decides it is.
           status: SparePartStatus.DRAFT,
@@ -306,6 +308,7 @@ export async function createSparePartAction(
             stockQuantity: input.stockQuantity,
             availability: input.availability,
             photoCount: prepared.photos.length,
+            ...(input.hiddenFields.length > 0 ? { hiddenFields: input.hiddenFields } : {}),
           },
         },
         tx
@@ -403,6 +406,7 @@ export async function updateSparePartAction(
       pricingMode: true,
       stockQuantity: true,
       availability: true,
+      hiddenFields: true,
     },
   })
 
@@ -463,6 +467,7 @@ export async function updateSparePartAction(
           price: input.price ?? null,
           supplierName: input.supplierName ?? null,
           supplierNotes: input.supplierNotes ?? null,
+          hiddenFields: input.hiddenFields,
         },
       })
 
@@ -504,6 +509,9 @@ export async function updateSparePartAction(
                   stockChangedFrom: existing.stockQuantity,
                   stockChangedTo: input.stockQuantity,
                 }
+              : {}),
+            ...(existing.hiddenFields.join() !== input.hiddenFields.join()
+              ? { hiddenFieldsFrom: existing.hiddenFields, hiddenFieldsTo: input.hiddenFields }
               : {}),
             /**
              * Recorded alongside price and stock, and for the same reason:
