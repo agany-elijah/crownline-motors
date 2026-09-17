@@ -221,7 +221,7 @@ test.describe("vehicle inventory", () => {
 
       // The vehicle is a draft, so the Published filter must exclude it.
       await page.goto(`${ADMIN_BASE_PATH}/vehicles?search=${model}&status=PUBLISHED`)
-      await expect(page.getByText("No matches")).toBeVisible()
+      await expect(page.getByText("No vehicles match")).toBeVisible()
     } finally {
       await page.goto(adminPath("/vehicles"))
       await page.getByRole("searchbox", { name: "Search vehicles" }).fill(model)
@@ -233,7 +233,7 @@ test.describe("vehicle inventory", () => {
   test("shows an empty state rather than a bare table", async ({ page }) => {
     await page.goto(adminPath("/vehicles?search=definitely-no-such-vehicle-xyz"))
 
-    await expect(page.getByText("No matches")).toBeVisible()
+    await expect(page.getByText("No vehicles match")).toBeVisible()
     await expect(page.getByRole("link", { name: "Show all vehicles" })).toBeVisible()
   })
 })

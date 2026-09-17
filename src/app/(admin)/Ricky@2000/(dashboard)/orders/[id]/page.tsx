@@ -1,18 +1,21 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+import { Mail, Phone } from "lucide-react"
 
-import { AdminPageHeader } from "@/components/admin/admin-page-header"
+import { AdminMetaDivider, AdminPageHeader } from "@/components/admin/admin-page-header"
+import { AdminPanel } from "@/components/admin/admin-panel"
 import { OrderCancelDialog } from "@/components/admin/order-cancel-dialog"
 import { OrderDeliveryDateForm } from "@/components/admin/order-delivery-date-form"
 import { OrderFinanceSummaryCard } from "@/components/admin/order-finance-summary"
 import { OrderPaymentsPanel } from "@/components/admin/order-payments-panel"
 import { OrderTrackingPanel } from "@/components/admin/order-tracking-panel"
 import { StatusBadge } from "@/components/admin/status-badge"
+import { WhatsAppGlyph } from "@/components/shared/whatsapp-glyph"
 import { siteConfig } from "@/config/site"
 import { requirePermission } from "@/lib/auth/admin-guard"
 import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
+import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from "@/lib/constants/order-status"
 import { trackingActivationProblem } from "@/lib/orders/order-lifecycle"
 import { getOrderById } from "@/lib/queries/order.queries"
 import { getOperationalSettings, getPublicSiteSettings } from "@/lib/queries/settings.queries"
@@ -29,11 +32,6 @@ export async function generateMetadata(
 
   return { title: order ? `Order ${order.orderNumber}` : "Order" }
 }
-
-/** Light panel styling shared by every section on this page — a soft ring
- *  and shadow instead of a hard border, so the page reads as smooth surfaces
- *  rather than boxed cards. See the equivalent recipe in `components/ui/card.tsx`. */
-const PANEL = "flex flex-col gap-4 rounded-xl bg-card p-6 shadow-[var(--shadow-subtle)] ring-1 ring-foreground/10"
 
 /**
  * A single order, and everywhere it is worked: what was sold, the payments
@@ -77,94 +75,73 @@ export default async function AdminOrderDetailPage(props: PageProps<"/Ricky@2000
   })
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4">
-        <Link
-          href={`${ADMIN_BASE_PATH}/orders`}
-          className="inline-flex w-fit items-center gap-1.5 text-small text-muted-foreground transition-colors duration-fast hover:text-gold-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          <ArrowLeft aria-hidden="true" className="size-3.5" />
-          All orders
-        </Link>
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader
+        back={{ href: `${ADMIN_BASE_PATH}/orders`, label: "All orders" }}
+        title={order.customerName}
+        meta={
+          <>
+            <span className="font-mono text-foreground">{order.orderNumber}</span>
+            <AdminMetaDivider />
+            <Link
+              href={`${ADMIN_BASE_PATH}/quotes/${order.quoteId}`}
+              className="rounded-sm underline-offset-4 transition-colors duration-fast hover:text-gold-ink hover:underline"
+            >
+              From quote <span className="font-mono">{order.quoteNumber}</span>
+            </Link>
+            <AdminMetaDivider />
+            <StatusBadge tone={ORDER_STATUS_TONES[order.status]}>{ORDER_STATUS_LABELS[order.status]}</StatusBadge>
+          </>
+        }
+        actions={canCancel ? <OrderCancelDialog orderId={order.id} orderNumber={order.orderNumber} /> : null}
+      />
 
-        <AdminPageHeader
-          title={order.customerName}
-          description={
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="text-small">{order.orderNumber}</span>
-              <span aria-hidden="true" className="text-muted-foreground">·</span>
-              <Link
-                href={`${ADMIN_BASE_PATH}/quotes/${order.quoteId}`}
-                className="text-small text-gold-ink hover:underline"
-              >
-                From quote {order.quoteNumber}
-              </Link>
-            </span>
-          }
-          actions={
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge tone="neutral" className="text-[11px] px-2 py-0.5">
-                {order.status.replaceAll("_", " ").toLowerCase()}
-              </StatusBadge>
-              {canCancel ? <OrderCancelDialog orderId={order.id} orderNumber={order.orderNumber} /> : null}
-            </div>
-          }
-        />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="flex flex-col gap-6 lg:col-span-2">
-          <section className={PANEL}>
-            <h2 className="font-heading text-h3 font-semibold">Items</h2>
-            <ul className="flex flex-col divide-y divide-border/60">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
+        <div className="flex min-w-0 flex-col gap-6">
+          <AdminPanel title="Items" description="What was sold, and the costs agreed on the quotation." flush>
+            <ul className="flex flex-col divide-y divide-border/70 border-t border-border">
               {order.items.map((item) => (
-                <li key={item.id} className="flex items-center justify-between gap-3 py-3">
-                  <div className="flex flex-col">
-                    <span className="font-medium">{item.description}</span>
-                    <span className="text-small text-muted-foreground">
+                <li key={item.id} className="flex items-center justify-between gap-4 px-5 py-3.5 sm:px-6">
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-small font-medium text-foreground">{item.description}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
                       {item.quantity} × {formatCurrency(item.unitPrice)}
                     </span>
                   </div>
-                  <span className="font-semibold tabular-nums">{formatCurrency(item.lineTotal)}</span>
+                  <span className="shrink-0 text-small font-medium text-foreground tabular-nums">
+                    {formatCurrency(item.lineTotal)}
+                  </span>
                 </li>
               ))}
             </ul>
 
-            <dl className="flex flex-col gap-1.5 border-t border-border/60 pt-4 text-small">
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">Shipping</dt>
-                <dd>{formatCurrencyOrDash(order.shippingCost)}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">Clearing</dt>
-                <dd>{formatCurrencyOrDash(order.clearingCost)}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">Import duty</dt>
-                <dd>{formatCurrencyOrDash(order.importDuty)}</dd>
-              </div>
+            <dl className="flex flex-col gap-2 border-t border-border bg-sunken/50 px-5 py-4 text-small sm:px-6">
+              <CostRow label="Shipping" value={formatCurrencyOrDash(order.shippingCost)} />
+              <CostRow label="Clearing" value={formatCurrencyOrDash(order.clearingCost)} />
+              <CostRow label="Import duty" value={formatCurrencyOrDash(order.importDuty)} />
               {order.otherCharges ? (
-                <div className="flex items-center justify-between">
-                  <dt className="text-muted-foreground">Accessories &amp; extras</dt>
-                  <dd>{formatCurrencyOrDash(order.otherCharges)}</dd>
-                </div>
+                <CostRow label="Accessories & extras" value={formatCurrencyOrDash(order.otherCharges)} />
               ) : null}
-              <div className="flex items-center justify-between border-t border-border/60 pt-1.5 font-semibold">
-                <dt>Total</dt>
-                <dd className="tabular-nums">{formatCurrency(order.finance.totalAmount)}</dd>
+              <div className="mt-1 flex items-baseline justify-between border-t border-border pt-3">
+                <dt className="font-medium text-foreground">Total</dt>
+                <dd className="text-body font-semibold text-foreground tabular-nums">
+                  {formatCurrency(order.finance.totalAmount)}
+                </dd>
               </div>
             </dl>
-          </section>
+          </AdminPanel>
 
           {order.notes ? (
-            <section className={PANEL}>
-              <h2 className="font-heading text-h3 font-semibold">Notes</h2>
-              <p className="whitespace-pre-wrap text-small text-muted-foreground">{order.notes}</p>
-            </section>
+            <AdminPanel title="Notes">
+              <p className="text-small whitespace-pre-wrap text-muted-foreground">{order.notes}</p>
+            </AdminPanel>
           ) : null}
 
-          <section className={PANEL}>
-            <h2 className="font-heading text-h3 font-semibold">Payments</h2>
+          <AdminPanel
+            id="payments"
+            title="Payments"
+            description="Record each payment as it arrives, against the stage it pays."
+          >
             <OrderPaymentsPanel
               orderId={order.id}
               milestones={order.finance.milestones}
@@ -174,10 +151,13 @@ export default async function AdminOrderDetailPage(props: PageProps<"/Ricky@2000
                 isCancelled ? "This order is cancelled, so no further payments can be recorded." : null
               }
             />
-          </section>
+          </AdminPanel>
 
-          <section className={PANEL}>
-            <h2 className="font-heading text-h3 font-semibold">Tracking</h2>
+          <AdminPanel
+            id="tracking"
+            title="Tracking"
+            description="Where the order is on its journey, as the customer sees it on Track My Order."
+          >
             <OrderTrackingPanel
               stages={(await getOperationalSettings()).trackingStages}
               orderId={order.id}
@@ -192,32 +172,57 @@ export default async function AdminOrderDetailPage(props: PageProps<"/Ricky@2000
               deliveryDate={order.estimatedDeliveryDate}
               deliveryDateLatest={order.estimatedDeliveryLatest}
             />
-          </section>
+          </AdminPanel>
         </div>
 
-        <div className="flex flex-col gap-6">
+        {/* First on a phone: what is owed is the question an order is opened
+            to answer, and on a narrow screen it would otherwise sit under
+            every form on the page. */}
+        <div className="flex min-w-0 flex-col gap-6 max-lg:order-first lg:sticky lg:top-20">
           <OrderFinanceSummaryCard finance={order.finance} />
 
-          <section className={PANEL}>
-            <h2 className="font-heading text-h3 font-semibold">Customer</h2>
-            <div className="flex flex-col gap-1 text-small">
+          <AdminPanel title="Customer" as="aside">
+            <div className="flex flex-col gap-3 text-small">
               <Link
                 href={`${ADMIN_BASE_PATH}/customers/${order.customerId}`}
-                className="font-medium hover:text-gold-ink"
+                className="w-fit font-medium text-foreground underline-offset-4 transition-colors duration-fast hover:text-gold-ink hover:underline"
               >
                 {order.customerName}
               </Link>
-              {order.customerPhone ? (
-                <span className="text-muted-foreground">{order.customerPhone}</span>
-              ) : null}
-              {order.customerWhatsapp && order.customerWhatsapp !== order.customerPhone ? (
-                <span className="text-muted-foreground">WhatsApp {order.customerWhatsapp}</span>
-              ) : null}
-              <span className="break-all text-muted-foreground">{order.customerEmail ?? "No email on file"}</span>
+              <ul className="flex flex-col gap-2 text-muted-foreground">
+                {order.customerPhone ? (
+                  <li className="flex items-center gap-2">
+                    <Phone aria-hidden="true" className="size-3.5 shrink-0" />
+                    <span className="font-mono text-xs text-foreground tabular-nums">{order.customerPhone}</span>
+                  </li>
+                ) : null}
+                {order.customerWhatsapp && order.customerWhatsapp !== order.customerPhone ? (
+                  <li className="flex items-center gap-2">
+                    <WhatsAppGlyph className="size-3.5 shrink-0" />
+                    <span>
+                      WhatsApp{" "}
+                      <span className="font-mono text-xs text-foreground tabular-nums">{order.customerWhatsapp}</span>
+                    </span>
+                  </li>
+                ) : null}
+                <li className="flex items-center gap-2">
+                  <Mail aria-hidden="true" className="size-3.5 shrink-0" />
+                  <span className="break-all">{order.customerEmail ?? "No email on file"}</span>
+                </li>
+              </ul>
             </div>
-          </section>
+          </AdminPanel>
         </div>
       </div>
+    </div>
+  )
+}
+
+function CostRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="text-foreground tabular-nums">{value}</dd>
     </div>
   )
 }

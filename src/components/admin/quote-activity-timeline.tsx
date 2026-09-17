@@ -52,13 +52,23 @@ export function QuoteActivityTimeline({ createdAt, sentAt, lastSentVia, order }:
   events.sort((a, b) => a.date.getTime() - b.date.getTime())
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-[var(--shadow-subtle)] ring-1 ring-foreground/10">
-      <h2 className="text-meta text-muted-foreground">Activity</h2>
+    <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-[var(--shadow-subtle)]">
+      <h2 className="text-small font-medium text-foreground">Activity</h2>
 
-      <ol className="flex flex-col gap-4">
+      <ol className="flex flex-col">
         {events.map((event, index) => (
-          <li key={index} className="flex gap-3">
-            <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-muted-foreground [&_svg]:size-3.5">
+          <li key={index} className="relative flex gap-3 pb-4 last:pb-0">
+            {/* The thread between events, stopping at the last one. */}
+            {index < events.length - 1 ? (
+              <span aria-hidden="true" className="absolute top-7 bottom-0 left-3 w-px -translate-x-1/2 bg-border" />
+            ) : null}
+            <span
+              className={
+                index === events.length - 1
+                  ? "relative mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-gold-ink/30 bg-accent text-gold-ink [&_svg]:size-3.5"
+                  : "relative mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-muted-foreground [&_svg]:size-3.5"
+              }
+            >
               {event.icon}
             </span>
             <div className="flex flex-col gap-0.5">
@@ -66,7 +76,7 @@ export function QuoteActivityTimeline({ createdAt, sentAt, lastSentVia, order }:
                 {event.label}
                 {event.detail ? <span className="text-muted-foreground"> · {event.detail}</span> : null}
               </p>
-              <p className="text-xs text-muted-foreground">{DATE_FORMAT.format(event.date)}</p>
+              <p className="text-xs text-muted-foreground tabular-nums">{DATE_FORMAT.format(event.date)}</p>
             </div>
           </li>
         ))}

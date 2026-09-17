@@ -9,6 +9,8 @@ import {
   updateVehicleAction,
   type VehicleFormState,
 } from "@/lib/actions/vehicle.actions"
+import { AdminFormActionBar, AdminFormSection } from "@/components/admin/admin-form"
+import { NATIVE_SELECT_CLASS } from "@/components/admin/settings/settings-ui"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,6 +21,7 @@ import { cn } from "@/lib/utils"
 import {
   COUNTRY_OPTIONS,
   DRIVE_TYPE_OPTIONS,
+  VEHICLE_BODY_TYPE_OPTIONS,
   FUEL_TYPE_OPTIONS,
   TRANSMISSION_OPTIONS,
   VEHICLE_CONDITION_OPTIONS,
@@ -161,7 +164,7 @@ export function VehicleForm({ vehicle, siteWideVisibility }: VehicleFormProps) {
         </Alert>
       ) : null}
 
-      <FormSection title="Identity">
+      <FormSection title="Identity" description="What the vehicle is, as it appears on the card and in search.">
         <Field label="Make" name="make" error={error("make")} className="sm:col-span-2"
           controlKey={controlKey}>
           {(control) => (
@@ -248,7 +251,10 @@ export function VehicleForm({ vehicle, siteWideVisibility }: VehicleFormProps) {
         </Field>
       </FormSection>
 
-      <FormSection title="Pricing">
+      <FormSection
+        title="Pricing"
+        description="The asking price, and the estimates customers see as the delivered cost. Estimates are labelled as such on the website."
+      >
         <Field label="Price (USD)" name="price" error={error("price")}
           controlKey={controlKey}>
           {(control) => (
@@ -327,7 +333,7 @@ export function VehicleForm({ vehicle, siteWideVisibility }: VehicleFormProps) {
         </Field>
       </FormSection>
 
-      <FormSection title="Specification">
+      <FormSection title="Specification" description="The facts a buyer compares vehicles on.">
         <Field label="Mileage (km)" name="mileageKm" error={error("mileageKm")}
           controlKey={controlKey}>
           {(control) => (
@@ -406,6 +412,21 @@ export function VehicleForm({ vehicle, siteWideVisibility }: VehicleFormProps) {
           )}
         </Field>
 
+        <Field label="Body type" name="bodyType" error={error("bodyType")}
+          controlKey={controlKey}>
+          {(control) => (
+            <NativeSelect
+              {...control}
+              name="bodyType"
+              // Optional, unlike the selects above: an empty value is a real
+              // answer ("not set") and keeps the vehicle out of body-type
+              // browsing rather than filing it under a guess.
+              defaultValue={defaultOf("bodyType", vehicle?.bodyType)?.toString() ?? ""}
+              options={[{ value: "", label: "Not set" }, ...VEHICLE_BODY_TYPE_OPTIONS]}
+            />
+          )}
+        </Field>
+
         <Field
           label="Current location"
           name="currentLocation"
@@ -458,10 +479,7 @@ export function VehicleForm({ vehicle, siteWideVisibility }: VehicleFormProps) {
         </Field>
       </FormSection>
 
-      <FormSection
-        title="Features"
-        columns={1}
-      >
+      <FormSection title="Features" description="One feature per line. Each becomes an item in the listing's feature list." columns={1}>
         <Field
           label="Features"
           name="features"
@@ -485,7 +503,7 @@ export function VehicleForm({ vehicle, siteWideVisibility }: VehicleFormProps) {
 
       </FormSection>
 
-      <FormSection title="Description" columns={1}>
+      <FormSection title="Description" description="The condition and history, in plain words." columns={1}>
         <Field label="Description" name="description" error={error("description")}
           controlKey={controlKey}>
           {(control) => (
@@ -500,7 +518,7 @@ export function VehicleForm({ vehicle, siteWideVisibility }: VehicleFormProps) {
           )}
         </Field>
 
-        <label className="flex items-start gap-3 rounded-lg border border-border bg-card p-4">
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-sunken/60 p-4 transition-colors duration-fast hover:border-foreground/20">
           <input
             key={controlKey}
             type="checkbox"
@@ -511,9 +529,12 @@ export function VehicleForm({ vehicle, siteWideVisibility }: VehicleFormProps) {
                 ? state.values.isFeatured === "true"
                 : vehicle?.isFeatured
             }
-            className="mt-0.5 size-4 accent-[var(--gold)]"
+            className="mt-0.5 size-4 shrink-0 cursor-pointer accent-[var(--gold)]"
           />
-          <span className="text-small font-semibold">Feature on the homepage</span>
+          <span className="flex flex-col gap-0.5">
+            <span className="text-small font-medium text-foreground">Feature on the homepage</span>
+            <span className="text-xs text-muted-foreground">Featured vehicles are listed first wherever vehicles appear on the website.</span>
+          </span>
         </label>
       </FormSection>
 
@@ -549,13 +570,11 @@ export function VehicleForm({ vehicle, siteWideVisibility }: VehicleFormProps) {
         and it stops at the form's own end rather than floating over the
         gallery below.
       */}
-      <div className="sticky bottom-0 z-20 -mx-4 mt-2 border-t border-border bg-card/95 px-4 py-4 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="flex justify-end">
+      <AdminFormActionBar hint={isEdit ? undefined : "The vehicle is created as a draft. Nothing is public until you publish it."}>
           <Button
             type="submit"
-            size="lg"
             disabled={isPending}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto sm:min-w-36"
           >
             {isPending ? (
               <>
@@ -568,8 +587,7 @@ export function VehicleForm({ vehicle, siteWideVisibility }: VehicleFormProps) {
               "Create vehicle"
             )}
           </Button>
-        </div>
-      </div>
+      </AdminFormActionBar>
     </form>
   )
 }
@@ -578,26 +596,26 @@ export function VehicleForm({ vehicle, siteWideVisibility }: VehicleFormProps) {
 
 function FormSection({
   title,
+  description,
   columns = 2,
   children,
 }: {
   title: string
+  description?: string
   columns?: 1 | 2
   children: React.ReactNode
 }) {
   return (
-    <section className="flex flex-col gap-5 rounded-xl border border-border bg-card p-6">
-      <h2 className="font-heading text-h3 font-semibold">{title}</h2>
-
-      <div
-        className={cn(
-          "grid gap-4",
-          columns === 2 ? "sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1"
-        )}
-      >
-        {children}
-      </div>
-    </section>
+    <AdminFormSection
+      title={title}
+      description={description}
+      bodyClassName={cn(
+        "grid gap-x-4 gap-y-5",
+        columns === 2 ? "sm:grid-cols-2 xl:grid-cols-4" : "grid-cols-1"
+      )}
+    >
+      {children}
+    </AdminFormSection>
   )
 }
 
@@ -656,11 +674,11 @@ function Field({
   }
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <Label htmlFor={id} className="justify-between">
+    <div className={cn("flex min-w-0 flex-col gap-2", className)}>
+      <Label htmlFor={id} className="justify-between font-medium">
         <span>{label}</span>
         {optional ? (
-          <span className="text-xs font-normal text-muted-foreground">Optional</span>
+          <span className="text-xs leading-none font-normal text-muted-foreground">Optional</span>
         ) : null}
       </Label>
 
@@ -705,12 +723,7 @@ function NativeSelect({
       {...control}
       name={name}
       defaultValue={defaultValue}
-      className={cn(
-        "h-11 w-full rounded-lg border border-input bg-card px-3 text-base text-foreground",
-        "transition-colors outline-none",
-        "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-        "md:text-sm"
-      )}
+      className={NATIVE_SELECT_CLASS}
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>

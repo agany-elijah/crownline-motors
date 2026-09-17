@@ -9,6 +9,7 @@ import {
   updateVehicleStatusAction,
   type VehicleFormState,
 } from "@/lib/actions/vehicle.actions"
+import { ListingStatusBar } from "@/components/admin/listing-status-bar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { VehicleStatusBadge } from "@/components/admin/vehicle-status-badge"
@@ -53,15 +54,27 @@ export function VehicleStatusControl({
   const publishingWithoutPhotos = photoCount === 0
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-heading text-h3 font-semibold">Status</h2>
-        <VehicleStatusBadge status={status} />
-      </div>
-
+    <ListingStatusBar
+      badge={<VehicleStatusBadge status={status} />}
+      live={status === VehicleStatus.PUBLISHED}
+      actions={transitions.map((target) => (
+        <form key={target} action={formAction}>
+          <input type="hidden" name="id" value={vehicleId} />
+          <input type="hidden" name="status" value={target} />
+          <Button
+            type="submit"
+            disabled={isPending}
+            variant={target === VehicleStatus.PUBLISHED ? "default" : "outline"}
+          >
+            {isPending ? <Loader2 aria-hidden="true" className="animate-spin" /> : null}
+            {labelForTransition(target)}
+          </Button>
+        </form>
+      ))}
+    >
       {state.status === "success" && state.message ? (
         <Alert>
-          <CheckCircle2 aria-hidden="true" className="text-gold-ink" />
+          <CheckCircle2 aria-hidden="true" className="text-success" />
           <AlertDescription>{state.message}</AlertDescription>
         </Alert>
       ) : null}
@@ -81,7 +94,7 @@ export function VehicleStatusControl({
             browsing the website will see a listing with no images.{" "}
             <Link
               href={`${ADMIN_BASE_PATH}/vehicles/${vehicleId}#photographs`}
-              className="font-semibold text-gold-ink underline underline-offset-3"
+              className="font-medium text-gold-ink underline underline-offset-3"
             >
               Add photographs
             </Link>
@@ -89,24 +102,7 @@ export function VehicleStatusControl({
           </AlertDescription>
         </Alert>
       ) : null}
-
-      <div className="flex flex-wrap gap-2">
-        {transitions.map((target) => (
-          <form key={target} action={formAction}>
-            <input type="hidden" name="id" value={vehicleId} />
-            <input type="hidden" name="status" value={target} />
-            <Button
-              type="submit"
-              disabled={isPending}
-              variant={target === VehicleStatus.PUBLISHED ? "default" : "outline"}
-            >
-              {isPending ? <Loader2 aria-hidden="true" className="animate-spin" /> : null}
-              {labelForTransition(target)}
-            </Button>
-          </form>
-        ))}
-      </div>
-    </section>
+    </ListingStatusBar>
   )
 }
 

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { NATIVE_SELECT_CLASS } from "@/components/admin/settings/settings-ui"
 import { StatusBadge } from "@/components/admin/status-badge"
 import { WhatsAppGlyph } from "@/components/shared/whatsapp-glyph"
 import { Textarea } from "@/components/ui/textarea"
@@ -34,7 +35,7 @@ import { cn } from "@/lib/utils"
 
 const CREATE_INITIAL = { status: "idle" as const }
 
-const FIELD = "h-9 rounded-md border-input px-2.5 text-small placeholder:text-muted-foreground/70"
+const FIELD = "h-9 rounded-md border-input bg-card px-2.5 text-small placeholder:text-muted-foreground/70"
 const EVENT_DATE_FORMAT = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" })
 
 function todayInputValue(): string {
@@ -76,16 +77,19 @@ export function OrderTrackingPanel({
   if (!shipment) {
     if (activationProblem) {
       return (
-        <div className="flex flex-col gap-1">
-          <p className="text-small text-muted-foreground">Not activated.</p>
-          <p className="text-small text-muted-foreground">{activationProblem}</p>
+        <div className="flex items-start gap-3 rounded-lg border border-dashed border-border bg-sunken/60 px-4 py-3">
+          <Truck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          <div className="flex flex-col gap-0.5">
+            <p className="text-small font-medium text-foreground">Tracking not activated</p>
+            <p className="text-small text-muted-foreground">{activationProblem}</p>
+          </div>
         </div>
       )
     }
 
     return (
-      <div className="flex flex-col gap-3">
-        <p className="text-small text-muted-foreground">Not activated.</p>
+      <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border bg-sunken/60 px-4 py-3">
+        <p className="text-small font-medium text-foreground">Tracking not activated</p>
 
         <form action={createAction}>
           <input type="hidden" name="orderId" value={orderId} />
@@ -108,11 +112,11 @@ export function OrderTrackingPanel({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 rounded-lg bg-accent/30 p-4 ring-1 ring-foreground/10">
+      <div className="flex flex-col gap-3 rounded-lg border border-gold-ink/25 bg-accent/40 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">Customer tracking number</span>
-            <span className="font-mono text-h3 font-semibold tracking-wide">{shipment.trackingNumber}</span>
+            <span className="font-mono text-xl font-medium tracking-wide text-foreground">{shipment.trackingNumber}</span>
             {shipment.currentLocation ? (
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
                 <MapPin aria-hidden="true" className="size-3" />
@@ -145,13 +149,13 @@ export function OrderTrackingPanel({
       </div>
 
       {lockedReason ? (
-        <p className="border-t border-border/60 pt-4 text-small text-muted-foreground">{lockedReason}</p>
+        <p className="rounded-lg border border-border bg-sunken/60 px-4 py-3 text-small text-muted-foreground">{lockedReason}</p>
       ) : (
         <AddTrackingEventForm shipmentId={shipment.id} shipmentType={shipment.shipmentType} stages={stages} />
       )}
 
       {shipment.events.length > 0 ? (
-        <ol className="flex flex-col gap-3">
+        <ol aria-label="Tracking updates" className="flex flex-col">
           {shipment.events.map((event) => (
             <TrackingEventRow
               key={event.id}
@@ -216,8 +220,10 @@ function AddTrackingEventForm({
   const timeline = recordableTrackingStages(stages, shipmentType)
 
   return (
-    <form action={formAction} className="flex flex-col gap-3 border-t border-border/60 pt-4">
+    <form action={formAction} className="flex flex-col gap-3 rounded-lg border border-border bg-sunken/60 p-4">
       <input type="hidden" name="shipmentId" value={shipmentId} />
+
+      <h3 className="text-small font-medium text-foreground">Post an update</h3>
 
       {state.status === "error" && state.message ? (
         <p className="flex items-center gap-1.5 text-xs text-destructive">
@@ -243,11 +249,7 @@ function AddTrackingEventForm({
             name="status"
             defaultValue=""
             required
-            className={cn(
-              "w-full border bg-card text-foreground outline-none transition-colors",
-              "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40",
-              FIELD
-            )}
+            className={cn(NATIVE_SELECT_CLASS, "h-9 rounded-md text-small md:text-small")}
           >
             <option value="" disabled>
               Choose a status…
@@ -290,12 +292,12 @@ function AddTrackingEventForm({
           rows={2}
           maxLength={1000}
           placeholder="Internal"
-          className="min-h-16 rounded-md border-input px-2.5 py-2 text-small placeholder:text-muted-foreground/70"
+          className="min-h-16 rounded-md border-input bg-card px-2.5 py-2 text-small placeholder:text-muted-foreground/70"
         />
       </div>
 
-      <div>
-        <Button type="submit" size="sm" disabled={isPending}>
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isPending}>
           {isPending ? <Loader2 aria-hidden="true" className="animate-spin" /> : <Plus aria-hidden="true" />}
           Add update
         </Button>
@@ -310,18 +312,23 @@ function TrackingEventRow({ event, label }: { event: OrderTrackingEvent; label: 
   const reasonId = useId()
 
   return (
-    <li
-      className={cn(
-        "flex items-start justify-between gap-3 border-t border-border/60 pt-3 first:border-t-0 first:pt-0",
-        event.isVoided && "opacity-50"
-      )}
-    >
-      <div className="flex flex-col gap-0.5">
+    <li className="group/event relative flex items-start justify-between gap-3 pb-4 pl-7 last:pb-0">
+      {/* The journey's thread, and a dot per update. A voided update keeps its
+          place in the record but reads as withdrawn. */}
+      <span aria-hidden="true" className="absolute top-3 bottom-0 left-[0.3125rem] w-px bg-border group-last/event:hidden" />
+      <span
+        aria-hidden="true"
+        className={cn(
+          "absolute top-1.5 left-0 size-2.5 rounded-full border-2",
+          event.isVoided ? "border-border bg-card" : "border-gold bg-card"
+        )}
+      />
+      <div className={cn("flex min-w-0 flex-col gap-0.5", event.isVoided && "opacity-60")}>
         <p className={cn("text-small font-medium", event.isVoided && "line-through")}>
           {label}
         </p>
         <p className="text-xs text-muted-foreground">
-          {EVENT_DATE_FORMAT.format(event.eventDate)}
+          <span className="tabular-nums">{EVENT_DATE_FORMAT.format(event.eventDate)}</span>
           {event.location ? ` · ${event.location}` : ""}
         </p>
         {event.notes ? <p className="text-xs text-muted-foreground">{event.notes}</p> : null}

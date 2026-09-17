@@ -3,6 +3,7 @@ import { z } from "zod"
 import {
   CountryOfOrigin,
   DriveType,
+  VehicleBodyType,
   FuelType,
   TransmissionType,
   VehicleCondition,
@@ -215,6 +216,16 @@ const vehicleFields = {
   fuelType: z.enum(FuelType),
   transmission: z.enum(TransmissionType),
   driveType: z.enum(DriveType),
+  /**
+   * Optional, and null rather than undefined when left unset: the update
+   * action spreads the parsed input into the write, where `undefined` means
+   * "leave the column alone". An operator who clears the body type means the
+   * vehicle no longer has one, so the blank option must write NULL.
+   */
+  bodyType: z.preprocess(
+    (value) => (value === "" || value === undefined ? null : value),
+    z.enum(VehicleBodyType, { error: "Choose a body type from the list." }).nullable()
+  ),
   countryOfOrigin: z.enum(CountryOfOrigin),
   condition: z.enum(VehicleCondition),
 

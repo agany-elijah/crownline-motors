@@ -1,13 +1,15 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 import { Package } from "lucide-react"
 
+import { AdminEmptyState } from "@/components/admin/admin-empty-state"
+import { AdminListCount } from "@/components/admin/admin-list-toolbar"
 import { AdminPageHeader } from "@/components/admin/admin-page-header"
-import { DataTable, type DataTableColumn } from "@/components/admin/data-table"
+import { DataTable, DataTableRecordLink, type DataTableColumn } from "@/components/admin/data-table"
 import { StatusBadge } from "@/components/admin/status-badge"
 import { Pagination } from "@/components/shared/pagination"
 import { requirePermission } from "@/lib/auth/admin-guard"
 import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
+import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from "@/lib/constants/order-status"
 import { FINANCIAL_STATUS_LABELS } from "@/lib/orders/order-finance"
 import { listOrders, type OrderListItem } from "@/lib/queries/order.queries"
 import { formatCurrency } from "@/lib/utils/format-currency"
@@ -19,10 +21,8 @@ export const metadata: Metadata = {
 /**
  * Every order created from an accepted quotation.
  *
- * Read-only for now — recording payments, cancelling an order, and creating
- * its shipment are their own, later phase of work (see order.queries.ts's
- * file note). This exists so "Convert Quote to Order" has somewhere real to
- * send an operator and something real to show them once they arrive.
+ * The list is for finding an order; recording payments, cancelling and
+ * tracking all happen on the order's own page, beside its balance.
  */
 export default async function AdminOrdersPage(props: PageProps<"/Ricky@2000/orders">) {
   await requirePermission("order:read")
@@ -37,22 +37,18 @@ export default async function AdminOrdersPage(props: PageProps<"/Ricky@2000/orde
       id: "order",
       header: "Order",
       render: (order) => (
-        <Link
+        <DataTableRecordLink
           href={`${ADMIN_BASE_PATH}/orders/${order.id}`}
-          className="group/link flex flex-col gap-0.5 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          <span className="font-semibold transition-colors duration-fast group-hover/link:text-gold-ink">
-            {order.customerName}
-          </span>
-          <span className="font-mono text-xs text-muted-foreground">{order.orderNumber}</span>
-        </Link>
+          title={order.customerName}
+          reference={order.orderNumber}
+        />
       ),
     },
     {
       id: "status",
       header: "Status",
       render: (order) => (
-        <StatusBadge tone="neutral">{order.status.replaceAll("_", " ").toLowerCase()}</StatusBadge>
+        <StatusBadge tone={ORDER_STATUS_TONES[order.status]}>{ORDER_STATUS_LABELS[order.status]}</StatusBadge>
       ),
     },
     {
@@ -68,14 +64,24 @@ export default async function AdminOrdersPage(props: PageProps<"/Ricky@2000/orde
       id: "total",
       header: "Total",
       align: "right",
-      render: (order) => <span className="font-semibold tabular-nums">{formatCurrency(order.totalAmount)}</span>,
+      render: (order) => <span className="font-medium tabular-nums">{formatCurrency(order.totalAmount)}</span>,
     },
     {
       id: "balance",
       header: "Balance",
       align: "right",
       hideBelow: "md",
-      render: (order) => <span className="tabular-nums">{formatCurrency(order.finance.balance)}</span>,
+      render: (order) => (
+        <span
+          className={
+            order.finance.balance > 0
+              ? "text-foreground tabular-nums"
+              : "text-muted-foreground tabular-nums"
+          }
+        >
+          {formatCurrency(order.finance.balance)}
+        </span>
+      ),
     },
     {
       id: "created",
@@ -91,8 +97,11 @@ export default async function AdminOrdersPage(props: PageProps<"/Ricky@2000/orde
   ]
 
   return (
-    <div className="flex flex-col gap-8">
-      <AdminPageHeader title="Orders" />
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader
+        title="Orders"
+        description="Orders created from accepted quotations — what each is worth, what has been paid, and what is still owed."
+      />
 
       <DataTable
         columns={columns}
@@ -100,28 +109,27 @@ export default async function AdminOrdersPage(props: PageProps<"/Ricky@2000/orde
         getRowKey={(order) => order.id}
         caption="Orders"
         emptyState={
-          <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border bg-card px-6 py-16 text-center">
-            <span
-              aria-hidden="true"
-              className="flex size-12 items-center justify-center rounded-full bg-secondary text-muted-foreground"
-            >
-              <Package className="size-6" />
-            </span>
-            <h2 className="font-heading text-h3 font-semibold">No orders yet</h2>
-          </div>
+          <AdminEmptyState
+            icon={Package}
+            title="No orders yet"
+            description="An order is created when a customer accepts a quotation. Convert one from its quote page."
+          />
         }
       />
 
       {result.pageCount > 1 ? (
-        <Pagination
-          page={result.page}
-          pageCount={result.pageCount}
-          hrefFor={(target) =>
-            target > 1 ? `${ADMIN_BASE_PATH}/orders?page=${target}` : `${ADMIN_BASE_PATH}/orders`
-          }
-          label="Orders list pages"
-          className="border-t-0 pt-0"
-        />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <AdminListCount total={result.total} noun="orders" />
+          <Pagination
+            page={result.page}
+            pageCount={result.pageCount}
+            hrefFor={(target) =>
+              target > 1 ? `${ADMIN_BASE_PATH}/orders?page=${target}` : `${ADMIN_BASE_PATH}/orders`
+            }
+            label="Orders list pages"
+            className="border-t-0 pt-0"
+          />
+        </div>
       ) : null}
     </div>
   )

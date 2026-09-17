@@ -39,7 +39,7 @@ export default async function TwoFactorChallengePage(props: PageProps<"/Ricky@20
         </form>
       }
     >
-      <p className="mb-5 text-small text-background/70">
+      <p className="mb-6 text-small text-muted-foreground">
         Open your authenticator app and enter the six-digit code for {access.admin.email}.
       </p>
       <TwoFactorSignInForm next={next} />

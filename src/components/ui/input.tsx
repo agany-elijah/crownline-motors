@@ -6,10 +6,12 @@ import { cn } from "@/lib/utils"
 /**
  * Crownline text input.
  *
- * Height is 44px, not the 32px this started at. Most Crownline customers
+ * Height is 44px (`--control-height`), not the 32px this started at. Most Crownline customers
  * arrive on a phone (brief §16) and will fill in a quote request there;
  * 44px is the smallest reliably tappable target, and a 32px field is a
- * genuine usability defect on the one form the business depends on.
+ * genuine usability defect on the one form the business depends on. The
+ * staff dashboard tightens it to 40px from a tablet up, where there is a
+ * pointer to aim with (see "Admin console" in globals.css).
  *
  * `text-base md:text-sm` is deliberate and must stay in that order: iOS
  * Safari zooms the whole page in whenever a focused field renders below
@@ -33,7 +35,7 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
       type={type}
       data-slot="input"
       className={cn(
-        "h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3.5 py-2 text-base text-foreground transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
+        "h-(--control-height) w-full min-w-0 rounded-lg border border-input bg-card px-3.5 py-2 text-base text-foreground transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-sunken dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
         className
       )}
       {...props}

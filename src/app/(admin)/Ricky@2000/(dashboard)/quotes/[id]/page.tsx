@@ -2,8 +2,9 @@ import type { ReactNode } from "react"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeft, ArrowRight } from "lucide-react"
+import { ArrowRight, PackageCheck } from "lucide-react"
 
+import { AdminMetaDivider, AdminPageHeader } from "@/components/admin/admin-page-header"
 import { OrderFinanceSummaryCard } from "@/components/admin/order-finance-summary"
 import { QuoteActivityTimeline } from "@/components/admin/quote-activity-timeline"
 import { QuoteConvertDialog } from "@/components/admin/quote-convert-dialog"
@@ -19,7 +20,7 @@ import { Button } from "@/components/ui/button"
 import { siteConfig } from "@/config/site"
 import { requirePermission } from "@/lib/auth/admin-guard"
 import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
-import { isQuoteConvertible, isQuoteEditable, isQuoteSendable } from "@/lib/constants/quote-status"
+import { QUOTE_TYPE_LABELS, isQuoteConvertible, isQuoteEditable, isQuoteSendable } from "@/lib/constants/quote-status"
 import { getQuoteById } from "@/lib/queries/quote.queries"
 import { QuotePricingProvider } from "@/lib/quotes/quote-pricing-context"
 
@@ -59,32 +60,31 @@ export default async function AdminQuoteDetailPage(props: PageProps<"/Ricky@2000
       adminNotes={quote.adminNotes}
     >
       <div className="flex flex-col gap-6">
-        {/* ── Minimal header ────────────────────────────────────────────
-            Back link, customer name, status badge, and the two primary
-            actions — nothing else. Wrapped in `QuotePricingProvider` (now
-            hoisted above this whole page) so `QuoteDispatchDialog` can read
-            the same live readiness state the details form and issues panel
-            already share, rather than only the quote's saved status. */}
-        <div className="flex flex-col gap-3 border-b border-border/60 pb-5">
-          <div className="flex items-start justify-between gap-3">
-            <Link
-              href={`${ADMIN_BASE_PATH}/quotes`}
-              className="inline-flex w-fit items-center gap-1.5 text-small text-muted-foreground transition-colors duration-fast hover:text-gold-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            >
-              <ArrowLeft aria-hidden="true" className="size-3.5" />
-              All quotes
-            </Link>
-
-            <QuoteStatusBadge
-              status={quote.status}
-              className="border-transparent bg-secondary/70 px-2 py-0.5 text-[11px] font-medium tracking-wide text-muted-foreground"
-            />
-          </div>
-
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <h1 className="font-heading text-h2 font-semibold text-balance">{quote.customerName}</h1>
-
-            <div className="flex shrink-0 flex-wrap items-start gap-2">
+        {/* ── Header ────────────────────────────────────────────────────
+            Back link, customer name, the quote's identity and status, and the
+            two primary actions — nothing else. Wrapped in
+            `QuotePricingProvider` (hoisted above this whole page) so
+            `QuoteDispatchDialog` can read the same live readiness state the
+            details form and issues panel already share, rather than only the
+            quote's saved status. */}
+        <AdminPageHeader
+          back={{ href: `${ADMIN_BASE_PATH}/quotes`, label: "All quotes" }}
+          title={quote.customerName}
+          meta={
+            <>
+              <span className="font-mono text-foreground">{quote.quoteNumber}</span>
+              <AdminMetaDivider />
+              <span>{QUOTE_TYPE_LABELS[quote.type]} quote</span>
+              <AdminMetaDivider />
+              <QuoteStatusBadge status={quote.status} />
+            </>
+          }
+          actions={
+            // A quote that has become an order can be neither sent nor
+            // converted, and the banner below is the way forward from it — two
+            // dead buttons beside it would only need explaining.
+            quote.order && !sendable ? null : (
+            <>
               <QuoteDispatchDialog
                 quoteId={quote.id}
                 customerName={quote.contactName ?? quote.customerName}
@@ -92,9 +92,7 @@ export default async function AdminQuoteDetailPage(props: PageProps<"/Ricky@2000
                 contactWhatsapp={quote.contactWhatsapp}
                 alreadySent={Boolean(quote.sentAt)}
                 disabled={!sendable}
-                disabledReason={
-                  sendable ? undefined : "This quote is not in a state that can be sent."
-                }
+                disabledReason={sendable ? undefined : "This quote is not in a state that can be sent."}
               />
               <QuoteConvertDialog
                 quoteId={quote.id}
@@ -106,15 +104,25 @@ export default async function AdminQuoteDetailPage(props: PageProps<"/Ricky@2000
                     : "Send and accept this quote before converting it."
                 }
               />
-            </div>
-          </div>
-        </div>
+            </>
+            )
+          }
+        />
 
         {quote.order ? (
-          <div className="flex flex-col gap-4 rounded-xl bg-accent/40 p-6 ring-1 ring-gold-ink/25 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-small text-muted-foreground">This quote became an order</p>
-              <p className="font-heading text-h3 font-semibold">{quote.order.orderNumber}</p>
+          <div className="relative flex flex-col gap-4 overflow-hidden rounded-xl border border-gold-ink/25 bg-accent/50 py-4 pr-5 pl-6 sm:flex-row sm:items-center sm:justify-between">
+            <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-gold" />
+            <div className="flex items-center gap-3">
+              <span
+                aria-hidden="true"
+                className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-card text-gold-ink ring-1 ring-gold-ink/20"
+              >
+                <PackageCheck className="size-4.5" strokeWidth={1.75} />
+              </span>
+              <div className="flex flex-col">
+                <p className="text-small text-muted-foreground">This quote became an order</p>
+                <p className="font-mono text-body font-medium text-foreground">{quote.order.orderNumber}</p>
+              </div>
             </div>
             <Button render={<Link href={`${ADMIN_BASE_PATH}/orders/${quote.order.id}`} />} variant="outline">
               View order
@@ -145,7 +153,7 @@ export default async function AdminQuoteDetailPage(props: PageProps<"/Ricky@2000
             {quote.order ? <OrderFinanceSummaryCard finance={quote.order.finance} /> : null}
           </div>
 
-          <div className="flex flex-col gap-5 lg:sticky lg:top-6 lg:self-start">
+          <div className="flex flex-col gap-4 lg:sticky lg:top-20 lg:self-start">
             <QuoteSummaryCard />
 
             <QuoteIssuesPanel
@@ -211,8 +219,8 @@ export default async function AdminQuoteDetailPage(props: PageProps<"/Ricky@2000
 
 function ReferenceCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-2 rounded-xl bg-card p-5 shadow-[var(--shadow-subtle)] ring-1 ring-foreground/10">
-      <h2 className="text-meta text-muted-foreground">{title}</h2>
+    <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-5 shadow-[var(--shadow-subtle)]">
+      <h2 className="text-small font-medium text-foreground">{title}</h2>
       {children}
     </section>
   )

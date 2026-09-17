@@ -32,12 +32,10 @@ export const metadata = {
  * the two things the business sells.
  *
  * ── Why the cart provider is here ─────────────────────────────────────
- * `SiteHeader` renders `CartSummary`, which reads the basket — and this page
- * composes the shell itself rather than inheriting the public layout, so it
- * has to supply the provider itself as well. That is not merely to satisfy
- * the hook: a customer with three parts shortlisted who follows a dead link
- * should still see their basket, on the page whose whole job is to put them
- * back on course.
+ * The basket is read by the add-to-cart controls and the spare-parts bar,
+ * and this page composes the shell itself rather than inheriting the public
+ * layout — so it supplies the provider the same way the layout does, and a
+ * shortlist survives a detour through a dead link.
  */
 export default async function NotFound() {
   // Same reason as the public layout: SiteHeader is a Client Component and

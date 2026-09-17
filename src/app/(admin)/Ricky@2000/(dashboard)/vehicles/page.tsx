@@ -2,8 +2,10 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { Car, Plus } from "lucide-react"
 
+import { AdminEmptyState } from "@/components/admin/admin-empty-state"
+import { AdminListCount } from "@/components/admin/admin-list-toolbar"
 import { AdminPageHeader } from "@/components/admin/admin-page-header"
-import { DataTable, type DataTableColumn } from "@/components/admin/data-table"
+import { DataTable, DataTableRecordLink, type DataTableColumn } from "@/components/admin/data-table"
 import { Pagination } from "@/components/shared/pagination"
 import { VehicleListFilters } from "@/components/admin/vehicle-list-filters"
 import { VehicleStatusBadge } from "@/components/admin/vehicle-status-badge"
@@ -56,17 +58,11 @@ export default async function AdminVehiclesPage(
       id: "vehicle",
       header: "Vehicle",
       render: (vehicle) => (
-        <Link
+        <DataTableRecordLink
           href={`${ADMIN_BASE_PATH}/vehicles/${vehicle.id}`}
-          className="group/link flex flex-col gap-0.5 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          <span className="font-semibold transition-colors duration-fast group-hover/link:text-gold-ink">
-            {vehicle.year} {vehicle.make} {vehicle.model}
-          </span>
-          <span className="font-mono text-xs text-muted-foreground">
-            {vehicle.referenceNumber}
-          </span>
-        </Link>
+          title={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+          reference={vehicle.referenceNumber}
+        />
       ),
     },
     {
@@ -79,7 +75,7 @@ export default async function AdminVehiclesPage(
       header: "Price",
       align: "right",
       render: (vehicle) => (
-        <span className="font-semibold tabular-nums">
+        <span className="font-medium tabular-nums">
           {formatCurrency(vehicle.price)}
         </span>
       ),
@@ -90,7 +86,7 @@ export default async function AdminVehiclesPage(
       align: "right",
       hideBelow: "md",
       render: (vehicle) => (
-        <span className="tabular-nums text-muted-foreground">
+        <span className="text-muted-foreground tabular-nums">
           {formatMileage(vehicle.mileageKm)}
         </span>
       ),
@@ -113,7 +109,7 @@ export default async function AdminVehiclesPage(
             // A published vehicle with no photographs is the single most
             // damaging listing the business can have, so zero is marked
             // rather than rendered as just another number.
-            vehicle.photoCount === 0 ? "text-warning" : "text-muted-foreground"
+            vehicle.photoCount === 0 ? "font-medium text-warning" : "text-muted-foreground"
           )}
           aria-label={
             vehicle.photoCount === 0
@@ -141,11 +137,12 @@ export default async function AdminVehiclesPage(
   ]
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <AdminPageHeader
         title="Vehicles"
+        description="Every vehicle listing — drafts being prepared, cars on the website, and those reserved or sold."
         actions={
-          <Button render={<Link href={`${ADMIN_BASE_PATH}/vehicles/new`} />} size="lg">
+          <Button render={<Link href={`${ADMIN_BASE_PATH}/vehicles/new`} />}>
             <Plus aria-hidden="true" />
             Add vehicle
           </Button>
@@ -165,10 +162,8 @@ export default async function AdminVehiclesPage(
       />
 
       {result.pageCount > 1 ? (
-        <div className="flex flex-col gap-3">
-          <p className="text-small text-muted-foreground">
-            <span className="tabular">{result.total}</span> vehicles
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <AdminListCount total={result.total} noun="vehicles" />
           <Pagination
             page={result.page}
             pageCount={result.pageCount}
@@ -190,32 +185,29 @@ export default async function AdminVehiclesPage(
  * suggest the inventory is empty when it is not.
  */
 function EmptyVehicles({ hasFilters }: { hasFilters: boolean }) {
-  return (
-    <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border bg-card px-6 py-16 text-center">
-      <span
-        aria-hidden="true"
-        className="flex size-12 items-center justify-center rounded-full bg-secondary text-muted-foreground"
-      >
-        <Car className="size-6" />
-      </span>
-
-      {hasFilters ? (
-        <>
-          <h2 className="font-heading text-h3 font-semibold">No matches</h2>
-          <Button render={<Link href={`${ADMIN_BASE_PATH}/vehicles`} />} variant="outline">
-            Show all vehicles
-          </Button>
-        </>
-      ) : (
-        <>
-          <h2 className="font-heading text-h3 font-semibold">No vehicles yet</h2>
-          <Button render={<Link href={`${ADMIN_BASE_PATH}/vehicles/new`} />}>
-            <Plus aria-hidden="true" />
-            Add vehicle
-          </Button>
-        </>
-      )}
-    </div>
+  return hasFilters ? (
+    <AdminEmptyState
+      icon={Car}
+      title="No vehicles match"
+      description="Nothing in the inventory fits this search and status. Try a different term, or clear the filters."
+      action={
+        <Button render={<Link href={`${ADMIN_BASE_PATH}/vehicles`} />} variant="outline">
+          Show all vehicles
+        </Button>
+      }
+    />
+  ) : (
+    <AdminEmptyState
+      icon={Car}
+      title="No vehicles yet"
+      description="Add the first listing — it stays a draft, visible only here, until you publish it."
+      action={
+        <Button render={<Link href={`${ADMIN_BASE_PATH}/vehicles/new`} />}>
+          <Plus aria-hidden="true" />
+          Add vehicle
+        </Button>
+      }
+    />
   )
 }
 

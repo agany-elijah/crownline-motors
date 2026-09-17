@@ -77,7 +77,7 @@ export function QuoteLeadWatcher() {
   return (
     <div
       role="status"
-      className="fixed right-4 bottom-4 z-40 flex max-w-xs items-start gap-3 rounded-xl border border-gold-ink/30 bg-popover p-4 text-popover-foreground shadow-lg ring-1 ring-foreground/10"
+      className="fixed right-4 bottom-4 z-40 flex max-w-xs items-start gap-3 rounded-xl border border-gold-ink/30 bg-popover p-4 text-popover-foreground shadow-[var(--shadow-overlay)]"
     >
       <Bell aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-gold-ink" />
       <div className="flex flex-1 flex-col gap-2">

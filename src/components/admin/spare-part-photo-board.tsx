@@ -5,6 +5,7 @@ import { useActionState, useEffect, useRef, useState } from "react"
 import { AlertCircle, CheckCircle2, Loader2, Upload, X } from "lucide-react"
 
 import { PhotoDropTile, PhotoTile } from "@/components/admin/photo-tile"
+import { AdminFormBadge, AdminFormSection } from "@/components/admin/admin-form"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { syncFileInput, useStagedPhotos } from "@/hooks/use-staged-photos"
@@ -198,16 +199,20 @@ export function SparePartPhotoBoard({
   }
 
   return (
-    <section
+    <AdminFormSection
       id="photographs"
-      className="flex flex-col gap-6 rounded-xl border border-border bg-card p-6"
+      title="Photographs"
+      description="The main image appears on the part's catalogue card and leads its gallery. Changes here take effect straight away."
+      badge={
+        <AdminFormBadge tone={photos.length === 0 ? "warning" : "neutral"}>
+          <span className="tabular-nums">
+            {photos.length}/{MAX_PHOTOS_PER_SPARE_PART}
+          </span>
+          photographs
+        </AdminFormBadge>
+      }
+      bodyClassName="flex flex-col gap-6"
     >
-      <h2 className="font-heading text-h3 font-semibold">
-        Photographs
-        <span className="ml-2 text-body font-normal text-muted-foreground tabular">
-          {photos.length}/{MAX_PHOTOS_PER_SPARE_PART}
-        </span>
-      </h2>
 
       {feedback.status === "success" && feedback.message ? (
         <Alert>
@@ -232,7 +237,7 @@ export function SparePartPhotoBoard({
 
       {/* ── Main image ───────────────────────────────────────────── */}
       <div className="flex flex-col gap-3">
-        <h3 className="font-heading text-small font-semibold">Main image</h3>
+        <h3 className="text-small font-medium text-foreground">Main image</h3>
 
         <div className="max-w-xl">
           {main ? (
@@ -262,10 +267,10 @@ export function SparePartPhotoBoard({
 
       {/* ── Other images ─────────────────────────────────────────── */}
       <div className="flex flex-col gap-3">
-        <h3 className="font-heading text-small font-semibold">
+        <h3 className="text-small font-medium text-foreground">
           Other images
           {others.length > 0 ? (
-            <span className="ml-2 font-normal text-muted-foreground tabular">
+            <span className="ml-2 font-normal text-muted-foreground tabular-nums">
               {others.length}
             </span>
           ) : null}
@@ -335,7 +340,7 @@ export function SparePartPhotoBoard({
         ) : null}
 
         {staged.length > 0 ? (
-          <div className="flex flex-col gap-4 rounded-lg border border-border bg-secondary/50 p-4">
+          <div className="flex flex-col gap-4 rounded-lg border border-dashed border-gold-ink/35 bg-accent/40 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-small font-semibold">
                 {staged.length} image{staged.length === 1 ? "" : "s"} ready to
@@ -400,7 +405,7 @@ export function SparePartPhotoBoard({
           </div>
         ) : null}
       </form>
-    </section>
+    </AdminFormSection>
   )
 }
 

@@ -127,7 +127,7 @@ export async function SiteFooter() {
               aria-label={`${settings.businessName} — home`}
               className="inline-block transition-opacity duration-fast hover:opacity-80"
             >
-              <BrandMark size="lg" tone="dark" />
+              <BrandMark size="lg" tone="dark" layout="lockup" />
             </Link>
 
             <p className="mt-5 max-w-sm text-body text-background/65">{settings.businessDescription}</p>

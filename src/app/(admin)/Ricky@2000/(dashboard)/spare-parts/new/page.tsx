@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
-import Link from "next/link"
-import { ArrowLeft, ChevronRight, TriangleAlert } from "lucide-react"
+import { TriangleAlert } from "lucide-react"
 
+import { AdminStepTrail } from "@/components/admin/admin-form"
 import { AdminPageHeader } from "@/components/admin/admin-page-header"
 import { SparePartForm } from "@/components/admin/spare-part-form"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -30,9 +30,8 @@ export default async function AdminSparePartNewPage() {
    */
   if (categories.length === 0) {
     return (
-      <div className="flex flex-col gap-8">
-        <BackLink />
-        <AdminPageHeader title="Add spare part" />
+      <div className="flex flex-col gap-6">
+        <AdminPageHeader back={BACK} title="Add spare part" />
         <Alert variant="destructive">
           <TriangleAlert aria-hidden="true" />
           <AlertDescription>
@@ -47,30 +46,21 @@ export default async function AdminSparePartNewPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4">
-        <BackLink />
-
-        <AdminPageHeader title="Add spare part" />
+      <div className="flex flex-col gap-5">
+        <AdminPageHeader
+          back={BACK}
+          title="Add spare part"
+          description="Enter the part, its fitment details and photographs. It is saved as a draft for you to review and publish."
+        />
+        <AdminStepTrail steps={STEPS} current={0} />
       </div>
-
-      <WorkflowTrail />
 
       <SparePartForm categories={categories} siteWideVisibility={catalogDisplay.sparePart} />
     </div>
   )
 }
 
-function BackLink() {
-  return (
-    <Link
-      href={`${ADMIN_BASE_PATH}/spare-parts`}
-      className="inline-flex w-fit items-center gap-1.5 text-small text-muted-foreground transition-colors duration-fast hover:text-gold-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-    >
-      <ArrowLeft aria-hidden="true" className="size-3.5" />
-      All spare parts
-    </Link>
-  )
-}
+const BACK = { href: `${ADMIN_BASE_PATH}/spare-parts`, label: "All spare parts" }
 
 /**
  * The three stages, as a trail rather than a set of cards.
@@ -78,45 +68,10 @@ function BackLink() {
  * It replaced three explanatory panels that took a third of the screen to
  * say what an operator learns once and then never needs again. What is
  * genuinely useful on the second listing is knowing where you are and what
- * happens next, which is a line of text and two arrows.
- *
- * An ordered list, so the sequence is in the markup rather than only in the
- * arrows — a screen reader announces three numbered items and skips the
- * chevrons, which are decorative.
+ * happens next.
  */
-function WorkflowTrail() {
-  const steps = [
-    "Part details and photographs",
-    "Create part — saved as a draft",
-    "Publish to put it on the website",
-  ]
-
-  return (
-    <ol className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-small">
-      {steps.map((step, index) => (
-        <li key={step} className="flex items-center gap-2">
-          {index > 0 ? (
-            <ChevronRight
-              aria-hidden="true"
-              className="size-3.5 text-muted-foreground/50"
-            />
-          ) : null}
-
-          <span
-            // The first step is the one this screen is: marked with
-            // aria-current so it is announced as the position, not only
-            // coloured.
-            aria-current={index === 0 ? "step" : undefined}
-            className={
-              index === 0
-                ? "font-semibold text-gold-ink"
-                : "text-muted-foreground"
-            }
-          >
-            {step}
-          </span>
-        </li>
-      ))}
-    </ol>
-  )
-}
+const STEPS = [
+  "Part details and photographs",
+  "Create part — saved as a draft",
+  "Publish to put it on the website",
+] as const

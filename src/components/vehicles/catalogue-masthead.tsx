@@ -2,6 +2,7 @@ import * as React from "react"
 
 import { Container } from "@/components/layout/container"
 import { Breadcrumbs } from "@/components/layout/breadcrumbs"
+import { AnimatedWords } from "@/components/motion/animated-words"
 
 /**
  * The catalogue's opening statement.
@@ -68,12 +69,12 @@ export function CatalogueMasthead() {
           {PHRASES.map((phrase, index) => (
             <React.Fragment key={phrase}>
               {/*
-                Each phrase is its own inline block so the stagger applies
-                per phrase — and because a transform is ignored on a plain
-                inline element.
+                Each phrase rises word by word, each phrase starting after
+                the last, so the three read as one sentence being set rather
+                than three things fading at once. The last is set in gold.
               */}
-              <span data-entrance="" style={step(index)} className="inline-block">
-                {phrase}
+              <span className={index === PHRASES.length - 1 ? "text-gold-ink" : undefined}>
+                <AnimatedWords text={phrase} trigger="load" startDelay={index * PHRASE_STAGGER_MS * 3} />
               </span>
               {/*
                 The separating space sits *between* the spans, not inside

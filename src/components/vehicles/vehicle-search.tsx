@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label"
 import { RotatingPlaceholder } from "@/components/shared/rotating-placeholder"
 import { VEHICLE_SEARCH_SUGGESTIONS } from "@/lib/constants/search-suggestions"
 import { cn } from "@/lib/utils"
+import type { VehicleBodyType } from "@/generated/prisma/enums"
+import { VEHICLE_BODY_TYPE_LABELS } from "@/lib/constants/vehicle-options"
 import type { VehicleFacet } from "@/lib/queries/public-vehicle.queries"
 import {
   catalogueHref,
@@ -62,6 +64,8 @@ import {
 interface VehicleSearchProps {
   /** Distinct published make/model/year combinations. */
   facets: VehicleFacet[]
+  /** Body types held by published listings; the filter is not offered when empty. */
+  bodyTypes: VehicleBodyType[]
   /** The criteria the current page was rendered with. */
   criteria: VehicleSearchCriteria
 }
@@ -71,7 +75,7 @@ const ANY = ""
 /** Where the filter panel stops being collapsible — Tailwind's `sm`. */
 const DESKTOP_QUERY = "(min-width: 40rem)"
 
-export function VehicleSearch({ facets, criteria }: VehicleSearchProps) {
+export function VehicleSearch({ facets, bodyTypes, criteria }: VehicleSearchProps) {
   const router = useRouter()
   const [isPending, startTransition] = React.useTransition()
 
@@ -79,6 +83,7 @@ export function VehicleSearch({ facets, criteria }: VehicleSearchProps) {
   const makeId = React.useId()
   const modelId = React.useId()
   const yearId = React.useId()
+  const bodyTypeId = React.useId()
 
   /**
    * The search box is uncontrolled, and read through this ref.
@@ -158,7 +163,18 @@ export function VehicleSearch({ facets, criteria }: VehicleSearchProps) {
 
   /** How many dropdowns are narrowing the results — the badge on Filters. */
   const activeFilterCount =
-    (criteria.make ? 1 : 0) + (criteria.model ? 1 : 0) + (criteria.year ? 1 : 0)
+    (criteria.make ? 1 : 0) +
+    (criteria.model ? 1 : 0) +
+    (criteria.year ? 1 : 0) +
+    (criteria.bodyType ? 1 : 0)
+
+  // Offered while any listing carries a body type, and kept while one is
+  // selected even if it no longer matches anything — a customer who arrived
+  // from a homepage tile must always be able to see and clear that choice.
+  const offersBodyType = bodyTypes.length > 0 || criteria.bodyType !== undefined
+  const bodyTypeOptions = [
+    ...new Set([...bodyTypes, ...(criteria.bodyType ? [criteria.bodyType] : [])]),
+  ].map((value) => ({ value, label: VEHICLE_BODY_TYPE_LABELS[value] }))
 
   /**
    * Applies a change to one control.
@@ -265,7 +281,7 @@ export function VehicleSearch({ facets, criteria }: VehicleSearchProps) {
               // search field above it would be doing something the customer
               // did not ask for and cannot see happen on a phone, where the
               // panel is open and the field is scrolled off.
-              apply({ make: undefined, model: undefined, year: undefined })
+              apply({ make: undefined, model: undefined, year: undefined, bodyType: undefined })
             }
           >
             <FilterSelect
@@ -306,6 +322,20 @@ export function VehicleSearch({ facets, criteria }: VehicleSearchProps) {
               }))}
               onChange={(value) => apply({ year: value ? Number(value) : undefined })}
             />
+            ) : null}
+
+            {offersBodyType ? (
+              <FilterSelect
+                id={bodyTypeId}
+                name="type"
+                label="Body type"
+                anyLabel="Any body type"
+                value={criteria.bodyType ?? ANY}
+                options={bodyTypeOptions}
+                onChange={(value) =>
+                  apply({ bodyType: value ? (value as VehicleBodyType) : undefined })
+                }
+              />
             ) : null}
           </FilterPanel>
         </form>
@@ -579,7 +609,7 @@ function FilterPanel({
           which is the difference between a filter people use and one they
           scroll past.
         */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{children}</div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(10rem,1fr))]">{children}</div>
 
         {/*
           Shown only while something is actually selected, so the panel is

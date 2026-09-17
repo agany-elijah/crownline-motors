@@ -10,6 +10,8 @@ import {
   updateSparePartAction,
   type SparePartFormState,
 } from "@/lib/actions/spare-part.actions"
+import { AdminFormActionBar, AdminFormBadge, AdminFormSection } from "@/components/admin/admin-form"
+import { NATIVE_SELECT_CLASS } from "@/components/admin/settings/settings-ui"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -276,7 +278,7 @@ export function SparePartForm({ part, categories, siteWideVisibility }: SparePar
           label="Description"
           name="description"
           error={error("description")}
-          className="sm:col-span-2 lg:col-span-4"
+          className="sm:col-span-2 xl:col-span-4"
           controlKey={controlKey}
         >
           {(control) => (
@@ -291,7 +293,7 @@ export function SparePartForm({ part, categories, siteWideVisibility }: SparePar
           )}
         </Field>
 
-        <label className="flex items-start gap-3 rounded-lg border border-border bg-background p-4 sm:col-span-2 lg:col-span-4">
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-sunken/60 p-4 transition-colors duration-fast hover:border-foreground/20 sm:col-span-2 xl:col-span-4">
           <input
             key={controlKey}
             type="checkbox"
@@ -300,9 +302,12 @@ export function SparePartForm({ part, categories, siteWideVisibility }: SparePar
             defaultChecked={
               state.values ? state.values.isFeatured === "true" : part?.isFeatured
             }
-            className="mt-0.5 size-4 accent-[var(--gold)]"
+            className="mt-0.5 size-4 shrink-0 cursor-pointer accent-[var(--gold)]"
           />
-          <span className="text-small font-semibold">Feature in the catalogue</span>
+          <span className="flex flex-col gap-0.5">
+            <span className="text-small font-medium text-foreground">Feature on the homepage</span>
+            <span className="text-xs text-muted-foreground">Featured parts appear on the homepage and are listed first in the parts catalogue.</span>
+          </span>
         </label>
       </FormSection>
 
@@ -392,7 +397,7 @@ export function SparePartForm({ part, categories, siteWideVisibility }: SparePar
           name="supplierNotes"
           error={error("supplierNotes")}
           optional
-          className="sm:col-span-2 lg:col-span-4"
+          className="sm:col-span-2 xl:col-span-4"
           controlKey={controlKey}
         >
           {(control) => (
@@ -435,13 +440,11 @@ export function SparePartForm({ part, categories, siteWideVisibility }: SparePar
         correcting one figure means scrolling past everything else to commit
         it, and an operator who does not find it assumes the form has no save.
       */}
-      <div className="sticky bottom-0 z-20 -mx-4 mt-2 border-t border-border bg-card/95 px-4 py-4 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="flex justify-end">
+      <AdminFormActionBar hint={isEdit ? undefined : "The part is created as a draft. Nothing is public until you publish it."}>
           <Button
             type="submit"
-            size="lg"
             disabled={isPending}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto sm:min-w-36"
           >
             {isPending ? (
               <>
@@ -454,8 +457,7 @@ export function SparePartForm({ part, categories, siteWideVisibility }: SparePar
               "Create part"
             )}
           </Button>
-        </div>
-      </div>
+      </AdminFormActionBar>
     </form>
   )
 }
@@ -474,7 +476,12 @@ type SectionVisibility = "public" | "internal"
 
 const VISIBILITY_LABEL: Record<SectionVisibility, string> = {
   public: "Shown on the website",
-  internal: "Admin only — never shown on the website",
+  internal: "Admin only",
+}
+
+const SECTION_DESCRIPTION: Record<SectionVisibility, string> = {
+  public: "Everything a customer reads on the part's card and page.",
+  internal: "Stock, sourcing and supplier details for the team.",
 }
 
 function FormSection({
@@ -489,35 +496,22 @@ function FormSection({
   const internal = visibility === "internal"
 
   return (
-    <section
-      className={cn(
-        "flex flex-col gap-5 rounded-xl border p-6",
-        internal ? "border-dashed border-border bg-secondary/40" : "border-border bg-card"
-      )}
-    >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <h2 className="font-heading text-h3 font-semibold">{title}</h2>
-
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5",
-            "text-xs font-semibold",
-            internal
-              ? "bg-muted text-muted-foreground"
-              : "bg-accent text-gold-ink"
-          )}
+    <AdminFormSection
+      title={title}
+      description={SECTION_DESCRIPTION[visibility]}
+      variant={visibility === "internal" ? "internal" : "default"}
+      badge={
+        <AdminFormBadge
+          tone={internal ? "neutral" : "gold"}
+          icon={internal ? <Lock aria-hidden="true" /> : <Globe aria-hidden="true" />}
         >
-          {internal ? (
-            <Lock aria-hidden="true" className="size-3" />
-          ) : (
-            <Globe aria-hidden="true" className="size-3" />
-          )}
           {VISIBILITY_LABEL[visibility]}
-        </span>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{children}</div>
-    </section>
+        </AdminFormBadge>
+      }
+      bodyClassName="grid gap-x-4 gap-y-5 sm:grid-cols-2 xl:grid-cols-4"
+    >
+      {children}
+    </AdminFormSection>
   )
 }
 
@@ -571,11 +565,11 @@ function Field({
   }
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <Label htmlFor={id} className="justify-between">
+    <div className={cn("flex min-w-0 flex-col gap-2", className)}>
+      <Label htmlFor={id} className="justify-between font-medium">
         <span>{label}</span>
         {optional ? (
-          <span className="text-xs font-normal text-muted-foreground">Optional</span>
+          <span className="text-xs leading-none font-normal text-muted-foreground">Optional</span>
         ) : null}
       </Label>
 
@@ -618,12 +612,7 @@ function NativeSelect({
       name={name}
       defaultValue={defaultValue}
       onChange={onChange}
-      className={cn(
-        "h-11 w-full rounded-lg border border-input bg-card px-3 text-base text-foreground",
-        "transition-colors outline-none",
-        "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-        "md:text-sm"
-      )}
+      className={NATIVE_SELECT_CLASS}
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>

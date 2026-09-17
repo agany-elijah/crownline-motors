@@ -95,7 +95,7 @@ export default async function SecurityActivityPage(props: PageProps<"/Ricky@2000
             ))}
           </select>
         </div>
-        <Button type="submit" variant="outline" className="col-span-2 h-11 sm:col-span-1">
+        <Button type="submit" variant="outline" className="col-span-2 h-(--control-height) sm:col-span-1">
           <Filter aria-hidden="true" />
           Apply
         </Button>
@@ -135,7 +135,7 @@ export default async function SecurityActivityPage(props: PageProps<"/Ricky@2000
                   )}
                 </p>
                 {entry.changes.length > 0 ? (
-                  <ul className="flex flex-col gap-1 rounded-lg bg-secondary/50 px-3 py-2">
+                  <ul className="flex flex-col gap-1 rounded-lg border border-border bg-sunken/60 px-3 py-2">
                     {entry.changes.map((change, index) => (
                       <li key={`${change.field}-${index}`} className="grid gap-x-3 text-xs sm:grid-cols-[10rem_minmax(0,1fr)]">
                         <span className="font-medium text-foreground">{change.field}</span>

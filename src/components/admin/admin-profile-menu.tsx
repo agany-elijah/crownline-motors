@@ -31,7 +31,7 @@ function Avatar({ name, className }: { name: string; className?: string }) {
       aria-hidden="true"
       className={cn(
         "flex shrink-0 items-center justify-center rounded-full font-heading font-semibold tracking-wide select-none",
-        "bg-gradient-to-br from-[oklch(0.86_0.13_88)] to-[oklch(0.7_0.13_78)] text-gold-foreground",
+        "bg-rail text-gold ring-1 ring-gold/35 ring-inset",
         className
       )}
     >
@@ -40,7 +40,7 @@ function Avatar({ name, className }: { name: string; className?: string }) {
   )
 }
 
-const ITEM = "gap-2.5 rounded-lg px-2.5 py-2 text-small"
+const ITEM = "h-9 gap-2.5 rounded-md px-2.5 text-small"
 
 /**
  * The administrator's menu, opened from their avatar in the top bar.
@@ -77,27 +77,29 @@ export function AdminProfileMenu({
       <DropdownMenuTrigger
         aria-label={`Account menu for ${name}`}
         className={cn(
-          "group/avatar relative flex size-9 items-center justify-center rounded-full outline-none",
-          "ring-2 ring-transparent ring-offset-2 ring-offset-background transition-[box-shadow,transform] duration-fast ease-crownline",
-          "hover:ring-gold/40 focus-visible:ring-gold data-popup-open:ring-gold/70 active:scale-95"
+          "group/avatar relative flex size-8 shrink-0 items-center justify-center rounded-full outline-none",
+          "ring-2 ring-transparent ring-offset-2 ring-offset-background transition-[box-shadow] duration-fast ease-crownline",
+          "hover:ring-gold/35 focus-visible:ring-gold data-popup-open:ring-gold/60"
         )}
       >
-        <Avatar name={name} className="size-9 text-xs" />
-        <span
-          aria-hidden="true"
-          className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full border-2 border-background bg-success"
-        />
+        <Avatar name={name} className="size-8 text-[0.6875rem]" />
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" sideOffset={10} className="w-72 rounded-xl p-1.5 shadow-[var(--shadow-raised)]">
-        <div className="flex items-center gap-3 px-2.5 pt-2 pb-3">
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className="w-72 rounded-xl p-1.5 shadow-[var(--shadow-overlay)] ring-foreground/8"
+      >
+        <div className="flex items-center gap-3 px-2.5 pt-2.5 pb-3">
           <Avatar name={name} className="size-10 text-small" />
-          <div className="flex min-w-0 flex-col">
-            <span className="truncate text-small font-semibold text-foreground">{name}</span>
-            <span className="truncate text-xs text-muted-foreground">{email}</span>
-            <span className="mt-1 w-fit rounded-full bg-accent px-2 py-0.5 text-[0.625rem] font-semibold tracking-wide text-accent-foreground uppercase">
-              {roleLabel}
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-small font-semibold text-foreground">{name}</span>
+              <span className="shrink-0 rounded-full border border-gold-ink/25 bg-accent px-1.5 text-[0.6875rem] leading-5 font-medium text-gold-ink">
+                {roleLabel}
+              </span>
             </span>
+            <span className="truncate text-xs text-muted-foreground">{email}</span>
           </div>
         </div>
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useActionState, useEffect, type ReactNode } from "react"
-import { AlertCircle, CheckCircle2, Loader2, Plus, Trash2 } from "lucide-react"
+import { AlertCircle, CheckCircle2, Loader2, Lock, Plus, Trash2 } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -21,7 +21,7 @@ const INITIAL_STATE: QuoteDetailsFormState = { status: "idle" }
  *  from the 44px `Input` default, which exists for the public site's
  *  phone-first forms (see input.tsx). An operator working a quote at a desk
  *  needs density, not a larger tap target. */
-const FIELD = "h-9 rounded-md border-input px-2.5 text-small placeholder:text-muted-foreground/70"
+const FIELD = "h-9 rounded-md border-input bg-card px-2.5 text-small placeholder:text-muted-foreground/70"
 const AREA = "min-h-20 rounded-md border-input px-2.5 py-2 text-small leading-relaxed placeholder:text-muted-foreground/70"
 
 interface LookingFor {
@@ -108,23 +108,41 @@ export function QuoteDetailsForm({
 
   if (!isEditable) {
     return (
-      <section id="pricing" className="flex flex-col gap-2 rounded-xl bg-card p-6 shadow-[var(--shadow-subtle)] ring-1 ring-foreground/10">
-        <h2 className="font-heading text-h3 font-semibold">Details</h2>
-        <p className="text-small text-muted-foreground">Locked.</p>
+      <section
+        id="pricing"
+        className="flex scroll-mt-24 items-start gap-4 rounded-xl border border-border bg-card p-5 shadow-[var(--shadow-subtle)] sm:p-6"
+      >
+        <span
+          aria-hidden="true"
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-sunken text-muted-foreground"
+        >
+          <Lock className="size-4" strokeWidth={1.75} />
+        </span>
+        <div className="flex flex-col gap-1">
+          <h2 className="text-h3">Quotation locked</h2>
+          <p className="text-small text-muted-foreground">
+            Its items and prices can no longer be edited in this status.
+          </p>
+        </div>
       </section>
     )
   }
 
   return (
-    <section id="pricing" className="flex flex-col gap-6 rounded-xl bg-card p-5 shadow-[var(--shadow-subtle)] ring-1 ring-foreground/10 sm:p-6">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="font-heading text-h3 font-semibold">Details</h2>
+    <section id="pricing" className="flex scroll-mt-24 flex-col gap-6 rounded-xl border border-border bg-card p-5 shadow-[var(--shadow-subtle)] sm:p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-h3">Quotation</h2>
+          <p className="text-small text-muted-foreground">
+            What is being offered, at what price, and the words that go to the customer.
+          </p>
+        </div>
         <QuotePdfDialog quoteId={quoteId} />
       </div>
 
       {state.status === "success" && state.message ? (
         <Alert>
-          <CheckCircle2 aria-hidden="true" className="text-gold-ink" />
+          <CheckCircle2 aria-hidden="true" className="text-success" />
           <AlertDescription>{state.message}</AlertDescription>
         </Alert>
       ) : null}
@@ -141,23 +159,48 @@ export function QuoteDetailsForm({
         <input type="hidden" name="expectedUpdatedAt" value={state.updatedAt ?? updatedAt.toISOString()} />
         <input type="hidden" name="lines" value={linesJson} />
 
+        {/* ── What they're looking for ────────────────────────────────── */}
+        {hasLookingFor ? (
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-sunken/60 p-4">
+            <SubsectionHeading title="What they're looking for" description="From the customer's request." />
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-small sm:grid-cols-4">
+              {requestedMake ? <LookingForRow label="Make" value={requestedMake} /> : null}
+              {requestedModel ? <LookingForRow label="Model" value={requestedModel} /> : null}
+              {preferredYear ? <LookingForRow label="Year" value={String(preferredYear)} /> : null}
+              {maxBudget !== null ? (
+                <LookingForRow label="Budget" value={formatCurrencyOrDash(maxBudget)} />
+              ) : null}
+              {requestedPartName ? <LookingForRow label="Part" value={requestedPartName} /> : null}
+              {requestedPartNumber ? (
+                <LookingForRow label="Part number" value={requestedPartNumber} />
+              ) : null}
+            </dl>
+            {additionalRequirements ? (
+              <p className="border-t border-border pt-3 whitespace-pre-wrap text-small text-muted-foreground">
+                {additionalRequirements}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
         {/* ── Line items ──────────────────────────────────────────────── */}
-        <div className="flex flex-col gap-2">
-          <div className="overflow-hidden rounded-lg ring-1 ring-border/70">
+        <div className="flex flex-col gap-3">
+          <SubsectionHeading title="Line items" description="Each line becomes a row of the quotation." />
+          <div className="overflow-hidden rounded-lg border border-border">
             {/* Column headings — table-style on tablet/desktop. Below sm each
                 row exposes its own field labels instead, since six columns
                 cannot fit a phone width. */}
             <div
               className={cn(
-                "hidden items-center gap-2 border-b border-border/60 bg-secondary/40 px-3 py-2 sm:grid",
+                "hidden items-center gap-2 border-b border-border bg-sunken/70 px-3 py-2 sm:grid",
                 "sm:grid-cols-[1fr_7.5rem_3.25rem_6rem_6rem_1.75rem]"
               )}
             >
-              <span className="text-meta text-muted-foreground">Item</span>
-              <span className="text-meta text-muted-foreground">Reference</span>
-              <span className="text-meta text-right text-muted-foreground">Qty</span>
-              <span className="text-meta text-right text-muted-foreground">Unit price</span>
-              <span className="text-meta text-right text-muted-foreground">Total</span>
+              <span className="text-xs font-medium text-muted-foreground">Item</span>
+              <span className="text-xs font-medium text-muted-foreground">Reference</span>
+              <span className="text-right text-xs font-medium text-muted-foreground">Qty</span>
+              <span className="text-right text-xs font-medium text-muted-foreground">Unit price</span>
+              <span className="text-right text-xs font-medium text-muted-foreground">Total</span>
               <span aria-hidden="true" />
             </div>
 
@@ -220,8 +263,8 @@ export function QuoteDetailsForm({
                         grid columns, matching the desktop table layout. */}
                     <div className="col-span-2 flex items-center justify-between gap-2 sm:contents">
                       <div className="flex items-center gap-2 sm:justify-self-end">
-                        <span className="text-meta text-muted-foreground sm:hidden">Total</span>
-                        <span className="text-small font-semibold tabular-nums">{lineTotal}</span>
+                        <span className="text-xs font-medium text-muted-foreground sm:hidden">Total</span>
+                        <span className="text-small font-medium tabular-nums">{lineTotal}</span>
                       </div>
 
                       <Button
@@ -250,7 +293,8 @@ export function QuoteDetailsForm({
         </div>
 
         {/* ── Fees ────────────────────────────────────────────────────── */}
-        <div className="flex flex-col gap-4 border-t border-border/50 pt-6">
+        <div className="flex flex-col gap-4 border-t border-border pt-6">
+          <SubsectionHeading title="Costs and validity" description="Leave a cost empty if it is not part of this quotation." />
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="shippingCost" className="text-small font-medium">
@@ -334,32 +378,9 @@ export function QuoteDetailsForm({
           </div>
         </div>
 
-        {/* ── What they're looking for ────────────────────────────────── */}
-        {hasLookingFor ? (
-          <div className="flex flex-col gap-2 border-t border-border/50 pt-6">
-            <span className="text-small font-medium">What they&apos;re looking for</span>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-small sm:grid-cols-4">
-              {requestedMake ? <LookingForRow label="Make" value={requestedMake} /> : null}
-              {requestedModel ? <LookingForRow label="Model" value={requestedModel} /> : null}
-              {preferredYear ? <LookingForRow label="Year" value={String(preferredYear)} /> : null}
-              {maxBudget !== null ? (
-                <LookingForRow label="Budget" value={formatCurrencyOrDash(maxBudget)} />
-              ) : null}
-              {requestedPartName ? <LookingForRow label="Part" value={requestedPartName} /> : null}
-              {requestedPartNumber ? (
-                <LookingForRow label="Part number" value={requestedPartNumber} />
-              ) : null}
-            </dl>
-            {additionalRequirements ? (
-              <p className="whitespace-pre-wrap text-small text-muted-foreground">
-                {additionalRequirements}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-
         {/* ── Text that reaches the customer ──────────────────────────── */}
-        <div className="flex flex-col gap-4 border-t border-border/50 pt-6">
+        <div className="flex flex-col gap-4 border-t border-border pt-6">
+          <SubsectionHeading title="For the customer" description="Printed on the quotation they receive." />
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="paymentInstructions" className="text-small font-medium">
               Payment instructions
@@ -394,10 +415,8 @@ export function QuoteDetailsForm({
         </div>
 
         {/* ── Internal notes ──────────────────────────────────────────── */}
-        <div className="flex flex-col gap-1.5 border-t border-border/50 pt-6">
-          <Label htmlFor="adminNotes" className="text-small font-medium">
-            Internal notes
-          </Label>
+        <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border bg-sunken/60 p-4">
+          <SubsectionHeading title="Internal notes" description="Only the team sees these. Never sent to the customer." />
           <Textarea
             id="adminNotes"
             name="adminNotes"
@@ -405,13 +424,14 @@ export function QuoteDetailsForm({
             onChange={(event) => setAdminNotes(event.target.value)}
             rows={3}
             maxLength={5000}
-            placeholder="Internal only, never sent to the customer — call notes, sourcing details…"
+            aria-label="Internal notes"
+            placeholder="Call notes, sourcing details…"
             className={AREA}
           />
         </div>
 
-        <div className="border-t border-border/50 pt-6">
-          <Button type="submit" disabled={isPending}>
+        <div className="flex items-center justify-end border-t border-border pt-5">
+          <Button type="submit" disabled={isPending} className="w-full sm:w-auto sm:min-w-32">
             {isPending ? <Loader2 aria-hidden="true" className="animate-spin" /> : null}
             Save details
           </Button>
@@ -435,7 +455,7 @@ function FieldSlot({
 }) {
   return (
     <div className={cn("flex flex-col gap-1", className)}>
-      <span className="text-meta text-muted-foreground sm:hidden">{label}</span>
+      <span className="text-xs font-medium text-muted-foreground sm:hidden">{label}</span>
       {children}
     </div>
   )
@@ -443,9 +463,19 @@ function FieldSlot({
 
 function LookingForRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex min-w-0 flex-col gap-0.5">
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="font-medium">{value}</dd>
+      <dd className="font-medium break-words text-foreground">{value}</dd>
+    </div>
+  )
+}
+
+/** A heading for one part of the quotation form, with its one line of context. */
+function SubsectionHeading({ title, description }: { title: string; description?: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <h3 className="text-small font-medium text-foreground">{title}</h3>
+      {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
     </div>
   )
 }

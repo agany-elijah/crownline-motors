@@ -185,7 +185,7 @@ export function TwoFactorSignInForm({ next }: { next?: string }) {
         </p>
       ) : null}
       <CodeInput id="sign-in-code" error={state.fieldErrors?.code?.[0]} autoFocus />
-      <Button type="submit" size="lg" disabled={pending} className="w-full">
+      <Button type="submit" disabled={pending} className="h-11 w-full">
         {pending ? <Loader2 aria-hidden="true" className="animate-spin" /> : null}
         {pending ? "Verifying" : "Verify"}
       </Button>

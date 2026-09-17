@@ -1,9 +1,12 @@
 import type { Metadata } from "next"
 import type { ReactNode } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { ArrowRight, BadgeCheck, FileText, MessageCircle, Search, ShieldCheck, type LucideIcon } from "lucide-react"
 
 import { Section } from "@/components/layout/section"
+import { AnimatedWords, wordsDuration } from "@/components/motion/animated-words"
+import { delay } from "@/components/motion/motion"
 import { QuoteRequestForm } from "@/components/quotes/quote-request-form"
 import { Reveal } from "@/components/shared/reveal"
 import { WhatsAppGlyph } from "@/components/shared/whatsapp-glyph"
@@ -25,6 +28,10 @@ import { buildGeneralWhatsAppMessage, buildWhatsAppUrl } from "@/lib/utils/whats
  * number wants to know that first.
  */
 
+const HERO_LEAD = "Tell us what you're looking for."
+const HERO_ACCENT = "We'll find it."
+const HERO_TEXT_AT = 160 + wordsDuration(HERO_LEAD) + wordsDuration(HERO_ACCENT) + 80
+
 export async function generateMetadata(): Promise<Metadata> {
   const { businessName } = await getPublicSiteSettings()
 
@@ -44,22 +51,48 @@ export default async function GetAQuotePage() {
 
   return (
     <>
-      {/* ── Hero ─────────────────────────────────────────────────── */}
-      <section data-tone="dark" className="gold-ambient overflow-hidden bg-foreground text-background">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-14 sm:px-6 md:py-20 lg:px-8">
-          <span className="eyebrow text-gold">Get a Quote</span>
-          <h1 className="max-w-3xl text-h1">Tell us what you&apos;re looking for. We&apos;ll find it.</h1>
-          <p className="max-w-2xl text-body-lg text-background/70">
+      {/* ── Hero ─────────────────────────────────────────────────────
+          The light-trail photograph that opened the homepage before it moved
+          to film. A directional scrim keeps the words legible on the left and
+          lets the cars show on the right; the words rise in on first paint,
+          as the homepage's do. */}
+      <section data-tone="dark" className="relative isolate overflow-hidden bg-night text-white">
+        <div aria-hidden="true" className="absolute inset-0 -z-10">
+          <Image
+            src="/images/quote/quote-hero.jpg"
+            alt=""
+            fill
+            preload
+            sizes="100vw"
+            className="load-settle object-cover object-[70%_center] opacity-80"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-night via-night/80 to-night/15" />
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-night/80 to-transparent" />
+        </div>
+
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-16 sm:px-6 md:py-24 lg:px-8">
+          <span className="load-rise eyebrow text-gold" style={delay(80)}>
+            Get a Quote
+          </span>
+          <h1 className="max-w-3xl text-h1">
+            <AnimatedWords text={HERO_LEAD} trigger="load" startDelay={160} />{" "}
+            <span className="text-gold">
+              <AnimatedWords text={HERO_ACCENT} trigger="load" startDelay={160 + wordsDuration(HERO_LEAD)} />
+            </span>
+          </h1>
+          <p className="load-rise max-w-2xl text-body-lg text-white/75" style={delay(HERO_TEXT_AT)}>
             A particular vehicle, or the spare parts your car needs — describe it, and our team sources it from Japan
             and Korea and sends you a full quotation.
           </p>
-          <ul className="flex flex-wrap gap-x-6 gap-y-2 pt-1 text-small text-background/75">
-            {["No commitment", "Full price confirmed before you pay", "We reply by WhatsApp or email"].map((point) => (
-              <li key={point} className="flex items-center gap-2">
-                <BadgeCheck aria-hidden="true" className="size-4 text-gold" />
-                {point}
-              </li>
-            ))}
+          <ul className="flex flex-wrap gap-x-6 gap-y-2 pt-1 text-small text-white/80">
+            {["No commitment", "Full price confirmed before you pay", "We reply by WhatsApp or email"].map(
+              (point, index) => (
+                <li key={point} className="load-rise flex items-center gap-2" style={delay(HERO_TEXT_AT + 120 + index * 90)}>
+                  <BadgeCheck aria-hidden="true" className="size-4 text-gold" />
+                  {point}
+                </li>
+              )
+            )}
           </ul>
         </div>
       </section>
@@ -70,7 +103,7 @@ export default async function GetAQuotePage() {
           {/* What happens after sending — beside the form on a desktop, above it on a phone. */}
           <aside className="flex flex-col gap-8 lg:sticky lg:top-28 lg:self-start">
             <JourneyArt
-              image="/images/quote/quote-hero.jpg"
+              image="/images/journey/vehicle-secured.jpg"
               icon="ship"
               sizes="(min-width: 1024px) 38vw, 100vw"
               className="hidden aspect-[16/10] rounded-2xl ring-1 ring-foreground/10 lg:block"

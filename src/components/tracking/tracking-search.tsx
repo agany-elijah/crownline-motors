@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
  * whoever is collecting the car. The action carries `#track`, so the result
  * page opens scrolled to the answer rather than to the top of the page.
  */
-export function TrackingSearch({ defaultValue = "", example }: { defaultValue?: string; example: string }) {
+export function TrackingSearch({ defaultValue = "" }: { defaultValue?: string }) {
   return (
     <form
       method="get"
@@ -34,13 +34,12 @@ export function TrackingSearch({ defaultValue = "", example }: { defaultValue?: 
             name="number"
             type="text"
             defaultValue={defaultValue}
-            placeholder={example}
+            placeholder="Tracking or order number"
             autoComplete="off"
             autoCapitalize="characters"
             spellCheck={false}
             maxLength={40}
             required
-            aria-describedby="tracking-number-hint"
             className="h-14 w-full rounded-xl border border-input bg-card pr-4 pl-11 font-mono text-base tracking-wider text-foreground uppercase outline-none transition-[border-color,box-shadow] duration-fast placeholder:text-muted-foreground/60 placeholder:normal-case focus-visible:border-gold-ink focus-visible:ring-4 focus-visible:ring-gold/20"
           />
         </div>
@@ -48,11 +47,6 @@ export function TrackingSearch({ defaultValue = "", example }: { defaultValue?: 
           Track order
         </Button>
       </div>
-
-      <p id="tracking-number-hint" className="text-small text-muted-foreground">
-        It looks like <span className="font-mono text-foreground">{example}</span> and is in the email or WhatsApp
-        message we sent after your deposit was confirmed. Your order number (CLM-O-…) works too.
-      </p>
     </form>
   )
 }

@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation"
 import { ArrowRight, MenuIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { CartSummary } from "@/components/cart/cart-summary"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Container } from "@/components/layout/container"
 import { BrandMark } from "@/components/layout/brand-mark"
@@ -136,26 +135,39 @@ export function SiteHeader({ whatsappUrl }: SiteHeaderProps) {
   const [mobileOpen, setMobileOpen] = React.useState(false)
   const { businessName } = useSiteSettings()
 
-  const isTransparent = hasHeroBehind
+  /**
+   * Clear only while the page sits at the very top of a dark hero. The moment
+   * the visitor scrolls — over the hero or anywhere else — the header becomes
+   * dark glass, so the video or photograph keeps moving behind the navigation
+   * rather than being covered by a solid bar.
+   *
+   * The header is dark on every page, light ones included: the brand's black
+   * is its frame, and one treatment everywhere means the navigation never
+   * changes colour between pages.
+   */
+  const isTransparent = hasHeroBehind && !isScrolled
+  const tone = "dark"
 
   return (
     <header
       ref={headerRef}
       data-slot="site-header"
-      // Marks the whole header as a dark surface while it is transparent
-      // over the hero. globals.css keys the on-dark button treatments and
-      // the --gold-ink re-point off this one attribute, so nothing below
-      // needs a per-element conditional.
-      data-tone={isTransparent ? "dark" : undefined}
+      // Marks the whole header as a dark surface. globals.css keys the
+      // on-dark button treatments and the --gold-ink re-point off this one
+      // attribute, so nothing below needs a per-element conditional.
+      data-tone={tone}
       className={cn(
-        "fixed inset-x-0 top-0 z-40",
+        "fixed inset-x-0 top-0 z-40 border-b text-white",
         "transition-[background-color,border-color,box-shadow,backdrop-filter] duration-base ease-crownline",
         isTransparent
-          ? "border-b border-white/10 bg-transparent text-white"
+          ? "border-transparent bg-transparent"
           : cn(
-              "border-b border-border bg-background/85 text-foreground",
-              "backdrop-blur-xl backdrop-saturate-150",
-              isScrolled ? "shadow-[var(--shadow-header)]" : "shadow-none"
+              // Translucent enough that what scrolls beneath reads as depth,
+              // opaque enough that the navigation stays legible over a white
+              // page. The saturate lifts colour through the blur so the glass
+              // does not turn everything behind it grey.
+              "border-white/10 bg-night/75 backdrop-blur-xl backdrop-saturate-150",
+              "shadow-[0_8px_32px_-12px_oklch(0_0_0/0.55)]"
             )
       )}
     >
@@ -164,43 +176,14 @@ export function SiteHeader({ whatsappUrl }: SiteHeaderProps) {
           aria-label="Main"
           className="flex h-16 items-center justify-between gap-6 md:h-20"
         >
-          {/*
-            The left-hand cluster: the menu trigger, then the brand.
-
-            The hamburger sits at the *start* of the row on every surface that
-            has one — which is below `xl`, i.e. every phone and most tablets.
-            That is where a drawer anchored to the left edge should be opened
-            from: the panel slides out from under its own trigger rather than
-            travelling the full width of the screen away from the thumb that
-            asked for it. It also leaves the right-hand side to the basket,
-            which is the one control on this header whose position customers
-            already expect from every other shop they use.
-
-            `-ml-2` pulls the icon button's own padding back so the glyph
-            optically aligns with the container gutter instead of sitting an
-            extra 8px inside it.
-          */}
-          <div className="flex min-w-0 shrink-0 items-center gap-1.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="-ml-2 xl:hidden"
-              aria-label="Open menu"
-              aria-expanded={mobileOpen}
-              aria-controls="mobile-nav-panel"
-              onClick={() => setMobileOpen(true)}
-            >
-              <MenuIcon className="size-5" />
-            </Button>
-
-            <Link
-              href="/"
-              aria-label={`${businessName} — home`}
-              className="shrink-0 transition-opacity duration-fast hover:opacity-80"
-            >
-              <BrandMark tone={isTransparent ? "dark" : "light"} />
-            </Link>
-          </div>
+          {/* The brand: the logo, then the name with its last word in gold. */}
+          <Link
+            href="/"
+            aria-label={`${businessName} — home`}
+            className="min-w-0 shrink transition-opacity duration-fast hover:opacity-80"
+          >
+            <BrandMark tone={tone} layout="lockup" />
+          </Link>
 
           {/* Inline nav starts at xl, not lg: eight items plus a CTA
               measure past 1100px, so at lg they would crush together.
@@ -209,7 +192,7 @@ export function SiteHeader({ whatsappUrl }: SiteHeaderProps) {
             {headerNavItems.map((item) =>
               isNavGroup(item) ? (
                 <li key={item.label}>
-                  <ServicesMenu group={item} pathname={pathname} tone={isTransparent ? "dark" : "light"} />
+                  <ServicesMenu group={item} pathname={pathname} tone={tone} />
                 </li>
               ) : (
                 <li key={item.href}>
@@ -218,7 +201,7 @@ export function SiteHeader({ whatsappUrl }: SiteHeaderProps) {
                     label={item.label}
                     active={isLinkActive(pathname, item.href)}
                     available={isNavLinkAvailable(item)}
-                    tone={isTransparent ? "dark" : "light"}
+                    tone={tone}
                   />
                 </li>
               )
@@ -243,33 +226,28 @@ export function SiteHeader({ whatsappUrl }: SiteHeaderProps) {
           </div>
 
           {/*
-            The right-hand cluster: the basket.
+            The menu trigger, below `xl`, at the end of the row — where a thumb
+            holding a phone reaches it. The drawer still slides in from the
+            left edge, the side the brand sits on, so opening the menu brings
+            the site's name and its navigation together.
 
-            ── Why the basket is in the header at all ──────────────────
-            It used to sit in the spare-parts section's own utility bar, which
-            meant it existed on two routes and vanished the moment a customer
-            wandered onto How It Works. A basket is persistent state, not a
-            property of one page, and top-right of the header is where every
-            shop a customer has ever used puts it.
+            The spare-parts basket is not here: it lives in the spare-parts
+            section's own bar, beside the parts it holds.
 
-            The obvious objection — that a cart glyph on a page about cars
-            implies cars go in one — is answered by `CartSummary` itself: it
-            renders nothing at all until the basket holds something. A visitor
-            who has not added a part never sees it, and one who has is being
-            shown their own list on whatever page they wandered to.
-
-            ── Why it sits alone on the right ──────────────────────────
-            The menu trigger used to share this cluster, which put navigation
-            and the basket in the same corner and left the top-left of a phone
-            screen — the corner every drawer-based site puts its menu in —
-            empty. The trigger has moved to the start of the row, beside the
-            brand and above the edge its panel slides out from, so the basket
-            now owns the end of the row on its own. `shrink-0` keeps it there
-            whatever the rest of the row is carrying.
+            `-mr-2` pulls the icon button's padding back so the glyph aligns
+            with the container gutter instead of sitting 8px inside it.
           */}
-          <div className="flex shrink-0 items-center gap-1 xl:gap-2">
-            <CartSummary tone={isTransparent ? "dark" : "light"} />
-          </div>
+          <Button
+            variant="ghost"
+            size="icon-lg"
+            className="-mr-2 shrink-0 text-white xl:hidden"
+            aria-label="Open menu"
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-nav-panel"
+            onClick={() => setMobileOpen(true)}
+          >
+            <MenuIcon className="size-6" />
+          </Button>
         </nav>
       </Container>
 

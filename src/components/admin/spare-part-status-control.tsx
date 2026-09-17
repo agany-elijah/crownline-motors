@@ -9,6 +9,7 @@ import {
   updateSparePartStatusAction,
   type SparePartFormState,
 } from "@/lib/actions/spare-part.actions"
+import { ListingStatusBar } from "@/components/admin/listing-status-bar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { SparePartStatusBadge } from "@/components/admin/spare-part-status-badge"
@@ -107,15 +108,31 @@ export function SparePartStatusControl({
   const noPhotos = photoCount === 0
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-heading text-h3 font-semibold">Status</h2>
-        <SparePartStatusBadge status={status} />
-      </div>
+    <ListingStatusBar
+      badge={<SparePartStatusBadge status={status} />}
+      live={status === SparePartStatus.PUBLISHED}
+      actions={transitions.map((target) => {
+        const blocked = target === SparePartStatus.PUBLISHED && missingPrice
 
+        return (
+          <form key={target} action={formAction}>
+            <input type="hidden" name="id" value={sparePartId} />
+            <input type="hidden" name="status" value={target} />
+            <Button
+              type="submit"
+              disabled={isPending || blocked}
+              variant={target === SparePartStatus.PUBLISHED ? "default" : "outline"}
+            >
+              {isPending ? <Loader2 aria-hidden="true" className="animate-spin" /> : null}
+              {labelForTransition(target, status)}
+            </Button>
+          </form>
+        )
+      })}
+    >
       {state.status === "success" && state.message ? (
         <Alert>
-          <CheckCircle2 aria-hidden="true" className="text-gold-ink" />
+          <CheckCircle2 aria-hidden="true" className="text-success" />
           <AlertDescription>{state.message}</AlertDescription>
         </Alert>
       ) : null}
@@ -189,29 +206,7 @@ export function SparePartStatusControl({
         </Alert>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        {transitions.map((target) => {
-          const blocked = target === SparePartStatus.PUBLISHED && missingPrice
-
-          return (
-            <form key={target} action={formAction}>
-              <input type="hidden" name="id" value={sparePartId} />
-              <input type="hidden" name="status" value={target} />
-              <Button
-                type="submit"
-                disabled={isPending || blocked}
-                variant={target === SparePartStatus.PUBLISHED ? "default" : "outline"}
-              >
-                {isPending ? (
-                  <Loader2 aria-hidden="true" className="animate-spin" />
-                ) : null}
-                {labelForTransition(target, status)}
-              </Button>
-            </form>
-          )
-        })}
-      </div>
-    </section>
+    </ListingStatusBar>
   )
 }
 

@@ -497,3 +497,25 @@ describe("vehicle condition", () => {
     }
   })
 })
+
+describe("body type", () => {
+  it("is optional, and a blank selection is stored as null so clearing it clears the column", () => {
+    const blank = createVehicleSchema.safeParse({ ...valid, bodyType: "" })
+    const absent = createVehicleSchema.safeParse(valid)
+
+    expect(blank.success && blank.data.bodyType).toBeNull()
+    expect(absent.success && absent.data.bodyType).toBeNull()
+  })
+
+  it("accepts a listed body type", () => {
+    const result = createVehicleSchema.safeParse({ ...valid, bodyType: "SUV" })
+
+    expect(result.success && result.data.bodyType).toBe("SUV")
+  })
+
+  it("rejects anything else", () => {
+    const result = createVehicleSchema.safeParse({ ...valid, bodyType: "SPACESHIP" })
+
+    expect(result.success).toBe(false)
+  })
+})

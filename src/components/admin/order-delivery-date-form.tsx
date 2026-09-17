@@ -35,7 +35,7 @@ export function OrderDeliveryDateForm({
   const toId = useId()
 
   return (
-    <form action={formAction} className="flex flex-col gap-2.5 border-t border-border/60 pt-4">
+    <form action={formAction} className="flex flex-col gap-3 border-t border-border pt-4">
       <input type="hidden" name="orderId" value={orderId} />
 
       <div className="flex flex-col gap-0.5">
@@ -56,7 +56,7 @@ export function OrderDeliveryDateForm({
             name="deliveryDate"
             type="date"
             defaultValue={toDateInputValue(deliveryDate)}
-            className="h-9 w-40 rounded-md border-input px-2.5 text-small"
+            className="h-9 w-40 rounded-md border-input bg-card px-2.5 text-small"
           />
         </label>
         <label htmlFor={toId} className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -66,7 +66,7 @@ export function OrderDeliveryDateForm({
             name="deliveryDateLatest"
             type="date"
             defaultValue={toDateInputValue(deliveryDateLatest)}
-            className="h-9 w-40 rounded-md border-input px-2.5 text-small"
+            className="h-9 w-40 rounded-md border-input bg-card px-2.5 text-small"
           />
         </label>
         <Button type="submit" size="sm" variant="outline" disabled={isPending} className="h-9">

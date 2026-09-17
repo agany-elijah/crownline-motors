@@ -1,6 +1,7 @@
 import { z } from "zod"
 
-import { VEHICLE_YEAR_MIN, vehicleYearMax } from "@/lib/constants/vehicle-options"
+import { VehicleBodyType } from "@/generated/prisma/enums"
+import { VEHICLE_YEAR_MIN, bodyTypeToParam, vehicleYearMax } from "@/lib/constants/vehicle-options"
 
 /**
  * The public catalogue's search parameters (Stage 12).
@@ -139,11 +140,28 @@ const pageFilter = z
   .catch(1)
   .default(1)
 
+/**
+ * The body type, from `?type=suv`.
+ *
+ * Accepted in any case and mapped onto the enum, so a hand-typed `?type=SUV`
+ * and the tile's `?type=suv` are one search. Anything that is not a body type
+ * degrades to "not filtered", like every other field here.
+ */
+const bodyTypeFilter = z
+  .string()
+  .trim()
+  .max(TEXT_FILTER_MAX_LENGTH)
+  .transform((value) => (value.length === 0 ? undefined : value.toUpperCase()))
+  .pipe(z.enum(VehicleBodyType).optional())
+  .optional()
+  .catch(undefined)
+
 export const vehicleSearchSchema = z.object({
   q: searchTerm,
   make: textFilter,
   model: textFilter,
   year: yearFilter,
+  bodyType: bodyTypeFilter,
   page: pageFilter,
 })
 
@@ -171,13 +189,16 @@ export function parseVehicleSearchParams(
     make: first(params.make),
     model: first(params.model),
     year: first(params.year),
+    bodyType: first(params.type),
     page: first(params.page) ?? 1,
   })
 }
 
 /** True when at least one narrowing filter is active. */
 export function hasActiveSearch(criteria: VehicleSearchCriteria): boolean {
-  return Boolean(criteria.q || criteria.make || criteria.model || criteria.year)
+  return Boolean(
+    criteria.q || criteria.make || criteria.model || criteria.year || criteria.bodyType
+  )
 }
 
 /**
@@ -202,6 +223,7 @@ export function buildCatalogueQuery(
   if (criteria.make) params.set("make", criteria.make)
   if (criteria.model) params.set("model", criteria.model)
   if (criteria.year) params.set("year", String(criteria.year))
+  if (criteria.bodyType) params.set("type", bodyTypeToParam(criteria.bodyType))
   // Page one is the default and is left out, so "/cars" and "/cars?page=1"
   // do not become two URLs for the same page.
   if (page > 1) params.set("page", String(page))

@@ -275,6 +275,19 @@ export default function nextConfig(phase: string): NextConfig {
       // gallery that loads on a mobile connection in Juba and one that
       // does not (brief §19).
       formats: ["image/avif", "image/webp"],
+      // The default list ends at 3840px, which generates — and sends to any
+      // 4K or high-DPI desktop — variants several times heavier than any
+      // layout here can show: the widest image is a 62vw gallery, under
+      // 2000px even at 2× density. Capping at 2048 removes that variant
+      // without softening anything a screen can actually display.
+      deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
+      // An optimised variant is re-encoded at most once a month instead of
+      // every four hours. Safe because nothing served through the optimiser
+      // changes under the same URL: every uploaded photograph and logo is
+      // stored at a fresh UUID path (see src/lib/storage/*-media.ts). A
+      // photograph under public/images that is *replaced* should be given a
+      // new filename for the same reason.
+      minimumCacheTTL: 2_678_400,
     },
 
     async headers() {

@@ -71,7 +71,7 @@ export default async function AdminDashboardLayout({
 
   return (
     <AdminThemeProvider initialTheme={theme}>
-      <div className="flex min-h-dvh bg-secondary/40">
+      <div className="flex min-h-dvh bg-background text-foreground">
         {/*
           Fixed rail from lg up. Below that it is absent from the layout
           entirely and the same navigation is reachable through the drawer in
@@ -80,9 +80,9 @@ export default async function AdminDashboardLayout({
         */}
         <aside
           data-tone="dark"
-          className="hidden w-64 shrink-0 flex-col bg-foreground text-background lg:sticky lg:top-0 lg:flex lg:h-dvh"
+          className="hidden w-60 shrink-0 flex-col border-r border-rail-border bg-rail text-rail-foreground lg:sticky lg:top-0 lg:flex lg:h-dvh"
         >
-          <div className="flex h-16 shrink-0 items-center border-b border-white/10 px-5">
+          <div className="flex h-14 shrink-0 items-center gap-3 px-6">
             <Link
               href={ADMIN_BASE_PATH}
               className="rounded-sm transition-opacity duration-fast hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
@@ -92,20 +92,20 @@ export default async function AdminDashboardLayout({
             </Link>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-3 py-5">
+          <div className="flex-1 overflow-y-auto px-3 pt-4 pb-6">
             <AdminNav groups={navGroups} />
           </div>
 
-          <div className="shrink-0 border-t border-white/10 px-5 py-4">
-            <p className="font-heading text-[0.5625rem] font-semibold tracking-[0.28em] text-background/60 uppercase">
-              Staff Dashboard
-            </p>
+          <div className="shrink-0 border-t border-rail-border px-6 py-4">
+            <p className="text-xs text-rail-subtle">Staff dashboard</p>
           </div>
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
           <AdminTopBar admin={admin} navGroups={navGroups} />
-          <main className="flex-1 px-4 pt-5 pb-8 sm:px-6 sm:pt-8 lg:px-8">{children}</main>
+          <main className="mx-auto w-full max-w-[90rem] flex-1 px-4 pt-6 pb-12 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
+            {children}
+          </main>
         </div>
 
         {showLeadAlerts ? <QuoteLeadWatcher /> : null}

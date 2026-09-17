@@ -1,12 +1,11 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeft, CheckCircle2, TriangleAlert } from "lucide-react"
+import { CheckCircle2, TriangleAlert } from "lucide-react"
 
-import { AdminPageHeader } from "@/components/admin/admin-page-header"
+import { AdminMetaDivider, AdminPageHeader } from "@/components/admin/admin-page-header"
+import { ListingWebAddress } from "@/components/admin/listing-status-bar"
 import { VehicleForm } from "@/components/admin/vehicle-form"
 import { VehiclePhotoBoard } from "@/components/admin/vehicle-photo-board"
-import { VehicleStatusBadge } from "@/components/admin/vehicle-status-badge"
 import { VehicleStatusControl } from "@/components/admin/vehicle-status-control"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { requirePermission } from "@/lib/auth/admin-guard"
@@ -14,6 +13,7 @@ import { listVehiclePhotos } from "@/lib/queries/vehicle-photo.queries"
 import { getVehicleById } from "@/lib/queries/vehicle.queries"
 import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
+import { VehicleStatus } from "@/generated/prisma/enums"
 
 export async function generateMetadata(
   props: PageProps<"/Ricky@2000/vehicles/[id]">
@@ -54,32 +54,18 @@ export default async function AdminVehicleDetailPage(
   const photosFailed = searchParams.photos === "failed"
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4">
-        <Link
-          href={`${ADMIN_BASE_PATH}/vehicles`}
-          className="inline-flex w-fit items-center gap-1.5 text-small text-muted-foreground transition-colors duration-fast hover:text-gold-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          <ArrowLeft aria-hidden="true" className="size-3.5" />
-          All vehicles
-        </Link>
-
-        <AdminPageHeader
-          title={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-          description={
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="font-mono text-small">{vehicle.referenceNumber}</span>
-              <span aria-hidden="true" className="text-muted-foreground">
-                ·
-              </span>
-              <span className="text-small">
-                Web address: <code className="text-xs">/cars/{vehicle.slug}</code>
-              </span>
-            </span>
-          }
-          actions={<VehicleStatusBadge status={vehicle.status} />}
-        />
-      </div>
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader
+        back={{ href: `${ADMIN_BASE_PATH}/vehicles`, label: "All vehicles" }}
+        title={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+        meta={
+          <>
+            <span className="font-mono text-foreground">{vehicle.referenceNumber}</span>
+            <AdminMetaDivider />
+            <ListingWebAddress path={`/cars/${vehicle.slug}`} live={vehicle.status === VehicleStatus.PUBLISHED} />
+          </>
+        }
+      />
 
       {justCreated && !photosFailed ? (
         <Alert>

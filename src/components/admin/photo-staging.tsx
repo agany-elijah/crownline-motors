@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { AlertCircle, Loader2 } from "lucide-react"
 
+import { AdminFormSection } from "@/components/admin/admin-form"
 import { PhotoDropTile, PhotoTile } from "@/components/admin/photo-tile"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -93,8 +94,11 @@ export function PhotoStaging({
   const busy = disabled || preparing
 
   return (
-    <section className="flex flex-col gap-6 rounded-xl border border-border bg-card p-6">
-      <h2 className="font-heading text-h3 font-semibold">Photographs</h2>
+    <AdminFormSection
+      title="Photographs"
+      description="The main image appears on the card and leads the gallery. The photographs upload with the details when you save."
+      bodyClassName="flex flex-col gap-6"
+    >
 
       <input
         ref={inputRef}
@@ -121,7 +125,7 @@ export function PhotoStaging({
 
       {/* ── Main photograph ──────────────────────────────────────── */}
       <div className="flex flex-col gap-3">
-        <h3 className="font-heading text-small font-semibold">Main image</h3>
+        <h3 className="text-small font-medium text-foreground">Main image</h3>
 
         <div className="max-w-xl">
           {main ? (
@@ -155,10 +159,10 @@ export function PhotoStaging({
       {/* ── Supporting photographs ───────────────────────────────── */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h3 className="font-heading text-small font-semibold">
+          <h3 className="text-small font-medium text-foreground">
             Other images
             {others.length > 0 ? (
-              <span className="ml-2 font-normal text-muted-foreground tabular">
+              <span className="ml-2 font-normal text-muted-foreground tabular-nums">
                 {others.length}
               </span>
             ) : null}
@@ -221,6 +225,6 @@ export function PhotoStaging({
           ) : null}
         </ul>
       </div>
-    </section>
+    </AdminFormSection>
   )
 }

@@ -1,6 +1,32 @@
 import type { Metadata } from "next"
+import { Geist, Geist_Mono } from "next/font/google"
 
+import { AdminSurface } from "@/components/admin/admin-surface"
 import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
+import { cn } from "@/lib/utils"
+
+/**
+ * The dashboard's own families: Geist for the interface, Geist Mono for the
+ * references an operator matches character by character — order, quote and
+ * tracking numbers.
+ *
+ * Loaded here rather than in the root layout, so the public site — where most
+ * visitors arrive on a phone over mobile data — never downloads them. The
+ * tokens that put them to use are under "Admin console" in globals.css.
+ */
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+  display: "swap",
+})
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+  display: "swap",
+})
+
+const FONT_CLASSES = cn(geistSans.variable, geistMono.variable)
 
 /**
  * Layout for the whole administrator area.
@@ -45,6 +71,17 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export const dynamic = "force-dynamic"
 
+/**
+ * `data-admin` switches every staff screen — signed in or not — onto the
+ * dashboard's tokens. `contents` keeps the wrapper out of layout, so pages lay
+ * out exactly as if it were not there; custom properties still inherit
+ * through it.
+ */
 export default function AdminLayout({ children }: LayoutProps<"/Ricky@2000">) {
-  return <>{children}</>
+  return (
+    <div data-admin="" className={cn(FONT_CLASSES, "contents font-sans")}>
+      <AdminSurface fontClassName={FONT_CLASSES} />
+      {children}
+    </div>
+  )
 }

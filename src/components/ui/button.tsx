@@ -29,7 +29,8 @@ import { cn } from "@/lib/utils"
  * press returns it to the surface. The lift and the shadow are one
  * gesture — a shadow that grows while the element stays put reads as a
  * filter effect, whereas moving both together reads as the object
- * physically rising. Both run at --duration-fast (250ms) per the brief's
+ * physically rising. How far it rises is `--button-lift`, so the staff
+ * dashboard can hold its controls still. Both run at --duration-fast (250ms) per the brief's
  * micro-interaction budget, and the global reduced-motion rule collapses
  * them to near-zero for anyone who has asked for less movement.
  *
@@ -61,14 +62,14 @@ const buttonVariants = cva(
         // bright rather than flat against the warm-white page.
         default: [
           "bg-primary text-primary-foreground shadow-[var(--shadow-gold)]",
-          "hover:-translate-y-0.5 hover:bg-[color-mix(in_oklch,var(--primary),white_12%)]",
+          "hover:-translate-y-(--button-lift) hover:bg-[color-mix(in_oklch,var(--primary),white_12%)]",
           "hover:shadow-[var(--shadow-gold-strong)]",
           "active:translate-y-0 active:shadow-[var(--shadow-gold)]",
           "active:bg-[color-mix(in_oklch,var(--primary),black_6%)]",
         ],
         outline: [
           "border-border bg-background text-foreground shadow-[var(--shadow-subtle)]",
-          "hover:-translate-y-0.5 hover:border-gold-ink/45 hover:text-gold-ink",
+          "hover:-translate-y-(--button-lift) hover:border-gold-ink/45 hover:text-gold-ink",
           "hover:shadow-[var(--shadow-raised)]",
           "active:translate-y-0 active:shadow-[var(--shadow-subtle)]",
         ],

@@ -271,7 +271,7 @@ export function BusinessInformationForm({ settings, canEdit }: Props) {
               <span className="text-small font-medium text-foreground">Logo</span>
               <Link
                 href={adminPath("/settings/branding")}
-                className="flex h-11 items-center justify-between gap-2 rounded-lg border border-border px-3 text-small text-foreground transition-colors duration-fast hover:bg-muted"
+                className="flex h-(--control-height) items-center justify-between gap-2 rounded-lg border border-border px-3 text-small text-foreground transition-colors duration-fast hover:bg-muted"
               >
                 <span className="truncate">Website &amp; branding</span>
                 <ArrowUpRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />

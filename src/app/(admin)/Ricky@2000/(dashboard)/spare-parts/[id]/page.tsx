@@ -1,13 +1,12 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeft, CheckCircle2, TriangleAlert } from "lucide-react"
+import { CheckCircle2, TriangleAlert } from "lucide-react"
 
-import { AdminPageHeader } from "@/components/admin/admin-page-header"
+import { AdminMetaDivider, AdminPageHeader } from "@/components/admin/admin-page-header"
+import { ListingWebAddress } from "@/components/admin/listing-status-bar"
 import { SparePartFitmentBoard } from "@/components/admin/spare-part-fitment-board"
 import { SparePartForm } from "@/components/admin/spare-part-form"
 import { SparePartPhotoBoard } from "@/components/admin/spare-part-photo-board"
-import { SparePartStatusBadge } from "@/components/admin/spare-part-status-badge"
 import { SparePartStatusControl } from "@/components/admin/spare-part-status-control"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { requirePermission } from "@/lib/auth/admin-guard"
@@ -18,6 +17,7 @@ import {
   listSparePartFitment,
 } from "@/lib/queries/spare-part.queries"
 import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
+import { SparePartStatus } from "@/generated/prisma/enums"
 import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 
 export async function generateMetadata(
@@ -68,44 +68,26 @@ export default async function AdminSparePartDetailPage(
   const photosFailed = searchParams.photos === "failed"
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4">
-        <Link
-          href={`${ADMIN_BASE_PATH}/spare-parts`}
-          className="inline-flex w-fit items-center gap-1.5 text-small text-muted-foreground transition-colors duration-fast hover:text-gold-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          <ArrowLeft aria-hidden="true" className="size-3.5" />
-          All spare parts
-        </Link>
-
-        <AdminPageHeader
-          title={part.name}
-          description={
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="font-mono text-small">{part.referenceNumber}</span>
-              {part.oemPartNumber ? (
-                <>
-                  <span aria-hidden="true" className="text-muted-foreground">
-                    ·
-                  </span>
-                  <span className="text-small">
-                    Part number{" "}
-                    <span className="font-mono">{part.oemPartNumber}</span>
-                  </span>
-                </>
-              ) : null}
-              <span aria-hidden="true" className="text-muted-foreground">
-                ·
-              </span>
-              <span className="text-small">
-                Web address:{" "}
-                <code className="text-xs">/spare-parts/{part.slug}</code>
-              </span>
-            </span>
-          }
-          actions={<SparePartStatusBadge status={part.status} />}
-        />
-      </div>
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader
+        back={{ href: `${ADMIN_BASE_PATH}/spare-parts`, label: "All spare parts" }}
+        title={part.name}
+        meta={
+          <>
+            <span className="font-mono text-foreground">{part.referenceNumber}</span>
+            {part.oemPartNumber ? (
+              <>
+                <AdminMetaDivider />
+                <span>
+                  Part number <span className="font-mono text-foreground">{part.oemPartNumber}</span>
+                </span>
+              </>
+            ) : null}
+            <AdminMetaDivider />
+            <ListingWebAddress path={`/spare-parts/${part.slug}`} live={part.status === SparePartStatus.PUBLISHED} />
+          </>
+        }
+      />
 
       {justCreated ? (
         <Alert>

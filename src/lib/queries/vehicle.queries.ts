@@ -3,7 +3,7 @@ import "server-only"
 import { cache } from "react"
 
 import type { Prisma } from "@/generated/prisma/client"
-import type { VehicleCondition, VehicleStatus } from "@/generated/prisma/enums"
+import type { VehicleBodyType, VehicleCondition, VehicleStatus } from "@/generated/prisma/enums"
 import { prisma } from "@/lib/prisma"
 import type { VehicleListFilters } from "@/lib/validations/vehicle.schema"
 
@@ -217,6 +217,7 @@ export interface VehicleDetail {
   transmission: string
   engineSize: string
   driveType: string
+  bodyType: VehicleBodyType | null
   exteriorColor: string
   interiorColor: string
   countryOfOrigin: string

@@ -2,8 +2,10 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { Plus, Wrench } from "lucide-react"
 
+import { AdminEmptyState } from "@/components/admin/admin-empty-state"
+import { AdminListCount } from "@/components/admin/admin-list-toolbar"
 import { AdminPageHeader } from "@/components/admin/admin-page-header"
-import { DataTable, type DataTableColumn } from "@/components/admin/data-table"
+import { DataTable, DataTableRecordLink, type DataTableColumn } from "@/components/admin/data-table"
 import { Pagination } from "@/components/shared/pagination"
 import { SparePartListFilters } from "@/components/admin/spare-part-list-filters"
 import { SparePartAvailabilityTag } from "@/components/spare-parts/spare-part-availability-tag"
@@ -64,26 +66,20 @@ export default async function AdminSparePartsPage(
       id: "part",
       header: "Part",
       render: (part) => (
-        <Link
+        <DataTableRecordLink
           href={`${ADMIN_BASE_PATH}/spare-parts/${part.id}`}
-          className="group/link flex flex-col gap-0.5 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          <span className="font-semibold transition-colors duration-fast group-hover/link:text-gold-ink">
-            {part.name}
-          </span>
-          <span className="font-mono text-xs text-muted-foreground">
-            {/*
-              The manufacturer's number first when there is one: it is what a
-              customer reads off the old part and quotes down the phone, so it
-              is what an operator is most often matching against. Ours is
-              always shown beside it, because it is the one that identifies
-              exactly this listing.
-            */}
-            {part.oemPartNumber
-              ? `${part.oemPartNumber} · ${part.referenceNumber}`
-              : part.referenceNumber}
-          </span>
-        </Link>
+          title={part.name}
+          /*
+            The manufacturer's number first when there is one: it is what a
+            customer reads off the old part and quotes down the phone, so it
+            is what an operator is most often matching against. Ours is
+            always shown beside it, because it is the one that identifies
+            exactly this listing.
+          */
+          reference={
+            part.oemPartNumber ? `${part.oemPartNumber} · ${part.referenceNumber}` : part.referenceNumber
+          }
+        />
       ),
     },
     {
@@ -112,7 +108,7 @@ export default async function AdminSparePartsPage(
             {SPARE_PART_PRICING_MODE_LABELS.QUOTE_ONLY}
           </span>
         ) : (
-          <span className="font-semibold tabular-nums">
+          <span className="font-medium tabular-nums">
             {part.price === null ? "—" : formatCurrency(part.price)}
           </span>
         ),
@@ -200,14 +196,12 @@ export default async function AdminSparePartsPage(
   )
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <AdminPageHeader
         title="Spare parts"
+        description="The parts catalogue — pricing, stock on hand, and which vehicles each part fits."
         actions={
-          <Button
-            render={<Link href={`${ADMIN_BASE_PATH}/spare-parts/new`} />}
-            size="lg"
-          >
+          <Button render={<Link href={`${ADMIN_BASE_PATH}/spare-parts/new`} />}>
             <Plus aria-hidden="true" />
             Add part
           </Button>
@@ -229,10 +223,8 @@ export default async function AdminSparePartsPage(
       />
 
       {result.pageCount > 1 ? (
-        <div className="flex flex-col gap-3">
-          <p className="text-small text-muted-foreground">
-            <span className="tabular">{result.total}</span> parts
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <AdminListCount total={result.total} noun="parts" />
           <Pagination
             page={result.page}
             pageCount={result.pageCount}
@@ -254,35 +246,29 @@ export default async function AdminSparePartsPage(
  * suggest the catalogue is empty when it is not.
  */
 function EmptyParts({ hasFilters }: { hasFilters: boolean }) {
-  return (
-    <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border bg-card px-6 py-16 text-center">
-      <span
-        aria-hidden="true"
-        className="flex size-12 items-center justify-center rounded-full bg-secondary text-muted-foreground"
-      >
-        <Wrench className="size-6" />
-      </span>
-
-      {hasFilters ? (
-        <>
-          <h2 className="font-heading text-h3 font-semibold">No matches</h2>
-          <Button
-            render={<Link href={`${ADMIN_BASE_PATH}/spare-parts`} />}
-            variant="outline"
-          >
-            Show all parts
-          </Button>
-        </>
-      ) : (
-        <>
-          <h2 className="font-heading text-h3 font-semibold">No parts yet</h2>
-          <Button render={<Link href={`${ADMIN_BASE_PATH}/spare-parts/new`} />}>
-            <Plus aria-hidden="true" />
-            Add part
-          </Button>
-        </>
-      )}
-    </div>
+  return hasFilters ? (
+    <AdminEmptyState
+      icon={Wrench}
+      title="No parts match"
+      description="Nothing in the catalogue fits these filters. Try a different search, or clear them."
+      action={
+        <Button render={<Link href={`${ADMIN_BASE_PATH}/spare-parts`} />} variant="outline">
+          Show all parts
+        </Button>
+      }
+    />
+  ) : (
+    <AdminEmptyState
+      icon={Wrench}
+      title="No parts yet"
+      description="Add the first part — it stays a draft, visible only here, until you publish it."
+      action={
+        <Button render={<Link href={`${ADMIN_BASE_PATH}/spare-parts/new`} />}>
+          <Plus aria-hidden="true" />
+          Add part
+        </Button>
+      }
+    />
   )
 }
 

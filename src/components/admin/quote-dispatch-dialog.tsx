@@ -148,7 +148,6 @@ export function QuoteDispatchDialog({
           render={
             <Button
               type="button"
-              size="sm"
               disabled={effectiveDisabled}
               title={effectiveDisabled ? effectiveReason : undefined}
             />
@@ -165,7 +164,7 @@ export function QuoteDispatchDialog({
           {state.status === "success" ? (
             <div className="flex flex-col gap-4">
               <Alert>
-                <CheckCircle2 aria-hidden="true" className="text-gold-ink" />
+                <CheckCircle2 aria-hidden="true" className="text-success" />
                 <AlertDescription>
                   {state.channel === QuoteDispatchChannel.EMAIL
                     ? `The quotation has been emailed to ${contactEmail}.`
@@ -180,7 +179,7 @@ export function QuoteDispatchDialog({
                 <Button
                   render={<a href={state.dispatchUrl} target="_blank" rel="noopener noreferrer" />}
                   variant="whatsapp"
-                  size="lg"
+                  className="h-10"
                 >
                   <ExternalLink aria-hidden="true" />
                   Open in WhatsApp
@@ -223,7 +222,7 @@ export function QuoteDispatchDialog({
 
               {/* Channel selector — two selectable cards. */}
               <div className="flex flex-col gap-2">
-                <span className="text-meta text-muted-foreground">Send via</span>
+                <span className="text-xs font-medium text-muted-foreground">Send via</span>
                 <div role="group" aria-label="Send via" className="grid grid-cols-2 gap-2.5">
                   <ChannelCard
                     label="WhatsApp"
@@ -258,7 +257,7 @@ export function QuoteDispatchDialog({
               </label>
 
               <div className="flex flex-col gap-1.5">
-                <label htmlFor={noteId} className="text-meta text-muted-foreground">
+                <label htmlFor={noteId} className="text-xs font-medium text-muted-foreground">
                   Message
                 </label>
                 <Textarea
@@ -272,7 +271,7 @@ export function QuoteDispatchDialog({
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label htmlFor={instructionsId} className="text-meta text-muted-foreground">
+                <label htmlFor={instructionsId} className="text-xs font-medium text-muted-foreground">
                   Notes for the customer
                 </label>
                 <Textarea
@@ -318,7 +317,7 @@ export function QuoteDispatchDialog({
       </Dialog>
 
       {effectiveDisabled && effectiveReason ? (
-        <p className="max-w-56 text-right text-xs text-muted-foreground">{effectiveReason}</p>
+        <p className="max-w-60 text-right text-xs text-balance text-muted-foreground">{effectiveReason}</p>
       ) : null}
     </div>
   )

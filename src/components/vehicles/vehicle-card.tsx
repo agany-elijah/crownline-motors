@@ -208,7 +208,10 @@ export function VehicleCard({
               alt={vehicle.photoAltText ?? (vehicle.year !== null ? `${vehicle.year} ${name}` : name)}
               fill
               sizes={sizes}
-              priority={priority}
+              // Several first-row cards can be the largest paint, so they load
+              // eagerly at high priority rather than each being `preload`ed.
+              loading={priority ? "eager" : undefined}
+              fetchPriority={priority ? "high" : undefined}
               className="object-cover group-hover/card:scale-[1.08]"
             />
           ) : (

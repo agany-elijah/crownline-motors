@@ -194,14 +194,14 @@ export function MobileNav({ open, onOpenChange, whatsappUrl }: MobileNavProps) {
             "data-closed:animate-out data-closed:slide-out-to-left-full"
           )}
         >
-          <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
-            <DialogPrimitive.Title render={<BrandMark size="sm" tone="dark" />} />
+          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-5">
+            <DialogPrimitive.Title render={<BrandMark size="sm" tone="dark" layout="lockup" className="min-w-0" />} />
             <DialogPrimitive.Description className="sr-only">
               Site navigation
             </DialogPrimitive.Description>
             <DialogPrimitive.Close
               aria-label="Close menu"
-              className="flex size-9 items-center justify-center rounded-lg text-background/70 transition-colors duration-fast hover:bg-white/10 hover:text-background"
+              className="flex size-9 shrink-0 items-center justify-center rounded-lg text-background/70 transition-colors duration-fast hover:bg-white/10 hover:text-background"
             >
               <XIcon className="size-5" />
             </DialogPrimitive.Close>

@@ -503,6 +503,34 @@ export async function listPublishedSpareParts(options?: {
   return { parts: rows.map((row) => toCard(row, siteWide)), total, page, pageCount }
 }
 
+/** How many parts the homepage's spare-parts band shows. */
+export const HOMEPAGE_SPARE_PARTS_LIMIT = 4
+
+/**
+ * Parts an operator has marked as featured, for the homepage.
+ *
+ * Featured only — unlike the vehicle grid, which falls back to the newest
+ * listings. Parts are a secondary service on the homepage, and the operator's
+ * "Feature on the homepage" tick is the whole decision about which ones
+ * appear there; with none ticked the band introduces the catalogue without a
+ * product row rather than promoting parts nobody chose.
+ */
+export async function listFeaturedSpareParts(
+  limit: number = HOMEPAGE_SPARE_PARTS_LIMIT
+): Promise<PublicSparePartCard[]> {
+  const [rows, siteWide] = await Promise.all([
+    prisma.sparePart.findMany({
+      where: publicSparePartWhere({ isFeatured: true }),
+      orderBy: CARD_ORDER_BY,
+      take: Math.max(0, limit),
+      select: CARD_SELECT,
+    }),
+    siteWideVisibility(),
+  ])
+
+  return rows.map((row) => toCard(row, siteWide))
+}
+
 /* ── The category rail ───────────────────────────────────────────── */
 
 export interface PublicSparePartCategory {

@@ -9,6 +9,7 @@ import {
   removeSparePartCompatibilityAction,
   type FitmentFormState,
 } from "@/lib/actions/spare-part-compatibility.actions"
+import { AdminFormBadge, AdminFormSection } from "@/components/admin/admin-form"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -89,12 +90,22 @@ export function SparePartFitmentBoard({
   const notesId = useId()
 
   return (
-    <section className="flex flex-col gap-5 rounded-xl border border-border bg-card p-6">
-      <h2 className="font-heading text-h3 font-semibold">Fits these vehicles</h2>
+    <AdminFormSection
+      id="fitment"
+      title="Fits these vehicles"
+      description="An empty field widens the rule: no model means every model of that make, no year means any year. Customers searching by their own car find the part through these."
+      badge={
+        <AdminFormBadge tone={fitment.length === 0 ? "warning" : "neutral"}>
+          <span className="tabular-nums">{fitment.length}</span>
+          {fitment.length === 1 ? "rule" : "rules"}
+        </AdminFormBadge>
+      }
+      bodyClassName="flex flex-col gap-5"
+    >
 
       {state.status === "success" && state.message ? (
         <Alert>
-          <CheckCircle2 aria-hidden="true" className="text-gold-ink" />
+          <CheckCircle2 aria-hidden="true" className="text-success" />
           <AlertDescription>{state.message}</AlertDescription>
         </Alert>
       ) : null}
@@ -108,11 +119,11 @@ export function SparePartFitmentBoard({
 
       {/* ── What is already listed ─────────────────────────────── */}
       {fitment.length > 0 ? (
-        <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
+        <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border">
           {fitment.map((rule) => (
             <li
               key={rule.id}
-              className="flex items-start justify-between gap-3 px-4 py-3"
+              className="flex items-center justify-between gap-3 px-4 py-3 transition-colors duration-fast hover:bg-sunken/60"
             >
               <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="text-small font-medium text-foreground">
@@ -128,20 +139,22 @@ export function SparePartFitmentBoard({
           ))}
         </ul>
       ) : (
-        <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-small text-muted-foreground">
-          No fitment listed.
+        <p className="rounded-lg border border-dashed border-border bg-sunken/50 px-4 py-6 text-center text-small text-muted-foreground">
+          No fitment listed yet.
         </p>
       )}
 
       {/* ── Add one ────────────────────────────────────────────── */}
       <form
         action={formAction}
-        className="flex flex-col gap-4 rounded-lg border border-dashed border-border bg-secondary/40 p-4"
+        className="flex flex-col gap-4 rounded-lg border border-border bg-sunken/60 p-4"
         noValidate
       >
         <input type="hidden" name="sparePartId" value={sparePartId} />
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <p className="text-small font-medium text-foreground">Add a vehicle</p>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <FitmentField
             id={makeId}
             label="Make"
@@ -255,7 +268,7 @@ export function SparePartFitmentBoard({
           </Button>
         </div>
       </form>
-    </section>
+    </AdminFormSection>
   )
 }
 
@@ -323,8 +336,10 @@ function FitmentField({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">
+        {label}
+      </Label>
       {children}
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>

@@ -2,19 +2,14 @@
 
 import Link from "next/link"
 import { NavigationMenu } from "@base-ui/react/navigation-menu"
-import { ChevronDown, FileText, PackageSearch, type LucideIcon } from "lucide-react"
+import { ArrowRight, ChevronDown } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import type { NavGroup } from "@/lib/constants/nav-links"
 
-const ICONS: Record<NavGroup["children"][number]["icon"], LucideIcon> = {
-  track: PackageSearch,
-  quote: FileText,
-}
-
 /**
  * A header entry that opens a small menu — "Services", holding Track My Order
- * and Get a Quote.
+ * and Get a Quote as a short text list.
  *
  * Base UI's Navigation Menu rather than a hand-rolled hover panel: it opens on
  * hover *and* on click or tap, closes on Escape and on leaving, moves focus
@@ -56,11 +51,12 @@ export function ServicesMenu({
             </NavigationMenu.Icon>
           </NavigationMenu.Trigger>
 
-          <NavigationMenu.Content className="w-80 p-2 transition-opacity duration-base data-ending-style:opacity-0 data-starting-style:opacity-0">
-            <ul className="flex flex-col gap-1">
+          <NavigationMenu.Content className="w-52 p-1.5 transition-opacity duration-base data-ending-style:opacity-0 data-starting-style:opacity-0">
+            {/* Two words each, not cards: the labels already say what the pages
+                are, and a quiet list keeps the menu a glance rather than a read. */}
+            <ul className="flex flex-col">
               {group.children.map((child) => {
-                const Icon = ICONS[child.icon]
-                const current = pathname === child.href
+                const current = pathname === child.href || pathname.startsWith(`${child.href}/`)
 
                 return (
                   <li key={child.href}>
@@ -69,18 +65,22 @@ export function ServicesMenu({
                       active={current}
                       closeOnClick
                       className={cn(
-                        "group/item flex items-start gap-3 rounded-lg p-3 outline-none",
+                        "group/item flex items-center justify-between gap-3 rounded-md px-3 py-2.5 text-small font-medium outline-none",
                         "transition-colors duration-fast ease-crownline",
-                        "hover:bg-secondary focus-visible:bg-secondary data-active:bg-secondary"
+                        "text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:bg-secondary focus-visible:text-foreground",
+                        "data-active:text-gold-ink"
                       )}
                     >
-                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-foreground text-gold transition-transform duration-fast ease-crownline group-hover/item:-translate-y-0.5">
-                        <Icon aria-hidden="true" className="size-5" strokeWidth={1.75} />
-                      </span>
-                      <span className="flex flex-col gap-0.5">
-                        <span className="text-small font-semibold text-foreground">{child.label}</span>
-                        <span className="text-xs text-muted-foreground">{child.description}</span>
-                      </span>
+                      {child.label}
+                      <ArrowRight
+                        aria-hidden="true"
+                        className={cn(
+                          "size-3.5 transition-[opacity,translate] duration-fast ease-crownline",
+                          current
+                            ? "opacity-100"
+                            : "-translate-x-1 opacity-0 group-hover/item:translate-x-0 group-hover/item:opacity-100 group-focus-visible/item:translate-x-0 group-focus-visible/item:opacity-100"
+                        )}
+                      />
                     </NavigationMenu.Link>
                   </li>
                 )
@@ -91,10 +91,10 @@ export function ServicesMenu({
       </NavigationMenu.List>
 
       <NavigationMenu.Portal>
-        <NavigationMenu.Positioner sideOffset={18} align="start" alignOffset={-16} className="z-50">
+        <NavigationMenu.Positioner sideOffset={14} align="start" alignOffset={-12} className="z-50">
           <NavigationMenu.Popup
             className={cn(
-              "origin-[var(--transform-origin)] rounded-xl bg-popover text-popover-foreground",
+              "origin-[var(--transform-origin)] rounded-lg bg-popover text-popover-foreground",
               "shadow-[var(--shadow-raised)] ring-1 ring-foreground/10 outline-none",
               "transition-[opacity,scale,translate] duration-base ease-crownline",
               "data-starting-style:-translate-y-1 data-starting-style:scale-[0.98] data-starting-style:opacity-0",

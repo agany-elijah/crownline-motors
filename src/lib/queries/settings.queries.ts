@@ -4,7 +4,7 @@ import { cache } from "react"
 import { unstable_cache } from "next/cache"
 
 import { siteConfig } from "@/config/site"
-import type { BusinessSettings } from "@/generated/prisma/client"
+import { Prisma, type BusinessSettings } from "@/generated/prisma/client"
 import { AdminTheme } from "@/generated/prisma/enums"
 import {
   BRANDING_ASSET_KINDS,
@@ -58,6 +58,20 @@ import {
  */
 
 export const BUSINESS_SETTINGS_CACHE_TAG = "business-settings"
+
+/**
+ * Part of every settings cache key. **Bump it whenever the shape of a cached
+ * DTO changes** (a field renamed, added or regrouped).
+ *
+ * `unstable_cache` persists what it returns — in `.next/cache` locally, and in
+ * Vercel's Data Cache, which survives deployments. A tag invalidates entries
+ * when a setting is *saved*; nothing invalidates them when the *code* that
+ * built them changes. Without a version in the key, a deploy that renamed
+ * `catalogDisplay.vehicleCard` to `catalogDisplay.vehicle` went on serving the
+ * old object, and every reader of the new field got `undefined` — which is
+ * exactly how the homepage's prerender failed.
+ */
+const SETTINGS_CACHE_SHAPE_VERSION = "2026-09-19.2"
 
 /**
  * The spare-part steps stored in the Json column, or null when never
@@ -257,6 +271,12 @@ export interface PublicSiteSettings {
   trackingNumberPrefix: string
   trackingStages: TrackingStageConfig
   sparePartDeliverySteps: SparePartDeliveryStep[] | null
+  /**
+   * The default vehicle payment split, in percent, for explaining the
+   * payment stages to customers. Defaults only — what an order actually owes
+   * is locked into its own milestones when the quote is accepted.
+   */
+  paymentSchedule: { initial: number; mombasa: number; final: number }
 }
 
 /** Columns a public page may see. Supplier notes, security flags and the like are absent. */
@@ -288,6 +308,9 @@ const PUBLIC_COLUMNS = {
   trackingNumberPrefix: true,
   trackingStages: true,
   sparePartDeliverySteps: true,
+  defaultInitialPercentage: true,
+  defaultMombasaPercentage: true,
+  defaultFinalPercentage: true,
 } as const
 
 type PublicRow = { [K in keyof typeof PUBLIC_COLUMNS]: BusinessSettings[K] }
@@ -321,6 +344,10 @@ const PUBLIC_DEFAULT_ROW: PublicRow = {
   trackingNumberPrefix: "CLM",
   trackingStages: null,
   sparePartDeliverySteps: null,
+  // The schema's own column defaults.
+  defaultInitialPercentage: new Prisma.Decimal(50),
+  defaultMombasaPercentage: new Prisma.Decimal(25),
+  defaultFinalPercentage: new Prisma.Decimal(25),
 }
 
 function toPublicSiteSettings(row: PublicRow): PublicSiteSettings {
@@ -366,6 +393,13 @@ function toPublicSiteSettings(row: PublicRow): PublicSiteSettings {
     trackingNumberPrefix: row.trackingNumberPrefix,
     trackingStages: resolveTrackingStageConfig(row.trackingStages),
     sparePartDeliverySteps: parseStoredDeliverySteps(row.sparePartDeliverySteps),
+    // Numbers, not Decimals: this object is cached as JSON and handed to
+    // client components.
+    paymentSchedule: {
+      initial: row.defaultInitialPercentage.toNumber(),
+      mombasa: row.defaultMombasaPercentage.toNumber(),
+      final: row.defaultFinalPercentage.toNumber(),
+    },
   }
 }
 
@@ -378,7 +412,7 @@ const readPublicSiteSettings = unstable_cache(
     const row = await prisma.businessSettings.findUnique({ where: { id: 1 }, select: PUBLIC_COLUMNS })
     return toPublicSiteSettings(row ?? PUBLIC_DEFAULT_ROW)
   },
-  ["business-settings", "public-site-settings"],
+  ["business-settings", "public-site-settings", SETTINGS_CACHE_SHAPE_VERSION],
   { tags: [BUSINESS_SETTINGS_CACHE_TAG] }
 )
 
@@ -482,7 +516,7 @@ const readOperationalSettings = unstable_cache(
       defaultDashboardTheme: row.defaultDashboardTheme,
     }
   },
-  ["business-settings", "operational-settings"],
+  ["business-settings", "operational-settings", SETTINGS_CACHE_SHAPE_VERSION],
   { tags: [BUSINESS_SETTINGS_CACHE_TAG] }
 )
 

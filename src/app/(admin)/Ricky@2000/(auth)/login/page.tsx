@@ -76,7 +76,7 @@ export default async function AdminLoginPage(props: PageProps<"/Ricky@2000/login
     >
       {passwordUpdated ? (
         <Alert className="mb-5">
-          <CheckCircle2 aria-hidden="true" className="text-gold-ink" />
+          <CheckCircle2 aria-hidden="true" className="text-success" />
           <AlertDescription>
             Password updated. Sign in with your new password.
           </AlertDescription>
@@ -85,7 +85,7 @@ export default async function AdminLoginPage(props: PageProps<"/Ricky@2000/login
 
       {sessionNotice ? (
         <Alert className="mb-5">
-          <CheckCircle2 aria-hidden="true" className="text-gold-ink" />
+          <CheckCircle2 aria-hidden="true" className="text-success" />
           <AlertDescription>{sessionNotice}</AlertDescription>
         </Alert>
       ) : null}

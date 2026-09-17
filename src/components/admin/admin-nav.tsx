@@ -55,20 +55,21 @@ interface AdminNavProps {
  * the other is the classic version of that bug.
  *
  * `aria-current="page"` marks the active entry for screen readers; the gold
- * rail and background are the visual half of the same signal, never the
- * only half.
+ * needle, the raised background and the gold icon are the visual half of the
+ * same signal, never the only half.
+ *
+ * Painted with the `rail-*` tokens rather than the page's own, because the
+ * rail stays dark in both dashboard themes.
  */
 export function AdminNav({ groups, onNavigate }: AdminNavProps) {
   const pathname = usePathname()
 
   return (
-    <nav aria-label="Dashboard" className="flex flex-col gap-6">
+    <nav aria-label="Dashboard" className="flex flex-col gap-7">
       {groups.map((group, groupIndex) => (
         <div key={group.title ?? `group-${groupIndex}`} className="flex flex-col gap-1">
           {group.title ? (
-            <h2 className="px-3 pb-1 font-heading text-[0.625rem] font-bold tracking-[0.18em] text-background/65 uppercase">
-              {group.title}
-            </h2>
+            <h2 className="px-3 pb-1 text-meta text-rail-subtle uppercase">{group.title}</h2>
           ) : null}
 
           <ul className="flex flex-col gap-0.5">
@@ -83,12 +84,12 @@ export function AdminNav({ groups, onNavigate }: AdminNavProps) {
                 return (
                   <li key={link.href}>
                     <span
-                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-small text-background/55"
+                      className="flex h-9 items-center gap-3 rounded-md px-3 text-small text-rail-subtle"
                       aria-disabled="true"
                     >
-                      <Icon aria-hidden="true" className="size-4 shrink-0" />
+                      <Icon aria-hidden="true" className="size-4 shrink-0" strokeWidth={1.75} />
                       <span className="flex-1">{link.label}</span>
-                      <span className="rounded-4xl border border-white/25 px-1.5 py-0.5 text-[0.5625rem] font-semibold tracking-[0.08em] text-background/60 uppercase">
+                      <span className="rounded-full border border-rail-border px-1.5 text-[0.625rem] font-medium text-rail-subtle">
                         Soon
                       </span>
                     </span>
@@ -103,24 +104,34 @@ export function AdminNav({ groups, onNavigate }: AdminNavProps) {
                     onClick={onNavigate}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "relative flex items-center gap-3 rounded-lg px-3 py-2 text-small font-medium",
-                      "transition-colors duration-fast",
+                      "group/nav relative flex h-9 items-center gap-3 rounded-md px-3 text-small font-medium",
+                      "transition-colors duration-fast ease-crownline",
                       "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold",
                       active
-                        ? "bg-white/10 text-background"
-                        : "text-background/75 hover:bg-white/5 hover:text-background"
+                        ? "bg-rail-raised text-rail-foreground"
+                        : "text-rail-muted hover:bg-rail-raised/55 hover:text-rail-foreground"
                     )}
                   >
-                    {/* The gold rail. Decorative — aria-current carries the
-                        same meaning for anyone not seeing it. */}
-                    {active ? (
-                      <span
-                        aria-hidden="true"
-                        className="absolute top-1.5 bottom-1.5 -left-px w-0.5 rounded-r bg-gold"
-                      />
-                    ) : null}
-                    <Icon aria-hidden="true" className="size-4 shrink-0" />
-                    {link.label}
+                    {/* The gold needle at the rail's inner edge. Decorative —
+                        aria-current carries the same meaning for anyone not
+                        seeing it. */}
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "absolute top-1/2 -left-3 h-4 w-0.75 -translate-y-1/2 rounded-r-full bg-gold",
+                        "origin-left transition-[opacity,scale] duration-fast ease-crownline",
+                        active ? "scale-y-100 opacity-100" : "scale-y-0 opacity-0"
+                      )}
+                    />
+                    <Icon
+                      aria-hidden="true"
+                      strokeWidth={1.75}
+                      className={cn(
+                        "size-4 shrink-0 transition-colors duration-fast",
+                        active ? "text-gold" : "text-rail-subtle group-hover/nav:text-rail-foreground"
+                      )}
+                    />
+                    <span className="truncate">{link.label}</span>
                   </Link>
                 </li>
               )

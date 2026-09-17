@@ -110,9 +110,6 @@ export function TrackingResult({
                   <span className="text-title font-semibold">
                     {formatDateRange(result.expectedDelivery.earliest, result.expectedDelivery.latest)}
                   </span>
-                  <span className="text-xs text-muted-foreground">
-                    An estimate from our team, updated as the schedule firms up.
-                  </span>
                 </div>
               </div>
             ) : null}

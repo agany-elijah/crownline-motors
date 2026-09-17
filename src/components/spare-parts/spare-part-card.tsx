@@ -140,7 +140,10 @@ export function SparePartCard({
               alt={part.photoAltText ?? part.name}
               fill
               sizes={sizes}
-              priority={priority}
+              // Several first-row cards can be the largest paint, so they load
+              // eagerly at high priority rather than each being `preload`ed.
+              loading={priority ? "eager" : undefined}
+              fetchPriority={priority ? "high" : undefined}
               className={cn(
                 "object-cover",
                 // Named explicitly rather than through a utility, because

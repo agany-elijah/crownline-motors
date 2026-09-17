@@ -58,20 +58,21 @@ interface CartSummaryProps {
   /**
    * Which surface the trigger is sitting on.
    *
-   * The header goes transparent over the homepage's dark hero, and a control
-   * painted `bg-card` with `text-foreground` disappears into it — the same
-   * problem the nav links solve with their own tone prop. `dark` swaps to a
-   * translucent white treatment that reads on photography.
+   * A control painted `bg-card` with `text-foreground` disappears into a dark
+   * surface or photography — the same problem the nav links solve with their
+   * own tone prop. `dark` swaps to a translucent white treatment.
    *
    * The badge does not change: it is gold on both, which is legible on either
    * surface and is the one part of this control that should stay constant,
    * because the number is the whole point of it.
    */
   tone?: "light" | "dark"
+  /** Adds the words "Parts list" beside the glyph from `sm` up, where the row has room. */
+  labelled?: boolean
   className?: string
 }
 
-export function CartSummary({ tone = "light", className }: CartSummaryProps) {
+export function CartSummary({ tone = "light", labelled = false, className }: CartSummaryProps) {
   const { items, count, subtotal, ready, setQuantity, remove, clear } = useCart()
   const [open, setOpen] = React.useState(false)
   const [view, setView] = React.useState<"list" | "request">("list")
@@ -134,7 +135,11 @@ export function CartSummary({ tone = "light", className }: CartSummaryProps) {
           aria-label={`Cart · ${count}`}
           aria-haspopup="dialog"
           className={cn(
-            "relative inline-flex size-9 shrink-0 items-center justify-center rounded-[6px] border",
+            "relative inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-[6px] border",
+            labelled ? "w-9 sm:w-auto sm:px-3" : "w-9",
+            // Arrives with a small pop when the first part is added, so the
+            // control that just appeared is the one the eye goes to.
+            "animate-in fade-in-0 zoom-in-75 duration-base",
             "transition-[background-color,border-color,box-shadow] duration-fast ease-crownline",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
             tone === "dark"
@@ -144,6 +149,11 @@ export function CartSummary({ tone = "light", className }: CartSummaryProps) {
           )}
         >
           <ShoppingCart aria-hidden="true" className="size-5" />
+          {labelled ? (
+            <span aria-hidden="true" className="hidden text-small font-medium sm:inline">
+              Parts list
+            </span>
+          ) : null}
 
           {/*
             The count, as a badge on the corner of the glyph rather than a

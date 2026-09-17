@@ -43,12 +43,17 @@ export function QuoteStatusControl({ quoteId, status }: QuoteStatusControlProps)
   const transitions = MANUAL_QUOTE_TRANSITIONS[status]
 
   return (
-    <div className="flex flex-col gap-3">
-      <h2 className="text-meta text-muted-foreground">Status</h2>
+    <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-[var(--shadow-subtle)]">
+      <div className="flex flex-col gap-0.5">
+        <h2 className="text-small font-medium text-foreground">Status</h2>
+        <p className="text-xs text-muted-foreground">
+          Sending and converting move a quote on by themselves; these are the other moves.
+        </p>
+      </div>
 
       {state.status === "success" && state.message ? (
         <Alert>
-          <CheckCircle2 aria-hidden="true" className="text-gold-ink" />
+          <CheckCircle2 aria-hidden="true" className="text-success" />
           <AlertDescription>{state.message}</AlertDescription>
         </Alert>
       ) : null}
@@ -60,7 +65,9 @@ export function QuoteStatusControl({ quoteId, status }: QuoteStatusControlProps)
         </Alert>
       ) : null}
 
-      {transitions.length === 0 ? null : (
+      {transitions.length === 0 ? (
+        <p className="text-small text-muted-foreground">No further moves from here.</p>
+      ) : (
         <div className="flex flex-wrap gap-2">
           {transitions.map((target) => {
             const needsReason = target === QuoteStatus.REJECTED || target === QuoteStatus.EXPIRED
@@ -123,6 +130,6 @@ export function QuoteStatusControl({ quoteId, status }: QuoteStatusControlProps)
           })}
         </div>
       )}
-    </div>
+    </section>
   )
 }

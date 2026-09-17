@@ -1,4 +1,5 @@
 import * as React from "react"
+import Link from "next/link"
 
 import { cn } from "@/lib/utils"
 import {
@@ -83,24 +84,23 @@ export function DataTable<TRow>({
     // scrolls sideways on a phone.
     <div
       className={cn(
-        "w-full overflow-x-auto rounded-xl border border-border bg-card",
+        "w-full overflow-x-auto rounded-xl border border-border bg-card shadow-[var(--shadow-subtle)]",
         className
       )}
     >
-      <Table>
+      <Table className="text-small">
         {caption ? <caption className="sr-only">{caption}</caption> : null}
 
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
+        <TableHeader className="[&_tr]:border-border">
+          <TableRow className="bg-sunken/70 hover:bg-sunken/70">
             {columns.map((column) => (
               <TableHead
                 key={column.id}
                 className={cn(
-                  // foreground/70 rather than --muted-foreground: at 10px,
-                  // uppercase and widely tracked, a column heading needs
-                  // more contrast than body-adjacent secondary text, not
-                  // less. Measured at 7.4:1 on --card.
-                  "text-[0.625rem] font-bold tracking-[0.13em] text-foreground/70 uppercase",
+                  // Sentence case at 12px rather than tracked capitals: a
+                  // header row is read once, then the eye lives in the body,
+                  // and capitals are the loudest thing a table can carry.
+                  "h-10 px-4 text-xs font-medium text-muted-foreground first:pl-5 last:pr-5",
                   column.align === "right" && "text-right",
                   column.hideBelow && HIDE_CLASSES[column.hideBelow]
                 )}
@@ -113,12 +113,15 @@ export function DataTable<TRow>({
 
         <TableBody>
           {rows.map((row) => (
-            <TableRow key={getRowKey(row)}>
+            <TableRow
+              key={getRowKey(row)}
+              className="border-border/70 transition-colors duration-fast hover:bg-sunken/55"
+            >
               {columns.map((column) => (
                 <TableCell
                   key={column.id}
                   className={cn(
-                    "align-middle",
+                    "h-14 px-4 align-middle first:pl-5 last:pr-5",
                     column.align === "right" && "text-right",
                     column.hideBelow && HIDE_CLASSES[column.hideBelow]
                   )}
@@ -131,5 +134,46 @@ export function DataTable<TRow>({
         </TableBody>
       </Table>
     </div>
+  )
+}
+
+/**
+ * The first cell of most dashboard rows: what the record is, linked to it, with
+ * the reference that identifies it underneath in the mono face.
+ *
+ * One component so every list reads the same way — the name is the target, the
+ * reference is for matching against a phone call or an email.
+ */
+export function DataTableRecordLink({
+  href,
+  title,
+  reference,
+  leading,
+}: {
+  href: string
+  title: React.ReactNode
+  /** Mono secondary line: a reference number, part number, email. */
+  reference?: React.ReactNode
+  /** An optional thumbnail or mark before the text. */
+  leading?: React.ReactNode
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "group/record flex min-w-0 items-center gap-3 rounded-sm",
+        "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+      )}
+    >
+      {leading}
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="truncate font-medium text-foreground transition-colors duration-fast group-hover/record:text-gold-ink">
+          {title}
+        </span>
+        {reference ? (
+          <span className="truncate font-mono text-xs text-muted-foreground">{reference}</span>
+        ) : null}
+      </span>
+    </Link>
   )
 }

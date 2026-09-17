@@ -10,10 +10,19 @@
   --color-foreground: var(--foreground);
   /* Manrope for headings, Inter for body/UI. `font-heading` is a real,
      separate family here — not an alias of font-sans — so headings carry
-     their own voice. No bundled mono family: see layout.tsx. */
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-heading: var(--font-manrope), var(--font-inter), ui-sans-serif, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+     their own voice. No bundled mono family on the public site: see
+     layout.tsx.
+
+     Each family resolves through an `--app-font-*` property rather than
+     naming the loaded font directly. This block is `inline`, so a utility
+     is compiled with its value written out — a family named here could not
+     be changed for one part of the application. Pointing at a property
+     instead lets the staff dashboard swap in its own families on its own
+     surface (see "Admin console" at the end of this file) while every
+     public page compiles and renders exactly as before. */
+  --font-sans: var(--app-font-sans);
+  --font-heading: var(--app-font-heading);
+  --font-mono: var(--app-font-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -56,6 +65,21 @@
   --color-gold-bright-foreground: var(--gold-bright-foreground);
   --color-charcoal: var(--charcoal);
   --color-price: var(--price);
+  /* The deepest showroom black — the homepage's alternate band beneath the
+     dark canvas, so two dark sections in a row still read as two. */
+  --color-night: var(--night);
+
+  /* Staff dashboard surfaces. `sunken` is the recessed band behind a table
+     header or an inset list; the `rail-*` set paints the navigation rail,
+     which stays dark in both dashboard themes. Values live in :root and are
+     tuned for the dashboard under "Admin console" at the end of this file. */
+  --color-sunken: var(--sunken);
+  --color-rail: var(--rail);
+  --color-rail-raised: var(--rail-raised);
+  --color-rail-border: var(--rail-border);
+  --color-rail-foreground: var(--rail-foreground);
+  --color-rail-muted: var(--rail-muted);
+  --color-rail-subtle: var(--rail-subtle);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -138,25 +162,34 @@
      Negative tracking tightens as size grows, which is what stops large
      headings reading loose and web-default; the uppercase `meta` step
      goes the other way with wide positive tracking for eyebrow labels. */
-  --text-display: clamp(2.75rem, 1.6rem + 5.2vw, 5.25rem);
-  --text-display--line-height: 0.95;
-  --text-display--letter-spacing: -0.035em;
-  --text-display--font-weight: 700;
+  --text-display: var(--type-display);
+  --text-display--line-height: var(--type-display-line-height);
+  --text-display--letter-spacing: var(--type-display-letter-spacing);
+  --text-display--font-weight: var(--type-display-font-weight);
 
-  --text-h1: clamp(2.125rem, 1.4rem + 3.2vw, 3.5rem);
-  --text-h1--line-height: 1.05;
-  --text-h1--letter-spacing: -0.03em;
-  --text-h1--font-weight: 700;
+  /* The homepage hero's three-line positioning statement. Its own step
+     because neither neighbour fits: `display` is sized for one or two short
+     words and breaks "Global Standards." across two lines beside the
+     vehicle finder, and `h1` is too quiet for the first thing on the site. */
+  --text-hero: var(--type-hero);
+  --text-hero--line-height: var(--type-display-line-height);
+  --text-hero--letter-spacing: var(--type-display-letter-spacing);
+  --text-hero--font-weight: var(--type-display-font-weight);
 
-  --text-h2: clamp(1.625rem, 1.2rem + 1.9vw, 2.5rem);
-  --text-h2--line-height: 1.15;
-  --text-h2--letter-spacing: -0.022em;
-  --text-h2--font-weight: 600;
+  --text-h1: var(--type-h1);
+  --text-h1--line-height: var(--type-h1-line-height);
+  --text-h1--letter-spacing: var(--type-h1-letter-spacing);
+  --text-h1--font-weight: var(--type-h1-font-weight);
 
-  --text-h3: clamp(1.1875rem, 1.05rem + 0.7vw, 1.5rem);
-  --text-h3--line-height: 1.3;
-  --text-h3--letter-spacing: -0.015em;
-  --text-h3--font-weight: 600;
+  --text-h2: var(--type-h2);
+  --text-h2--line-height: var(--type-h2-line-height);
+  --text-h2--letter-spacing: var(--type-h2-letter-spacing);
+  --text-h2--font-weight: var(--type-h2-font-weight);
+
+  --text-h3: var(--type-h3);
+  --text-h3--line-height: var(--type-h3-line-height);
+  --text-h3--letter-spacing: var(--type-h3-letter-spacing);
+  --text-h3--font-weight: var(--type-h3-font-weight);
 
   /* Card and tile headings — and, on a vehicle card, the price beside
      them. Deliberately NOT fluid, unlike display–h3. A fluid heading is
@@ -171,25 +204,25 @@
      weight than the specification line underneath them, and a grid of
      cards read as uniformly grey. This is the step that makes the identity
      band the first thing the eye lands on after the photograph. */
-  --text-title: 1.3125rem;
-  --text-title--line-height: 1.35;
-  --text-title--letter-spacing: -0.012em;
-  --text-title--font-weight: 600;
+  --text-title: var(--type-title);
+  --text-title--line-height: var(--type-title-line-height);
+  --text-title--letter-spacing: var(--type-title-letter-spacing);
+  --text-title--font-weight: var(--type-title-font-weight);
 
-  --text-body-lg: 1.0625rem;
-  --text-body-lg--line-height: 1.65;
+  --text-body-lg: var(--type-body-lg);
+  --text-body-lg--line-height: var(--type-body-lg-line-height);
 
-  --text-body: 0.9375rem;
-  --text-body--line-height: 1.65;
+  --text-body: var(--type-body);
+  --text-body--line-height: var(--type-body-line-height);
 
-  --text-small: 0.8125rem;
-  --text-small--line-height: 1.55;
+  --text-small: var(--type-small);
+  --text-small--line-height: var(--type-small-line-height);
 
   /* Eyebrow / label / spec-key text. Always uppercase in use. */
-  --text-meta: 0.6875rem;
-  --text-meta--line-height: 1.4;
-  --text-meta--letter-spacing: 0.14em;
-  --text-meta--font-weight: 600;
+  --text-meta: var(--type-meta);
+  --text-meta--line-height: var(--type-meta-line-height);
+  --text-meta--letter-spacing: var(--type-meta-letter-spacing);
+  --text-meta--font-weight: var(--type-meta-font-weight);
 
   /* ── Elevation ────────────────────────────────────────────────
      Deliberately shallow. Premium reads as a soft, wide, low-opacity
@@ -337,6 +370,78 @@
   --price: oklch(0.56 0.13 152);
 
   --charcoal: oklch(0.22 0.004 90);
+  --night: oklch(0.085 0.003 90);
+
+  /* ── Families and type scale ───────────────────────────────────
+     The values behind `font-sans`/`font-heading`/`font-mono` and the
+     `text-display` … `text-meta` steps declared in the theme block above.
+     Defined here, on :root, so a surface with different needs (the staff
+     dashboard) can redefine them for its own subtree. The public site reads
+     these values and nothing else — change the scale here, not above. */
+  --app-font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --app-font-heading: var(--font-manrope), var(--font-inter), ui-sans-serif, sans-serif;
+  --app-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --type-display: clamp(2.75rem, 1.6rem + 5.2vw, 5.25rem);
+  --type-display-line-height: 0.95;
+  --type-display-letter-spacing: -0.035em;
+  --type-display-font-weight: 700;
+  --type-hero: clamp(2.25rem, 0.9rem + 4vw, 4.75rem);
+  --type-h1: clamp(2.125rem, 1.4rem + 3.2vw, 3.5rem);
+  --type-h1-line-height: 1.05;
+  --type-h1-letter-spacing: -0.03em;
+  --type-h1-font-weight: 700;
+  --type-h2: clamp(1.625rem, 1.2rem + 1.9vw, 2.5rem);
+  --type-h2-line-height: 1.15;
+  --type-h2-letter-spacing: -0.022em;
+  --type-h2-font-weight: 600;
+  --type-h3: clamp(1.1875rem, 1.05rem + 0.7vw, 1.5rem);
+  --type-h3-line-height: 1.3;
+  --type-h3-letter-spacing: -0.015em;
+  --type-h3-font-weight: 600;
+  --type-title: 1.3125rem;
+  --type-title-line-height: 1.35;
+  --type-title-letter-spacing: -0.012em;
+  --type-title-font-weight: 600;
+  --type-body-lg: 1.0625rem;
+  --type-body-lg-line-height: 1.65;
+  --type-body: 0.9375rem;
+  --type-body-line-height: 1.65;
+  --type-small: 0.8125rem;
+  --type-small-line-height: 1.55;
+  --type-meta: 0.6875rem;
+  --type-meta-line-height: 1.4;
+  --type-meta-letter-spacing: 0.14em;
+  --type-meta-font-weight: 600;
+
+  /* ── Primitive hooks ───────────────────────────────────────────
+     Measurements a shared primitive reads instead of hard-coding, so one
+     surface can tune density without forking the component.
+
+     --control-height  text inputs and native selects. 44px: the smallest
+                       reliably tappable field on a phone (see input.tsx).
+     --button-lift     how far a button rises under the pointer.
+     --shadow-overlay  dialogs. None on the public site, where the backdrop
+                       blur already separates the panel. */
+  --control-height: 2.75rem;
+  --button-lift: 0.125rem;
+  --alert-padding-x: 0.625rem;
+  --alert-padding-y: 0.5rem;
+  --dialog-padding: 1rem;
+  --dialog-title-size: 1rem;
+  --dialog-title-weight: 500;
+  --shadow-overlay: 0 0 #0000;
+  /* The chevron a native <select> draws once its platform arrow is removed
+     with `appearance-none`. A mid-grey that holds against both dashboard
+     themes, because a data URI cannot follow a custom property. */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b8880' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+
+  --sunken: oklch(0.965 0.003 90);
+  --rail: oklch(0.17 0.004 85);
+  --rail-raised: oklch(0.225 0.005 85);
+  --rail-border: oklch(1 0 0 / 0.07);
+  --rail-foreground: oklch(0.965 0.003 85);
+  --rail-muted: oklch(0.74 0.004 85);
+  --rail-subtle: oklch(0.6 0.004 85);
 
   /* Height of a pinned mobile action bar, excluding the safe-area inset it
      pads itself with. Declared once here because three separate things
@@ -859,4 +964,442 @@
     outline: 2px solid var(--gold);
     outline-offset: 4px;
   }
+}
+
+/* ══ Showroom motion ═══════════════════════════════════════════════════
+   The public site's marketing surfaces are where motion is part of the brief rather
+   than a courtesy: words rise into place, routes draw themselves, counts run
+   up. Everything here is CSS, so it costs no client JavaScript beyond the
+   one-line observer in components/motion/in-view.tsx, and it follows the two
+   rules the rest of this file keeps:
+
+   - Hidden starting states exist only under
+     `(scripting: enabled) and (prefers-reduced-motion: no-preference)`. A
+     visitor without JavaScript, or who has asked for less motion, gets the
+     finished page and nothing to wait for.
+   - Reveals are one-way. `data-inview` flips to "true" once and never back,
+     so nothing fades out or re-animates on the way back up the page.
+
+   Two triggers:
+     .load-*  plays on first paint — only for the hero, which is already on
+              screen and must not wait for hydration to become readable.
+     .rv-*    plays when the nearest `[data-inview]` ancestor scrolls into
+              view. Do not nest two InView wrappers: an inner, unrevealed one
+              would be matched through its revealed parent.
+
+   Stagger is `--d` (a delay in ms) set inline per element. */
+
+@property --count {
+  syntax: "<integer>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* A number that counts up from zero. The target is `--to`; the visible
+   figure is drawn by a CSS counter, so the markup pairs it with a real,
+   screen-reader-only number (see components/motion/count-up.tsx). Where
+   `@property` is unsupported the animation is discrete and the final figure
+   simply appears. */
+.count-up {
+  --count: var(--to, 0);
+  counter-reset: count var(--count);
+}
+
+.count-up::after {
+  content: counter(count);
+}
+
+/* The gold sweep across the hero's last line. Static gold under reduced
+   motion — the gradient is still clipped to the text, only the sweep stops. */
+.text-gold-sheen {
+  background-image: linear-gradient(
+    100deg,
+    var(--gold) 0%,
+    var(--gold) 38%,
+    oklch(0.97 0.05 92) 50%,
+    var(--gold) 62%,
+    var(--gold) 100%
+  );
+  background-size: 260% 100%;
+  background-position: 0% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* A faint dot lattice for dark feature bands. Masked towards the edges so
+   it reads as texture in the middle of the section, never as a pattern
+   that stops at a hard line. */
+.bg-dot-grid {
+  background-image: radial-gradient(oklch(1 0 0 / 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, black 30%, transparent 80%);
+}
+
+/* The deeper glass pane behind the hero's words: opaque where the copy sits
+   and clearing away from it — upwards on a phone, where the copy sits at the
+   bottom; leftwards from `lg`, where it sits on the right. */
+.hero-glass {
+  mask-image: linear-gradient(to top, black 35%, transparent 80%);
+}
+
+@media (width >= 64rem) {
+  .hero-glass {
+    mask-image: linear-gradient(to left, black 22%, transparent 62%);
+  }
+}
+
+/* The FAQ accordion opens by animating its height, where the browser can
+   interpolate to `auto`; elsewhere it opens instantly, which is still correct.
+   The question and answer themselves are plain, readable text either way. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (interpolate-size: allow-keywords) {
+    .faq-item {
+      interpolate-size: allow-keywords;
+    }
+
+    .faq-item::details-content {
+      block-size: 0;
+      overflow-y: clip;
+      opacity: 0;
+      transition:
+        block-size var(--duration-base) var(--ease-crownline),
+        opacity var(--duration-base) var(--ease-crownline),
+        content-visibility var(--duration-base) allow-discrete;
+    }
+
+    .faq-item[open]::details-content {
+      block-size: auto;
+      opacity: 1;
+    }
+  }
+}
+
+@keyframes home-rise {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes home-word {
+  from {
+    transform: translateY(110%) rotate(4deg);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes home-slide-left {
+  from {
+    opacity: 0;
+    transform: translateX(48px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes home-settle {
+  from {
+    scale: 1.14;
+  }
+  to {
+    scale: 1;
+  }
+}
+
+@keyframes home-count {
+  from {
+    --count: 0;
+  }
+}
+
+@keyframes home-sheen {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
+@keyframes home-scroll-cue {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes home-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--gold) 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 12px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .load-rise {
+    animation: home-rise 900ms var(--ease-crownline) var(--d, 0ms) both;
+  }
+
+  .load-word {
+    animation: home-word 1000ms var(--ease-crownline) var(--d, 0ms) both;
+  }
+
+  .load-slide-left {
+    animation: home-slide-left 1100ms var(--ease-crownline) var(--d, 0ms) both;
+  }
+
+  .load-settle {
+    animation: home-settle 2600ms var(--ease-crownline) both;
+  }
+
+  .load-count {
+    animation: home-count 1800ms var(--ease-crownline) var(--d, 0ms) both;
+  }
+
+  .text-gold-sheen.load-word {
+    animation:
+      home-word 1000ms var(--ease-crownline) var(--d, 0ms) both,
+      home-sheen 1600ms var(--ease-crownline-soft) calc(var(--d, 0ms) + 700ms) both;
+  }
+
+  .scroll-cue-dot {
+    animation: home-scroll-cue 1800ms var(--ease-crownline-soft) infinite;
+  }
+
+  .pulse-ring {
+    animation: home-pulse-ring 1800ms var(--ease-crownline-soft) infinite;
+  }
+}
+
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  [data-inview] .rv-up {
+    opacity: 0;
+    transform: translateY(32px);
+    transition:
+      opacity 800ms var(--ease-crownline) var(--d, 0ms),
+      transform 800ms var(--ease-crownline) var(--d, 0ms);
+  }
+
+  [data-inview] .rv-word {
+    transform: translateY(110%) rotate(4deg);
+    transition: transform 900ms var(--ease-crownline) var(--d, 0ms);
+  }
+
+  /* Icons arrive with a slight overshoot — the one spring on the page, kept
+     to something the size of a thumbnail. */
+  [data-inview] .rv-icon {
+    opacity: 0;
+    transform: scale(0.4) rotate(-18deg);
+    transition:
+      opacity 500ms var(--ease-crownline) var(--d, 0ms),
+      transform 700ms cubic-bezier(0.34, 1.56, 0.64, 1) var(--d, 0ms);
+  }
+
+  [data-inview] .rv-draw-x,
+  [data-inview] .rv-draw-y {
+    transition: transform 1800ms var(--ease-crownline-soft) var(--d, 0ms);
+  }
+
+  [data-inview] .rv-draw-x {
+    transform: scaleX(0);
+    transform-origin: left center;
+  }
+
+  [data-inview] .rv-draw-y {
+    transform: scaleY(0);
+    transform-origin: center top;
+  }
+
+  [data-inview] .rv-pop {
+    opacity: 0;
+    transform: scale(0.3);
+    transition:
+      opacity 400ms var(--ease-crownline) var(--d, 0ms),
+      transform 700ms cubic-bezier(0.34, 1.56, 0.64, 1) var(--d, 0ms);
+  }
+
+  /* A photograph uncovered from the bottom edge up while it settles from a
+     slight zoom — the frame opens, then the picture comes to rest in it. */
+  [data-inview] .rv-unveil {
+    clip-path: inset(100% 0 0 0);
+    transition: clip-path 1200ms var(--ease-crownline) var(--d, 0ms);
+  }
+
+  [data-inview] .rv-unveil img {
+    scale: 1.2;
+    transition: scale 1800ms var(--ease-crownline) var(--d, 0ms);
+  }
+
+  [data-inview="true"] :is(.rv-up, .rv-word, .rv-icon, .rv-draw-x, .rv-draw-y, .rv-pop) {
+    opacity: 1;
+    transform: none;
+  }
+
+  [data-inview="true"] .rv-unveil {
+    clip-path: inset(0 0 0 0);
+  }
+
+  [data-inview="true"] .rv-unveil img {
+    scale: 1;
+  }
+}
+
+/* ══ Admin console ═══════════════════════════════════════════════════
+   The staff dashboard's own surface: the same brand — the gold, the
+   warm neutrals — tuned for a tool used all day rather than a showroom.
+
+   Everything here is a redefinition of existing tokens, scoped to
+   `[data-admin]`. That attribute is set by the admin layout on the wrapper
+   around every staff screen, and mirrored onto <html> after hydration so
+   dialogs and menus portalled to <body> resolve the same values (see
+   components/admin/admin-surface.tsx). No component reads an admin-only
+   token by a different name, so a primitive shared with the public site
+   renders in dashboard proportions here and unchanged everywhere else.
+
+   What changes, and why:
+   - Families: Geist for the interface, Geist Mono for references — order,
+     quote and tracking numbers an operator matches character by character.
+     Money, dates and counts stay in Geist with tabular figures: in a
+     monospace face the thousands separator takes a full cell, and
+     "$47 , 875" reads as broken.
+   - Scale: fixed steps an operator's eye learns once, sized for panels
+     rather than for a hero. A 40px page title belongs on a showroom page;
+     on a list an operator opens forty times a day it is noise.
+   - Surfaces: an off-white canvas with brighter panels and hairline
+     borders, so structure comes from edges rather than shadows.
+   - Motion: controls do not rise under the pointer. A console that moves
+     under every hover feels busy; colour and border carry the feedback.
+
+   Deliberately unlayered, after :root and .dark, so these win on
+   specificity against the defaults and nothing else has to change order.
+   The light block excludes `.dark`, so on <html>, where both markers sit
+   together in the dark theme, only the dark block applies. */
+[data-admin] {
+  --app-font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --app-font-heading: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --app-font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --type-h1: 1.875rem;
+  --type-h1-line-height: 1.2;
+  --type-h1-letter-spacing: -0.028em;
+  --type-h1-font-weight: 600;
+  --type-h2: 1.625rem;
+  --type-h2-line-height: 1.2;
+  --type-h2-letter-spacing: -0.026em;
+  --type-h2-font-weight: 600;
+  --type-h3: 1rem;
+  --type-h3-line-height: 1.4;
+  --type-h3-letter-spacing: -0.012em;
+  --type-h3-font-weight: 600;
+  --type-title: 0.9375rem;
+  --type-title-line-height: 1.4;
+  --type-title-letter-spacing: -0.008em;
+  --type-title-font-weight: 600;
+  --type-body-lg: 0.9375rem;
+  --type-body-lg-line-height: 1.6;
+  --type-body: 0.875rem;
+  --type-body-line-height: 1.55;
+  --type-small: 0.8125rem;
+  --type-small-line-height: 1.5;
+  --type-meta: 0.6875rem;
+  --type-meta-line-height: 1.4;
+  --type-meta-letter-spacing: 0.06em;
+  --type-meta-font-weight: 500;
+
+  --control-height: 2.5rem;
+  --button-lift: 0px;
+  --alert-padding-x: 1rem;
+  --alert-padding-y: 0.75rem;
+  --dialog-padding: 1.5rem;
+  --dialog-title-size: 1.0625rem;
+  --dialog-title-weight: 600;
+  --radius: 0.5rem;
+
+  font-family: var(--app-font-sans);
+}
+
+/* Phones keep the full 44px field: the density a desk needs is a
+   mis-tap on a touch screen. */
+@media (width < 48rem) {
+  [data-admin] {
+    --control-height: 2.75rem;
+    --type-h2: 1.375rem;
+  }
+}
+
+[data-admin]:not(.dark) {
+  --background: oklch(0.973 0.002 85);
+  --foreground: oklch(0.2 0.006 85);
+  --card: oklch(0.996 0.001 85);
+  --card-foreground: oklch(0.2 0.006 85);
+  --popover: oklch(0.996 0.001 85);
+  --popover-foreground: oklch(0.2 0.006 85);
+  --secondary: oklch(0.953 0.003 85);
+  --secondary-foreground: oklch(0.24 0.006 85);
+  --muted: oklch(0.953 0.003 85);
+  /* 7.3:1 on --card. Most of a dashboard is secondary text at 13px; it
+     has to read as quiet, not as faint. */
+  --muted-foreground: oklch(0.465 0.006 85);
+  --accent: oklch(0.955 0.03 88);
+  --accent-foreground: oklch(0.2 0.01 88);
+  --border: oklch(0.908 0.004 85);
+  /* Fields carry a slightly firmer edge than panels, so an empty input
+     still reads as somewhere to type. */
+  --input: oklch(0.872 0.005 85);
+  --sunken: oklch(0.963 0.003 85);
+
+  --shadow-subtle: 0 1px 2px oklch(0.2 0.01 85 / 0.05);
+  --shadow-raised: 0 1px 2px oklch(0.2 0.01 85 / 0.05), 0 8px 24px -6px oklch(0.2 0.01 85 / 0.12);
+  --shadow-overlay: 0 1px 2px oklch(0.2 0.01 85 / 0.06), 0 24px 56px -12px oklch(0.2 0.01 85 / 0.28);
+  /* The gold button as a crisp object rather than a glow: a contact
+     shadow and a hairline of light along the top edge. */
+  --shadow-gold: 0 1px 2px oklch(0.3 0.06 80 / 0.24), inset 0 1px 0 oklch(1 0 0 / 0.28);
+  --shadow-gold-strong: 0 2px 6px oklch(0.3 0.06 80 / 0.28), inset 0 1px 0 oklch(1 0 0 / 0.32);
+}
+
+[data-admin] .dark,
+[data-admin].dark {
+  --background: oklch(0.152 0.003 85);
+  --foreground: oklch(0.955 0.003 85);
+  --card: oklch(0.188 0.004 85);
+  --card-foreground: oklch(0.955 0.003 85);
+  --popover: oklch(0.205 0.004 85);
+  --popover-foreground: oklch(0.955 0.003 85);
+  --secondary: oklch(0.235 0.004 85);
+  --secondary-foreground: oklch(0.93 0.003 85);
+  --muted: oklch(0.235 0.004 85);
+  --muted-foreground: oklch(0.72 0.005 85);
+  --accent: oklch(0.262 0.035 88);
+  --accent-foreground: oklch(0.95 0.02 88);
+  --border: oklch(1 0 0 / 0.085);
+  --input: oklch(1 0 0 / 0.14);
+  --sunken: oklch(0.17 0.003 85);
+
+  --rail: oklch(0.118 0.003 85);
+  --rail-raised: oklch(0.19 0.004 85);
+  --rail-border: oklch(1 0 0 / 0.06);
+
+  --shadow-subtle: 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-raised: 0 1px 2px oklch(0 0 0 / 0.3), 0 12px 32px -8px oklch(0 0 0 / 0.5);
+  --shadow-overlay: 0 0 0 1px oklch(1 0 0 / 0.06), 0 28px 64px -12px oklch(0 0 0 / 0.7);
+  --shadow-gold: 0 1px 2px oklch(0 0 0 / 0.4), inset 0 1px 0 oklch(1 0 0 / 0.3);
+  --shadow-gold-strong: 0 2px 8px oklch(0 0 0 / 0.45), inset 0 1px 0 oklch(1 0 0 / 0.34);
 }

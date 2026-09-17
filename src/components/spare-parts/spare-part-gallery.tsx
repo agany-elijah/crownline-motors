@@ -87,7 +87,7 @@ export function SparePartGallery({ photos, partName }: SparePartGalleryProps) {
               alt={describe(index)}
               fill
               sizes="(min-width: 1024px) 40vw, 100vw"
-              priority={index === 0}
+              preload={index === 0}
               loading={index === 0 ? undefined : "lazy"}
               className={cn(
                 "object-contain transition-opacity duration-base ease-crownline",

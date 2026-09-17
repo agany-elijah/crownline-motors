@@ -3,6 +3,7 @@ import {
   DriveType,
   FuelType,
   TransmissionType,
+  VehicleBodyType,
   VehicleCondition,
   VehicleStatus,
 } from "@/generated/prisma/enums"
@@ -43,6 +44,44 @@ export const DRIVE_TYPE_LABELS: Record<DriveType, string> = {
   RWD: "Rear-wheel drive",
   AWD: "All-wheel drive",
   FOUR_WD: "4WD",
+}
+
+/** A body type as it reads on one listing — "SUV", "Pickup truck". */
+export const VEHICLE_BODY_TYPE_LABELS: Record<VehicleBodyType, string> = {
+  SEDAN: "Sedan",
+  HATCHBACK: "Hatchback",
+  SUV: "SUV",
+  PICKUP: "Pickup truck",
+  VAN: "Van",
+  MINIBUS: "Minibus",
+  WAGON: "Station wagon",
+  COUPE: "Coupe",
+  CONVERTIBLE: "Convertible",
+  TRUCK: "Truck",
+}
+
+/** The same, as a category heading over several vehicles — "SUVs". */
+export const VEHICLE_BODY_TYPE_PLURAL_LABELS: Record<VehicleBodyType, string> = {
+  SEDAN: "Sedans",
+  HATCHBACK: "Hatchbacks",
+  SUV: "SUVs",
+  PICKUP: "Pickup trucks",
+  VAN: "Vans",
+  MINIBUS: "Minibuses",
+  WAGON: "Station wagons",
+  COUPE: "Coupes",
+  CONVERTIBLE: "Convertibles",
+  TRUCK: "Trucks",
+}
+
+/**
+ * The body type as it appears in a catalogue address: `/cars?type=suv`.
+ *
+ * Lower-case enum keys rather than a second vocabulary, so the mapping is
+ * total by construction and cannot drift from the enum.
+ */
+export function bodyTypeToParam(bodyType: VehicleBodyType): string {
+  return bodyType.toLowerCase()
 }
 
 export const COUNTRY_LABELS: Record<CountryOfOrigin, string> = {
@@ -102,6 +141,7 @@ function toOptions<T extends string>(
 export const FUEL_TYPE_OPTIONS = toOptions(FUEL_TYPE_LABELS)
 export const TRANSMISSION_OPTIONS = toOptions(TRANSMISSION_LABELS)
 export const DRIVE_TYPE_OPTIONS = toOptions(DRIVE_TYPE_LABELS)
+export const VEHICLE_BODY_TYPE_OPTIONS = toOptions(VEHICLE_BODY_TYPE_LABELS)
 export const COUNTRY_OPTIONS = toOptions(COUNTRY_LABELS)
 export const VEHICLE_CONDITION_OPTIONS = toOptions(VEHICLE_CONDITION_LABELS)
 export const VEHICLE_STATUS_OPTIONS = toOptions(VEHICLE_STATUS_LABELS)

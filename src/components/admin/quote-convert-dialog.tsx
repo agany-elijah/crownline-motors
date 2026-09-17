@@ -79,7 +79,6 @@ export function QuoteConvertDialog({ quoteId, total, disabled = false, disabledR
           render={
             <Button
               type="button"
-              size="sm"
               disabled={effectiveDisabled}
               title={effectiveDisabled ? effectiveReason : undefined}
             />
@@ -103,7 +102,7 @@ export function QuoteConvertDialog({ quoteId, total, disabled = false, disabledR
 
           {state.status === "success" ? (
             <Alert>
-              <CheckCircle2 aria-hidden="true" className="text-gold-ink" />
+              <CheckCircle2 aria-hidden="true" className="text-success" />
               <AlertDescription>
                 Order {state.orderNumber} created. Opening it now…
               </AlertDescription>
@@ -136,7 +135,7 @@ export function QuoteConvertDialog({ quoteId, total, disabled = false, disabledR
       </Dialog>
 
       {effectiveDisabled && effectiveReason ? (
-        <p className="max-w-56 text-right text-xs text-muted-foreground">{effectiveReason}</p>
+        <p className="max-w-60 text-right text-xs text-balance text-muted-foreground">{effectiveReason}</p>
       ) : null}
     </div>
   )

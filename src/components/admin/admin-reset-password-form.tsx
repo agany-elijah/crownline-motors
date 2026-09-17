@@ -50,7 +50,7 @@ export function AdminResetPasswordForm() {
             state.fieldErrors?.password ? ` ${passwordId}-error` : ""
           }`}
         />
-        <p id={`${passwordId}-hint`} className="text-small text-background/60">
+        <p id={`${passwordId}-hint`} className="text-small text-muted-foreground">
           At least 12 characters. Length matters more than symbols — a short
           memorable phrase of several words is stronger than a scrambled word.
         </p>
@@ -81,7 +81,7 @@ export function AdminResetPasswordForm() {
         ) : null}
       </div>
 
-      <Button type="submit" size="lg" disabled={isPending} className="mt-1 w-full">
+      <Button type="submit" disabled={isPending} className="mt-1 h-11 w-full">
         {isPending ? (
           <>
             <Loader2 aria-hidden="true" className="animate-spin" />

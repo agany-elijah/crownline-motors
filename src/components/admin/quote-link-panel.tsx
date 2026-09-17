@@ -16,23 +16,24 @@ export function QuoteLinkPanel({ quoteId, link }: { quoteId: string; link: strin
   const formRef = useRef<HTMLFormElement>(null)
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg bg-secondary/40 p-4">
-      <div className="flex flex-col gap-1">
-        <p className="text-small font-medium">Customer PDF link</p>
+    <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-[var(--shadow-subtle)]">
+      <div className="flex flex-col gap-2">
+        <h2 className="text-small font-medium text-foreground">Customer PDF link</h2>
         <a
           href={link}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex w-fit items-center gap-1.5 text-small text-gold-ink hover:underline"
+          className="group/link flex items-start gap-2 rounded-md border border-border bg-sunken/60 px-3 py-2 font-mono text-xs break-all text-foreground transition-colors duration-fast hover:border-gold-ink/40 hover:text-gold-ink"
         >
-          {link}
-          <ExternalLink aria-hidden="true" className="size-3.5" />
+          <span className="min-w-0 flex-1">{link}</span>
+          <ExternalLink aria-hidden="true" className="mt-px size-3.5 shrink-0 text-muted-foreground group-hover/link:text-gold-ink" />
+          <span className="sr-only">(opens in a new tab)</span>
         </a>
       </div>
 
       {state.status === "success" && state.message ? (
         <Alert>
-          <CheckCircle2 aria-hidden="true" className="text-gold-ink" />
+          <CheckCircle2 aria-hidden="true" className="text-success" />
           <AlertDescription>{state.message}</AlertDescription>
         </Alert>
       ) : null}
@@ -54,6 +55,6 @@ export function QuoteLinkPanel({ quoteId, link }: { quoteId: string; link: strin
           onConfirm={() => formRef.current?.requestSubmit()}
         />
       </form>
-    </div>
+    </section>
   )
 }

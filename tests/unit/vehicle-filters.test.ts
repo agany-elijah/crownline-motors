@@ -352,3 +352,34 @@ describe("catalogueHref", () => {
     expect(parseVehicleSearchParams(query)).toEqual({ ...criteria, page: 2 })
   })
 })
+
+describe("body type filter", () => {
+  it("parses the catalogue's lower-case address form onto the enum", () => {
+    const parsed = parseVehicleSearchParams({ type: "suv" })
+
+    expect(parsed.bodyType).toBe("SUV")
+    expect(hasActiveSearch(parsed)).toBe(true)
+  })
+
+  it("accepts any letter case", () => {
+    expect(parseVehicleSearchParams({ type: "Pickup" }).bodyType).toBe("PICKUP")
+  })
+
+  it("ignores a value that is not a body type rather than failing the page", () => {
+    expect(parseVehicleSearchParams({ type: "spaceship" }).bodyType).toBeUndefined()
+    expect(parseVehicleSearchParams({ type: "" }).bodyType).toBeUndefined()
+  })
+
+  it("filters on the column exactly", () => {
+    expect(vehicleSearchWhere({ bodyType: "SEDAN" })).toEqual({ bodyType: "SEDAN" })
+  })
+
+  it("is carried into links as ?type= and round-trips through the parser", () => {
+    const href = catalogueHref({ make: "Toyota", bodyType: "SUV" }, 2)
+
+    expect(href).toBe("/cars?make=Toyota&type=suv&page=2")
+
+    const params = Object.fromEntries(new URLSearchParams(href.split("?")[1]))
+    expect(parseVehicleSearchParams(params)).toMatchObject({ make: "Toyota", bodyType: "SUV", page: 2 })
+  })
+})

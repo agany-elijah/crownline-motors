@@ -36,18 +36,18 @@ export function AdminMobileNav({ groups }: AdminMobileNavProps) {
       <DialogPrimitive.Trigger
         aria-label="Open dashboard menu"
         className={cn(
-          "flex size-9 items-center justify-center rounded-lg lg:hidden",
+          "-ml-1.5 flex size-9 shrink-0 items-center justify-center rounded-md lg:hidden",
           "text-foreground transition-colors duration-fast hover:bg-secondary",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         )}
       >
-        <MenuIcon className="size-5" />
+        <MenuIcon className="size-5" strokeWidth={1.75} />
       </DialogPrimitive.Trigger>
 
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop
           className={cn(
-            "fixed inset-0 z-50 bg-charcoal/50 backdrop-blur-sm",
+            "fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px]",
             "duration-fast data-open:animate-in data-open:fade-in-0",
             "data-closed:animate-out data-closed:fade-out-0"
           )}
@@ -55,28 +55,28 @@ export function AdminMobileNav({ groups }: AdminMobileNavProps) {
         <DialogPrimitive.Popup
           data-tone="dark"
           className={cn(
-            "fixed inset-y-0 left-0 z-50 flex h-full w-full max-w-xs flex-col",
-            "bg-foreground text-background outline-none",
-            "shadow-[0_0_60px_oklch(0_0_0/0.4)]",
+            "fixed inset-y-0 left-0 z-50 flex h-full w-[85%] max-w-72 flex-col",
+            "border-r border-rail-border bg-rail text-rail-foreground outline-none",
+            "shadow-[var(--shadow-overlay)]",
             "duration-base ease-crownline",
             "data-open:animate-in data-open:slide-in-from-left-full",
             "data-closed:animate-out data-closed:slide-out-to-left-full"
           )}
         >
-          <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
+          <div className="flex h-14 shrink-0 items-center justify-between pr-3 pl-6">
             <DialogPrimitive.Title render={<BrandMark size="sm" tone="dark" />} />
             <DialogPrimitive.Description className="sr-only">
               Dashboard navigation
             </DialogPrimitive.Description>
             <DialogPrimitive.Close
               aria-label="Close menu"
-              className="flex size-9 items-center justify-center rounded-lg text-background/70 transition-colors duration-fast hover:bg-white/10 hover:text-background"
+              className="flex size-9 items-center justify-center rounded-md text-rail-muted transition-colors duration-fast hover:bg-rail-raised hover:text-rail-foreground"
             >
-              <XIcon className="size-5" />
+              <XIcon className="size-5" strokeWidth={1.75} />
             </DialogPrimitive.Close>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-3 py-5">
+          <div className="flex-1 overflow-y-auto px-3 pt-4 pb-6">
             <AdminNav groups={groups} onNavigate={() => setOpen(false)} />
           </div>
         </DialogPrimitive.Popup>

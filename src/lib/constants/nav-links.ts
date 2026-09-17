@@ -53,7 +53,7 @@ function findNavLink(href: string): NavLink {
 /** A header entry that opens a small menu of related pages. */
 export interface NavGroup {
   label: string
-  children: (NavLink & { description: string; icon: "track" | "quote" })[]
+  children: NavLink[]
 }
 
 export type HeaderNavItem = NavLink | NavGroup
@@ -79,18 +79,7 @@ export const headerNavItems: HeaderNavItem[] = [
   findNavLink("/how-it-works"),
   {
     label: "Services",
-    children: [
-      {
-        ...findNavLink("/track-my-order"),
-        description: "Follow your vehicle or parts, stage by stage.",
-        icon: "track",
-      },
-      {
-        ...findNavLink("/get-a-quote"),
-        description: "Tell us what you need and we will source it.",
-        icon: "quote",
-      },
-    ],
+    children: [findNavLink("/track-my-order"), findNavLink("/get-a-quote")],
   },
   findNavLink("/about-us"),
   findNavLink("/contact"),

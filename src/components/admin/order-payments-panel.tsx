@@ -9,6 +9,7 @@ import {
   reversePaymentAction,
   type PaymentActionState,
 } from "@/lib/actions/payment.actions"
+import { NATIVE_SELECT_CLASS } from "@/components/admin/settings/settings-ui"
 import { StatusBadge } from "@/components/admin/status-badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -31,12 +32,8 @@ import { formatCurrency } from "@/lib/utils/format-currency"
 
 const IDLE: PaymentActionState = { status: "idle" }
 
-const FIELD = "h-9 rounded-md border-input px-2.5 text-small placeholder:text-muted-foreground/70"
-const SELECT = cn(
-  "w-full border bg-card text-foreground outline-none transition-colors",
-  "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40",
-  FIELD
-)
+const FIELD = "h-9 rounded-md border-input bg-card px-2.5 text-small placeholder:text-muted-foreground/70"
+const SELECT = cn(NATIVE_SELECT_CLASS, "h-9 rounded-md text-small md:text-small")
 const DATE_FORMAT = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" })
 const METHODS = Object.values(PaymentMethod)
 
@@ -78,16 +75,19 @@ export function OrderPaymentsPanel({
   return (
     <div className="flex flex-col gap-5">
       {state.status === "success" && state.message ? (
-        <p role="status" className="flex items-start gap-1.5 text-small text-success">
-          <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+        <p role="status" className="flex items-start gap-2 rounded-lg border border-success/25 bg-success/8 px-3 py-2.5 text-small text-foreground">
+          <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-success" />
           {state.message}
         </p>
       ) : null}
 
       {lockedReason ? (
-        <p className="text-small text-muted-foreground">{lockedReason}</p>
+        <p className="rounded-lg border border-border bg-sunken/60 px-4 py-3 text-small text-muted-foreground">{lockedReason}</p>
       ) : openStages.length === 0 ? (
-        <p className="text-small text-muted-foreground">Every payment stage is paid in full.</p>
+        <p className="flex items-center gap-2 rounded-lg border border-success/25 bg-success/8 px-4 py-3 text-small text-foreground">
+          <CheckCircle2 aria-hidden="true" className="size-4 shrink-0 text-success" />
+          Every payment stage is paid in full.
+        </p>
       ) : (
         <RecordPaymentForm
           // A new payment row remounts the form, clearing it for the next one;
@@ -170,8 +170,10 @@ function RecordPaymentForm({
   const describedBy = (id: string, field: string) => (errors[field]?.[0] ? `${id}-error` : undefined)
 
   return (
-    <form action={formAction} className="flex flex-col gap-3">
+    <form action={formAction} className="flex flex-col gap-3 rounded-lg border border-border bg-sunken/60 p-4">
       <input type="hidden" name="orderId" value={orderId} />
+
+      <h3 className="text-small font-medium text-foreground">Record a payment</h3>
 
       {state.status === "error" && state.message ? (
         <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive">
@@ -273,12 +275,12 @@ function RecordPaymentForm({
           placeholder="Internal"
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
-          className="min-h-16 rounded-md border-input px-2.5 py-2 text-small placeholder:text-muted-foreground/70"
+          className="min-h-16 rounded-md border-input bg-card px-2.5 py-2 text-small placeholder:text-muted-foreground/70"
         />
       </Field>
 
       <div className="flex justify-end">
-        <Button type="submit" size="sm" disabled={isPending}>
+        <Button type="submit" disabled={isPending}>
           {isPending ? <Loader2 aria-hidden="true" className="animate-spin" /> : <Plus aria-hidden="true" />}
           Record payment
         </Button>
@@ -290,14 +292,14 @@ function RecordPaymentForm({
 function PaymentHistory({ payments }: { payments: OrderPaymentRecord[] }) {
   if (payments.length === 0) {
     return (
-      <p className="border-t border-border/60 pt-4 text-small text-muted-foreground">No payments recorded yet.</p>
+      <p className="text-small text-muted-foreground">No payments recorded yet.</p>
     )
   }
 
   return (
-    <div className="flex flex-col gap-3 border-t border-border/60 pt-4">
-      <h3 className="text-small font-semibold">Payment history</h3>
-      <ol className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3">
+      <h3 className="text-small font-medium text-foreground">Payment history</h3>
+      <ol className="flex flex-col divide-y divide-border/70 overflow-hidden rounded-lg border border-border">
         {payments.map((payment) => (
           <PaymentRow key={payment.id} payment={payment} />
         ))}
@@ -310,10 +312,15 @@ function PaymentRow({ payment }: { payment: OrderPaymentRecord }) {
   const counts = payment.status === PaymentStatus.CONFIRMED
 
   return (
-    <li className="flex items-start justify-between gap-3 border-t border-border/60 pt-3 first:border-t-0 first:pt-0">
+    <li className="flex items-start justify-between gap-3 px-4 py-3">
       <div className="flex min-w-0 flex-col gap-0.5">
         <div className="flex flex-wrap items-center gap-2">
-          <span className={cn("font-semibold tabular-nums", !counts && "text-muted-foreground line-through")}>
+          <span
+            className={cn(
+              "text-small font-medium tabular-nums",
+              counts ? "text-foreground" : "text-muted-foreground line-through"
+            )}
+          >
             {formatCurrency(payment.amount)}
           </span>
           <StatusBadge tone={PAYMENT_STATUS_TONES[payment.status]}>{PAYMENT_STATUS_LABELS[payment.status]}</StatusBadge>
@@ -324,7 +331,7 @@ function PaymentRow({ payment }: { payment: OrderPaymentRecord }) {
         </p>
         {payment.transactionReference ? (
           <p className="text-xs text-muted-foreground">
-            Ref <span className="font-mono">{payment.transactionReference}</span>
+            Ref <span className="font-mono text-foreground">{payment.transactionReference}</span>
           </p>
         ) : null}
         {payment.adminNotes ? (

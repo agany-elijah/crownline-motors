@@ -2,6 +2,7 @@ import * as React from "react"
 import Link from "next/link"
 import { ArrowLeftIcon } from "lucide-react"
 
+import { CartSummary } from "@/components/cart/cart-summary"
 import { Container } from "@/components/layout/container"
 import { cn } from "@/lib/utils"
 
@@ -18,18 +19,16 @@ import { cn } from "@/lib/utils"
  * with the page's name beside it.
  *
  *     ┌────────────────────────────────────────────────────┐
- *     │ ← Home │ Spare Parts                               │
+ *     │ ← Home │ Spare Parts                  [🛒 Parts list 3]│
  *     └────────────────────────────────────────────────────┘
  *
- * ── The basket used to be on this row, and has moved ──────────────────
- * It now lives in the site header, top right, beside the menu — where every
- * shop a customer has ever used puts it, and where it stays visible on every
- * page rather than only inside this section. `CartSummary` renders nothing
- * until the basket holds something, so a visitor who is not shopping for
- * parts never sees a cart icon on a page about cars.
- *
- * Keeping a second one here would have been two basket controls on the same
- * screen showing the same number, which is one more than any of them needs.
+ * ── The basket lives here ─────────────────────────────────────────────
+ * On the end of this row, on every spare-parts page — the catalogue, a part
+ * and the recently-viewed list — beside the parts it holds. It moved here
+ * from the site header at the dealership's request: the header is the
+ * company's frame on every page, and a basket belongs to the one section
+ * where there is something to put in it. `CartSummary` renders nothing until
+ * the basket holds something.
  *
  * ── The trail is gone from the screen, not from the page ──────────────
  * Search engines still receive the BreadcrumbList: the catalogue and the part
@@ -95,6 +94,8 @@ export function SparePartsBar({
               </>
             ) : null}
           </div>
+
+          <CartSummary labelled />
         </div>
       </Container>
     </div>

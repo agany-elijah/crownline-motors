@@ -80,7 +80,7 @@ export function VehicleGallery({ photos, vehicle }: VehicleGalleryProps) {
             alt={describe(index)}
             fill
             sizes="(min-width: 1024px) 62vw, 100vw"
-            priority={index === 0}
+            preload={index === 0}
             loading={index === 0 ? undefined : "lazy"}
             className={cn(
               "object-cover transition-opacity duration-base ease-crownline",

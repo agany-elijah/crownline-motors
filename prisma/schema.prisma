@@ -104,6 +104,23 @@ enum DriveType {
   FOUR_WD
 }
 
+/// The shape of a vehicle — what a buyer means by "an SUV" or "a pickup".
+/// Drives the homepage's "Browse by body type" tiles and the catalogue's
+/// `?type=` filter. Values are appended, never reordered (see §9 of the
+/// schema documentation on enum drift).
+enum VehicleBodyType {
+  SEDAN
+  HATCHBACK
+  SUV
+  PICKUP
+  VAN
+  MINIBUS
+  WAGON
+  COUPE
+  CONVERTIBLE
+  TRUCK
+}
+
 enum CountryOfOrigin {
   JAPAN
   KOREA
@@ -468,6 +485,10 @@ model Vehicle {
   transmission    TransmissionType
   engineSize      String
   driveType       DriveType
+  /// Nullable: listings created before body types existed have none, and a
+  /// guessed value would put a vehicle under the wrong category tile. A
+  /// vehicle without one is simply absent from body-type browsing.
+  bodyType        VehicleBodyType?
   exteriorColor   String
   interiorColor   String
   countryOfOrigin CountryOfOrigin
@@ -521,6 +542,7 @@ model Vehicle {
   updatedAt DateTime @updatedAt
 
   @@index([status, isFeatured])
+  @@index([status, bodyType])
   @@index([make, model])
   @@index([year])
   @@index([price])

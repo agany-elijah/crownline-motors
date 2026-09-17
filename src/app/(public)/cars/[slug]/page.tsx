@@ -6,6 +6,8 @@ import { ArrowLeftIcon } from "lucide-react"
 import { Section } from "@/components/layout/section"
 import { VehicleQuoteButton } from "@/components/quotes/quote-request-triggers"
 import { Reveal } from "@/components/shared/reveal"
+import { AnimatedWords } from "@/components/motion/animated-words"
+import { delay } from "@/components/motion/motion"
 import { WhatsAppGlyph } from "@/components/shared/whatsapp-glyph"
 import { Button } from "@/components/ui/button"
 import { RelatedVehicles } from "@/components/vehicles/related-vehicles"
@@ -19,6 +21,7 @@ import {
   DRIVE_TYPE_LABELS,
   FUEL_TYPE_LABELS,
   TRANSMISSION_LABELS,
+  VEHICLE_BODY_TYPE_LABELS,
 } from "@/lib/constants/vehicle-options"
 import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import {
@@ -189,6 +192,7 @@ export default async function VehiclePage({ params }: PageProps) {
   const fuel = label(FUEL_TYPE_LABELS, vehicle.fuelType)
   const transmission = label(TRANSMISSION_LABELS, vehicle.transmission)
   const drive = label(DRIVE_TYPE_LABELS, vehicle.driveType)
+  const bodyType = label(VEHICLE_BODY_TYPE_LABELS, vehicle.bodyType)
   const country = label(COUNTRY_LABELS, vehicle.countryOfOrigin)
   const mileage = vehicle.mileageKm === null ? null : formatMileage(vehicle.mileageKm)
 
@@ -238,6 +242,7 @@ export default async function VehiclePage({ params }: PageProps) {
 
   const specifications = [
     { label: "Year", value: vehicle.year === null ? null : String(vehicle.year) },
+    { label: "Body type", value: bodyType },
     { label: "Mileage", value: mileage },
     { label: "Engine", value: vehicle.engineSize },
     { label: "Transmission", value: transmission },
@@ -295,7 +300,8 @@ export default async function VehiclePage({ params }: PageProps) {
           */}
           <section
             aria-labelledby="summary-heading"
-            className="flex flex-col gap-6 rounded-xl border border-border bg-card p-6 sm:p-8"
+            className="load-rise flex flex-col gap-6 rounded-xl border border-border bg-card p-6 sm:p-8"
+            style={delay(120)}
           >
             {vehicle.condition ? <VehicleConditionTag condition={vehicle.condition} /> : null}
 
@@ -305,7 +311,7 @@ export default async function VehiclePage({ params }: PageProps) {
                   repeated as a second labelled grid of the same facts. */}
               <div className="flex flex-col gap-2">
                 <h1 id="summary-heading" className="text-h1">
-                  {name}
+                  <AnimatedWords text={name} trigger="load" startDelay={260} />
                 </h1>
                 {summaryFacts.length > 0 ? (
                   <p className="tabular text-body text-muted-foreground">{summaryFacts.join(" · ")}</p>
@@ -512,6 +518,7 @@ function VehicleStructuredData({
     sku: vehicle.referenceNumber,
     brand: { "@type": "Brand", name: vehicle.make },
     model: vehicle.model,
+    ...optional("bodyType", vehicle.bodyType === null ? null : VEHICLE_BODY_TYPE_LABELS[vehicle.bodyType]),
     ...optional("vehicleModelDate", vehicle.year === null ? null : String(vehicle.year)),
     ...optional(
       "mileageFromOdometer",

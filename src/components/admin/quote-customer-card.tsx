@@ -24,8 +24,8 @@ export function QuoteCustomerCard({ name, phone, whatsapp, email, city }: QuoteC
   const whatsappUrl = whatsapp ? buildWhatsAppUrl({ phoneNumber: whatsapp }) : null
 
   return (
-    <section id="customer" className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-[var(--shadow-subtle)] ring-1 ring-foreground/10">
-      <h2 className="text-meta text-muted-foreground">Customer</h2>
+    <section id="customer" className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-[var(--shadow-subtle)]">
+      <h2 className="text-small font-medium text-foreground">Customer</h2>
 
       <div className="flex flex-col gap-1">
         <p className="text-title font-semibold text-balance">{name}</p>
@@ -39,7 +39,7 @@ export function QuoteCustomerCard({ name, phone, whatsapp, email, city }: QuoteC
 
       {phone || email ? (
         <div className="flex flex-col gap-1 text-small text-muted-foreground">
-          {phone ? <p className="tabular-nums">{phone}</p> : null}
+          {phone ? <p className="font-mono text-xs text-foreground tabular-nums">{phone}</p> : null}
           {email ? <p className="truncate">{email}</p> : null}
         </div>
       ) : null}

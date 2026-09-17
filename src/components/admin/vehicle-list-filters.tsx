@@ -2,12 +2,14 @@
 
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useId, useState, useTransition } from "react"
-import { Loader2, Search, X } from "lucide-react"
 
 import { VehicleStatus } from "@/generated/prisma/enums"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { cn } from "@/lib/utils"
+import {
+  AdminClearFilters,
+  AdminFilterTab,
+  AdminFilterTabs,
+  AdminSearchInput,
+} from "@/components/admin/admin-list-toolbar"
 import { VEHICLE_STATUS_LABELS } from "@/lib/constants/vehicle-options"
 import { ADMIN_BASE_PATH } from "@/lib/constants/admin-routes"
 
@@ -108,41 +110,32 @@ export function VehicleListFilters({
   }, [search, urlSearch])
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="relative max-w-md">
-        <Label htmlFor={searchId} className="sr-only">
-          Search vehicles
-        </Label>
-        <Search
-          aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-        />
-        <Input
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <AdminSearchInput
           id={searchId}
-          type="search"
+          label="Search vehicles"
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={setSearch}
           placeholder="Search make, model or reference…"
-          className="pl-9"
+          pending={isPending}
         />
-        {isPending ? (
-          <Loader2
-            aria-hidden="true"
-            className="absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin text-muted-foreground"
+
+        {activeStatus || urlSearch ? (
+          <AdminClearFilters
+            onClick={() => {
+              setSearch("")
+              apply({ search: "", status: null })
+            }}
           />
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <FilterChip
-          label="All"
-          count={total}
-          active={!activeStatus}
-          onClick={() => apply({ status: null })}
-        />
+      <AdminFilterTabs label="Filter by status">
+        <AdminFilterTab label="All" count={total} active={!activeStatus} onClick={() => apply({ status: null })} />
 
         {STATUS_ORDER.map((status) => (
-          <FilterChip
+          <AdminFilterTab
             key={status}
             label={VEHICLE_STATUS_LABELS[status]}
             count={statusCounts[status] ?? 0}
@@ -150,54 +143,7 @@ export function VehicleListFilters({
             onClick={() => apply({ status: activeStatus === status ? null : status })}
           />
         ))}
-
-        {activeStatus || urlSearch ? (
-          <button
-            type="button"
-            onClick={() => {
-              setSearch("")
-              apply({ search: "", status: null })
-            }}
-            className="ml-1 inline-flex items-center gap-1 rounded-md px-2 py-1 text-small text-muted-foreground transition-colors duration-fast hover:text-gold-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          >
-            <X aria-hidden="true" className="size-3.5" />
-            Clear
-          </button>
-        ) : null}
-      </div>
+      </AdminFilterTabs>
     </div>
-  )
-}
-
-function FilterChip({
-  label,
-  count,
-  active,
-  onClick,
-}: {
-  label: string
-  count: number
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-small font-medium",
-        "transition-colors duration-fast",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-        active
-          ? "border-gold-ink/45 bg-accent text-accent-foreground"
-          : "border-border bg-card text-muted-foreground hover:border-gold-ink/30 hover:text-foreground"
-      )}
-    >
-      {label}
-      {/* No opacity here. The chip label is already --muted-foreground
-          when inactive; fading the count on top of that put it under 3:1. */}
-      <span className="text-xs tabular-nums">{count}</span>
-    </button>
   )
 }

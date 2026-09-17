@@ -57,18 +57,20 @@ export function QuoteIssuesPanel({ hasEmail, hasWhatsapp, isWon }: QuoteIssuesPa
 
   if (issues.length === 0) {
     return (
-      <section className="flex items-start gap-2.5 rounded-xl bg-success/5 p-5 ring-1 ring-success/25">
-        <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-success" />
+      <section className="flex items-center gap-3 rounded-xl border border-success/25 bg-success/8 px-5 py-4">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
+          <CheckCircle2 aria-hidden="true" className="size-4" />
+        </span>
         <p className="text-small font-medium text-foreground">Ready to send</p>
       </section>
     )
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-xl bg-warning/5 p-5 ring-1 ring-warning/25">
-      <h2 className="flex items-center gap-1.5 text-meta text-warning">
+    <section className="flex flex-col gap-3 rounded-xl border border-warning/30 bg-warning/8 p-5">
+      <h2 className="flex items-center gap-1.5 text-small font-medium text-warning">
         <AlertTriangle aria-hidden="true" className="size-3.5" />
-        {issues.length} issue{issues.length === 1 ? "" : "s"}
+        {issues.length} issue{issues.length === 1 ? "" : "s"} before sending
       </h2>
 
       <ul className="flex flex-col gap-2">

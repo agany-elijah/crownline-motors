@@ -13,8 +13,8 @@ export function QuoteSummaryCard() {
   const { totals } = useQuotePricing()
 
   return (
-    <section className="flex flex-col gap-3 rounded-xl bg-card p-5 shadow-[var(--shadow-subtle)] ring-1 ring-foreground/10">
-      <h2 className="text-meta text-muted-foreground">Quote summary</h2>
+    <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-[var(--shadow-subtle)]">
+      <h2 className="text-small font-medium text-foreground">Quote summary</h2>
 
       <dl className="flex flex-col gap-2 text-small">
         <Row label="Items" value={formatCurrency(totals.itemsSubtotal)} />
@@ -26,15 +26,15 @@ export function QuoteSummaryCard() {
         ) : null}
       </dl>
 
-      <div className="flex items-baseline justify-between gap-3 border-t border-border/60 pt-3">
+      <div className="flex items-baseline justify-between gap-3 border-t border-border pt-3">
         <span className="text-small font-medium text-muted-foreground">Total</span>
-        <span className="font-heading text-h3 font-semibold tabular-nums">
+        <span className="text-2xl leading-none font-semibold tracking-[-0.03em] text-foreground tabular-nums">
           {formatCurrency(totals.total)}
         </span>
       </div>
 
       {totals.unpricedLines > 0 ? (
-        <p className="text-small text-warning">
+        <p className="rounded-md bg-warning/10 px-2.5 py-1.5 text-xs font-medium text-warning">
           {totals.unpricedLines} line{totals.unpricedLines === 1 ? "" : "s"} still need a price
         </p>
       ) : null}
@@ -46,7 +46,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="tabular-nums">{value}</dd>
+      <dd className="text-foreground tabular-nums">{value}</dd>
     </div>
   )
 }

@@ -98,9 +98,16 @@ export function PhotoTile({
     >
       {image}
 
+      {/* A short shade under the corner controls, so they hold against a
+          bright sky or a white car. Legibility, not decoration. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-black/35 to-transparent"
+      />
+
       {isMain ? (
-        <span className="pointer-events-none absolute top-2 left-2 inline-flex items-center gap-1 rounded-md bg-gold px-2 py-0.5 text-xs font-bold text-gold-foreground">
-          <Star aria-hidden="true" className="size-3 fill-current" />
+        <span className="pointer-events-none absolute top-2 left-2 inline-flex h-6 items-center gap-1 rounded-full bg-black/60 px-2.5 text-xs font-medium text-white backdrop-blur-sm">
+          <Star aria-hidden="true" className="size-3 fill-gold text-gold" />
           Main image
         </span>
       ) : null}
@@ -109,9 +116,9 @@ export function PhotoTile({
         <DropdownMenuTrigger
           disabled={disabled}
           className={cn(
-            "absolute top-2 right-2 inline-flex size-8 items-center justify-center rounded-lg",
-            "bg-foreground/70 text-background backdrop-blur-sm",
-            "transition-colors duration-fast hover:bg-foreground",
+            "absolute top-2 right-2 inline-flex size-8 items-center justify-center rounded-md",
+            "bg-black/55 text-white backdrop-blur-sm",
+            "transition-colors duration-fast hover:bg-black/80 data-popup-open:bg-black/80",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
             "disabled:pointer-events-none disabled:opacity-50"
           )}
@@ -217,16 +224,18 @@ export function PhotoDropTile({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-xl px-4 text-center",
-        "border border-dashed border-border bg-card text-muted-foreground",
-        "transition-colors duration-fast hover:border-gold-ink/50 hover:bg-accent hover:text-gold-ink",
+        "group/drop flex aspect-video w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl px-4 text-center",
+        "border border-dashed border-input bg-sunken/60 text-muted-foreground",
+        "transition-colors duration-fast hover:border-gold-ink/50 hover:bg-accent/60 hover:text-foreground",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         "disabled:pointer-events-none disabled:opacity-60",
         className
       )}
     >
-      <ImagePlus aria-hidden="true" className="size-6" />
-      <span className="text-small font-semibold">{label}</span>
+      <span className="flex size-10 items-center justify-center rounded-full border border-border bg-card shadow-[var(--shadow-subtle)] transition-colors duration-fast group-hover/drop:text-gold-ink">
+        <ImagePlus aria-hidden="true" className="size-4.5" strokeWidth={1.75} />
+      </span>
+      <span className="text-small font-medium">{label}</span>
       {hint ? <span className="text-xs">{hint}</span> : null}
     </button>
   )

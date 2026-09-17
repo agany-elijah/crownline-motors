@@ -69,7 +69,12 @@ test.describe("Services in the header", () => {
     await expect(header.getByRole("link", { name: "Track Order" })).toHaveCount(0)
 
     await header.getByRole("button", { name: "Services" }).click()
-    await page.getByRole("link", { name: /Follow your vehicle or parts/ }).click()
+    // The menu is portalled to the end of <body>, after the footer's own
+    // Track My Order link — so the last match is the one the menu opened.
+    const menuLink = page.getByRole("link", { name: "Track My Order" }).last()
+    await expect(menuLink).toBeVisible()
+    await expect(header.getByRole("link", { name: "Track My Order" })).toHaveCount(0)
+    await menuLink.click()
     await expect(page).toHaveURL(/\/track-my-order$/, { timeout: 45_000 })
   })
 })

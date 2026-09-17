@@ -32,13 +32,18 @@ export default async function SettingsLayout({ children }: LayoutProps<"/Ricky@2
   )
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-4 lg:gap-6">
-      <header className="flex items-center justify-between gap-3">
-        <h1 className="font-heading text-h3 font-semibold tracking-tight sm:text-h2">Settings</h1>
+    <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-5 lg:gap-8">
+      <header className="flex items-end justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <h1 className="text-h2 text-foreground">Settings</h1>
+          <p className="hidden text-body text-muted-foreground sm:block">
+            How the business presents itself, sells, and keeps the dashboard secure.
+          </p>
+        </div>
         <SettingsSearch entries={entries} />
       </header>
 
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-10">
         <SettingsNav links={links} />
         <div className="flex max-w-3xl min-w-0 flex-col gap-6">{children}</div>
       </div>

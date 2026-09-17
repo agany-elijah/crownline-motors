@@ -16,6 +16,8 @@ import { SparePartAvailabilityTag } from "@/components/spare-parts/spare-part-av
 import { SparePartDeliverySteps } from "@/components/spare-parts/spare-part-delivery-steps"
 import { SparePartGallery } from "@/components/spare-parts/spare-part-gallery"
 import { SparePartMobileActionBar } from "@/components/spare-parts/spare-part-mobile-action-bar"
+import { AnimatedWords } from "@/components/motion/animated-words"
+import { delay } from "@/components/motion/motion"
 import { SparePartsBar } from "@/components/spare-parts/spare-parts-bar"
 import {
   PriceEstimateNote,
@@ -213,14 +215,16 @@ export default async function SparePartPage({ params }: PageProps) {
               Sticky from `lg`, so the description in the column beside it
               scrolls past a photograph that stays on screen. `top-24` clears
               the fixed header (5rem) with a rem of air. */}
-          <div className="lg:sticky lg:top-24 lg:w-[46%] lg:shrink-0">
+          <div className="load-rise lg:sticky lg:top-24 lg:w-[46%] lg:shrink-0" style={delay(60)}>
             <SparePartGallery photos={part.photos} partName={part.name} />
           </div>
 
           {/* ── The decision, and everything it needs ───────────── */}
-          <div className="flex min-w-0 flex-1 flex-col gap-6">
+          <div className="load-rise flex min-w-0 flex-1 flex-col gap-6" style={delay(180)}>
             <div className="flex flex-col gap-3">
-              <h1 className="text-h1">{part.name}</h1>
+              <h1 className="text-h1">
+                <AnimatedWords text={part.name} trigger="load" startDelay={260} />
+              </h1>
 
               {/*
                 ── Who made it, what it is filed under, and its number ──

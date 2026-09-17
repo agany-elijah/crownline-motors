@@ -97,25 +97,26 @@ export function SettingsNav({ links }: { links: SettingsNavLink[] }) {
                 aria-current={active && !link.children ? "page" : undefined}
                 data-active={active}
                 className={cn(
-                  "group/item flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-small",
+                  "group/item relative flex h-9 items-center gap-2.5 rounded-md px-2.5 text-small",
                   "transition-colors duration-fast ease-crownline",
                   active
-                    ? "bg-muted font-medium text-foreground"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                    ? "bg-card font-medium text-foreground shadow-[var(--shadow-subtle)] ring-1 ring-border"
+                    : "text-muted-foreground hover:bg-card/60 hover:text-foreground"
                 )}
               >
                 <Icon
                   aria-hidden="true"
+                  strokeWidth={1.75}
                   className={cn(
                     "size-4 shrink-0 transition-colors duration-fast",
-                    active ? "text-foreground" : "text-muted-foreground group-hover/item:text-foreground"
+                    active ? "text-gold-ink" : "text-muted-foreground group-hover/item:text-foreground"
                   )}
                 />
                 <span className="truncate">{link.label}</span>
               </Link>
 
               {link.children && active ? (
-                <ul className="my-1 ml-[1.1rem] flex flex-col border-l border-border pl-2.5">
+                <ul className="my-1.5 ml-[1.1rem] flex flex-col border-l border-border pl-2.5">
                   {link.children.map((child) => {
                     const childActive = pathname === child.href
 
@@ -125,8 +126,10 @@ export function SettingsNav({ links }: { links: SettingsNavLink[] }) {
                           href={child.href}
                           aria-current={childActive ? "page" : undefined}
                           className={cn(
-                            "block truncate rounded-md px-2 py-1.5 text-small transition-colors duration-fast",
-                            childActive ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground"
+                            "relative block truncate rounded-md px-2 py-1.5 text-small transition-colors duration-fast",
+                            childActive
+                              ? "font-medium text-foreground before:absolute before:top-1/2 before:-left-[0.6875rem] before:h-4 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-gold"
+                              : "text-muted-foreground hover:text-foreground"
                           )}
                         >
                           {child.label}
@@ -167,7 +170,7 @@ export function SecuritySubNav({ links }: { links: { label: string; href: string
                   "inline-flex h-8 items-center rounded-full px-3 text-xs whitespace-nowrap transition-colors duration-fast",
                   active
                     ? "bg-foreground font-medium text-background"
-                    : "bg-muted text-muted-foreground hover:text-foreground"
+                    : "border border-border bg-card text-muted-foreground hover:text-foreground"
                 )}
               >
                 {link.label}

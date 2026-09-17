@@ -6,6 +6,7 @@ import { AlertCircle, CheckCircle2, Loader2, Upload, X } from "lucide-react"
 
 import { PhotoDescriptionDialog } from "@/components/admin/photo-description-dialog"
 import { PhotoDropTile, PhotoTile } from "@/components/admin/photo-tile"
+import { AdminFormBadge, AdminFormSection } from "@/components/admin/admin-form"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { syncFileInput, useStagedPhotos } from "@/hooks/use-staged-photos"
@@ -235,15 +236,20 @@ export function VehiclePhotoBoard({
   }
 
   return (
-    <section id="photographs" className="flex flex-col gap-6 rounded-xl border border-border bg-card p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <h2 className="font-heading text-h3 font-semibold">
-          Photographs
-          <span className="ml-2 text-body font-normal text-muted-foreground tabular">
+    <AdminFormSection
+      id="photographs"
+      title="Photographs"
+      description="The main image appears on the vehicle's card and leads its gallery. Changes here take effect straight away."
+      badge={
+        <AdminFormBadge tone={photos.length === 0 ? "warning" : "neutral"}>
+          <span className="tabular-nums">
             {photos.length}/{MAX_PHOTOS_PER_VEHICLE}
           </span>
-        </h2>
-      </div>
+          photographs
+        </AdminFormBadge>
+      }
+      bodyClassName="flex flex-col gap-6"
+    >
 
       {feedback.status === "success" && feedback.message ? (
         <Alert>
@@ -268,7 +274,7 @@ export function VehiclePhotoBoard({
 
       {/* ── Main image ───────────────────────────────────────────── */}
       <div className="flex flex-col gap-3">
-        <h3 className="font-heading text-small font-semibold">Main image</h3>
+        <h3 className="text-small font-medium text-foreground">Main image</h3>
 
         <div className="max-w-xl">
           {main ? (
@@ -299,10 +305,10 @@ export function VehiclePhotoBoard({
 
       {/* ── Other images ─────────────────────────────────────────── */}
       <div className="flex flex-col gap-3">
-        <h3 className="font-heading text-small font-semibold">
+        <h3 className="text-small font-medium text-foreground">
           Other images
           {others.length > 0 ? (
-            <span className="ml-2 font-normal text-muted-foreground tabular">
+            <span className="ml-2 font-normal text-muted-foreground tabular-nums">
               {others.length}
             </span>
           ) : null}
@@ -373,7 +379,7 @@ export function VehiclePhotoBoard({
         ) : null}
 
         {staged.length > 0 ? (
-          <div className="flex flex-col gap-4 rounded-lg border border-border bg-secondary/50 p-4">
+          <div className="flex flex-col gap-4 rounded-lg border border-dashed border-gold-ink/35 bg-accent/40 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-small font-semibold">
                 {staged.length} image{staged.length === 1 ? "" : "s"} ready to
@@ -461,7 +467,7 @@ export function VehiclePhotoBoard({
           }}
         />
       ) : null}
-    </section>
+    </AdminFormSection>
   )
 }
 

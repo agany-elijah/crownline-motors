@@ -13,9 +13,11 @@ import { siteConfig } from "@/config/site"
 import { getPublicSiteSettings } from "@/lib/queries/settings.queries"
 import {
   listPublishedVehicles,
+  listVehicleBodyTypes,
   listVehicleFacets,
   PUBLIC_VEHICLES_PER_PAGE,
 } from "@/lib/queries/public-vehicle.queries"
+import { VEHICLE_BODY_TYPE_PLURAL_LABELS } from "@/lib/constants/vehicle-options"
 import { formatNumber } from "@/lib/utils/format-currency"
 import {
   catalogueHref,
@@ -82,7 +84,12 @@ export async function generateMetadata({
   // where `q` may be a fragment, a misspelling, or something with no
   // matches at all. A title is a promise about the page, so it is built
   // from the former and falls back to the catalogue's own name.
-  const described = [criteria.make, criteria.model, criteria.year]
+  const described = [
+    criteria.make,
+    criteria.model,
+    criteria.year,
+    criteria.bodyType ? VEHICLE_BODY_TYPE_PLURAL_LABELS[criteria.bodyType] : undefined,
+  ]
     .filter(Boolean)
     .join(" ")
 
@@ -124,9 +131,10 @@ export default async function CarsPage({
    * in sequence: they are independent, and on a mobile connection the
    * round trip is the expensive part, not the query.
    */
-  const [{ vehicles, total, page, pageCount }, facets] = await Promise.all([
+  const [{ vehicles, total, page, pageCount }, facets, bodyTypes] = await Promise.all([
     listPublishedVehicles({ page: requestedPage, criteria }),
     listVehicleFacets(),
+    listVehicleBodyTypes(),
   ])
 
   /**
@@ -189,7 +197,7 @@ export default async function CarsPage({
             which looks broken rather than new.
           */}
           {facets.length > 0 ? (
-            <VehicleSearch facets={facets} criteria={criteria} />
+            <VehicleSearch facets={facets} bodyTypes={bodyTypes} criteria={criteria} />
           ) : null}
 
           <div className="flex flex-wrap items-center justify-between gap-4">
