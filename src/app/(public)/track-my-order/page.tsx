@@ -183,7 +183,7 @@ export default async function TrackMyOrderPage(props: PageProps<"/track-my-order
   const trackingSection = (
     <Section id="track" spacing="default" className="scroll-mt-20">
       <div className="mx-auto flex max-w-6xl flex-col gap-10">
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-14">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-14">
           {/* ── The box ──────────────────────────────────────────── */}
           <div className="flex flex-col gap-6">
             <SectionHeading title="Track your order" description="Enter the tracking number our team sent you." />

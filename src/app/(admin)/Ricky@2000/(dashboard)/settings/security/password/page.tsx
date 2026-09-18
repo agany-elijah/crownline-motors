@@ -37,7 +37,7 @@ export default async function PasswordSettingsPage() {
         title="Password recovery"
         description="If you forget your password, a reset link is sent to your account email."
       >
-        <dl className="grid gap-5 sm:grid-cols-3">
+        <dl className="grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div className="flex flex-col gap-1">
             <dt className="text-xs text-muted-foreground">Recovery email</dt>
             <dd className="truncate text-small font-medium">{admin.email}</dd>

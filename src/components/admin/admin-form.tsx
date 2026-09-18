@@ -41,7 +41,7 @@ export function AdminFormSection({
       id={id}
       aria-labelledby={headingId}
       className={cn(
-        "grid min-w-0 scroll-mt-24 gap-4 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:gap-10",
+        "grid grid-cols-1 min-w-0 scroll-mt-24 gap-4 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:gap-10",
         className
       )}
     >

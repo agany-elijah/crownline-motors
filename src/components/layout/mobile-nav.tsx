@@ -137,7 +137,7 @@ export function MobileNav({ open, onOpenChange, whatsappUrl }: MobileNavProps) {
           <ArrowUpRightIcon
             aria-hidden="true"
             className={cn(
-              "size-4 transition-all duration-fast ease-crownline",
+              "size-4 transition-[transform,color] duration-fast ease-crownline",
               active
                 ? "text-gold opacity-100"
                 : "opacity-0 group-hover/item:translate-x-0.5 group-hover/item:text-gold group-hover/item:opacity-100"

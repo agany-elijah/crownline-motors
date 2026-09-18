@@ -129,7 +129,7 @@ export default async function ContactPage() {
       <section className="relative isolate overflow-hidden bg-night text-white">
         <div aria-hidden="true" className="absolute inset-0 -z-10">
           <Image
-            src="/images/contact/hero.jpg"
+            src="/images/journey/vehicle-handover.jpg"
             alt=""
             fill
             preload

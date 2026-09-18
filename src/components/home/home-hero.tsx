@@ -1,3 +1,4 @@
+import Image from "next/image"
 import Link from "next/link"
 import { ArrowRight, MessageSquareText } from "lucide-react"
 
@@ -5,15 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Container } from "@/components/layout/container"
 import { heroAnchorProps } from "@/components/layout/hero-anchor"
 import { AnimatedWords, wordsDuration } from "@/components/motion/animated-words"
-import { CountUp } from "@/components/motion/count-up"
 import { delay } from "@/components/motion/motion"
-import { HeroVideo } from "@/components/home/hero-video"
 import { HOME_MEDIA } from "@/components/home/home-media"
 
 interface HomeHeroProps {
   businessName: string
-  vehicleCount: number
-  makeCount: number
   showQuote: boolean
 }
 
@@ -39,37 +36,33 @@ function splitName(name: string) {
 /**
  * The homepage's opening screen.
  *
- * Deliberately spare, and spread across the frame rather than stacked in one
- * block: the dealership's name sits high, the positioning statement and the
- * two actions hold the middle, and the stock counts run along the bottom edge
- * beside the scroll cue. Everything is on the left, over a glass pane that
- * darkens behind the words and clears towards the right, where the film is
- * left to itself.
+ * Deliberately spare, and stacked as one block on the left: the dealership's
+ * name sits directly above the positioning statement it introduces, with the
+ * two actions beneath. Over a glass pane that darkens behind the words and
+ * clears towards the right, where the photograph is left to itself.
  *
  *     ┌──────────────────────────────────────────────────────────┐
- *     │ ── CROWNLINE MOTORS ▓▓▒▒░░                               │
  *     │                     ▓▓▒▒░░                               │
- *     │ Quality Cars.       ▓▓▒▒░░          film                 │
+ *     │ ── SUDARA AUTOMOTIVE▓▓▒▒░░                               │
+ *     │ Quality Cars.       ▓▓▒▒░░       photograph              │
  *     │ Global Standards.   ▓▓▒▒░░                               │
  *     │ Local Commitment.   ▓▓▒▒░░                               │
  *     │ [Explore] [Quote]   ▓▓▒▒░░                               │
  *     │                                                          │
- *     │ 4 vehicles │ 4 makes │ 2 countries     scroll          ▶ │
+ *     │                                 scroll                   │
  *     └──────────────────────────────────────────────────────────┘
+ *
+ * The name is the eyebrow to the statement rather than a separate mark high
+ * in the frame: read together they are one sentence — who this is, and what
+ * they promise — and separating them left the top line looking like a stray
+ * label on a phone, where the gap between them was most of the screen.
  *
  * Everything animates on first paint rather than on scroll, because it is
  * already on screen: waiting for hydration would leave the most important
  * copy on the site blank on a slow phone.
  */
-export function HomeHero({ businessName, vehicleCount, makeCount, showQuote }: HomeHeroProps) {
+export function HomeHero({ businessName, showQuote }: HomeHeroProps) {
   const name = splitName(businessName)
-  const stats = [
-    vehicleCount > 0
-      ? { value: vehicleCount, label: vehicleCount === 1 ? "Vehicle for sale" : "Vehicles for sale" }
-      : null,
-    makeCount > 0 ? { value: makeCount, label: makeCount === 1 ? "Make in stock" : "Makes in stock" } : null,
-    { value: 2, label: "Sourcing countries" },
-  ].filter((stat) => stat !== null)
 
   return (
     <section
@@ -80,18 +73,51 @@ export function HomeHero({ businessName, vehicleCount, makeCount, showQuote }: H
       className="relative isolate -mt-16 flex min-h-svh flex-col overflow-hidden bg-night text-white md:-mt-20"
     >
       <div aria-hidden="true" className="absolute inset-0 -z-10">
-        {/* The fallback surface: what shows before the film starts, and in
-            place of it when it cannot play. */}
+        {/* The surface beneath the photograph: what shows while it decodes,
+            and in its place if the file is ever missing. */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_75%_45%,oklch(0.8_0.145_85/0.14),transparent_70%)]" />
         <div className="bg-dot-grid absolute inset-0" />
 
-        <HeroVideo sources={HOME_MEDIA.heroVideo.sources} poster={HOME_MEDIA.heroVideo.poster} />
+        {/*
+          The hero photograph, and the page's LCP element.
 
-        {/* The glass. A light frost across the whole film, then a deeper
-            pane behind the words that clears towards the right — so the copy
-            is legible and the picture stays alive where there is none. */}
-        <div className="absolute inset-0 bg-night/20 backdrop-blur-[2px]" />
-        <div className="hero-glass absolute inset-0 bg-night/55 backdrop-blur-xl backdrop-saturate-125" />
+          `preload` puts a <link rel="preload"> in the head so the browser
+          starts it before it has parsed this far, and `fetchPriority="high"`
+          moves it ahead of everything else in the queue — together they are
+          the difference between the hero painting with the page and painting
+          a second later on a slow connection.
+
+          `sizes="100vw"` because it fills the viewport at every width; the
+          optimiser picks the variant from `deviceSizes` accordingly rather
+          than sending a desktop-width file to a phone.
+        */}
+        <Image
+          src={HOME_MEDIA.hero.src}
+          alt={HOME_MEDIA.hero.alt}
+          fill
+          preload
+          fetchPriority="high"
+          sizes="100vw"
+          className="load-settle object-cover object-[65%_center]"
+        />
+
+        {/*
+          The glass: a light frost across the whole photograph, then a deeper
+          pane behind the words that clears towards the right — so the copy is
+          legible and the picture stays alive where there is none.
+
+          ── Why the blur starts at `md` ──────────────────────────────────
+          A `backdrop-filter` covering the whole viewport is one of the most
+          expensive things a page can carry: the compositor re-samples
+          everything behind it on every frame, and on the mid-range Android
+          phones this audience is on that is what made the homepage feel
+          heavy and its hovers lag behind the pointer. Below `md` the pane is
+          a plain wash instead — slightly darker, to buy back the legibility
+          the blur was providing — and the same words sit on the same
+          photograph with nothing to composite.
+        */}
+        <div className="absolute inset-0 bg-night/20 md:backdrop-blur-[2px]" />
+        <div className="hero-glass absolute inset-0 bg-night/70 md:bg-night/55 md:backdrop-blur-xl md:backdrop-saturate-125" />
         <div className="absolute inset-0 bg-gradient-to-t from-night/90 via-night/40 to-transparent lg:bg-gradient-to-r lg:from-night/85 lg:via-night/45 lg:via-45% lg:to-transparent lg:to-75%" />
 
         {/* Under the header, and into the section below. */}
@@ -99,24 +125,25 @@ export function HomeHero({ businessName, vehicleCount, makeCount, showQuote }: H
         <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-transparent" />
       </div>
 
-      <Container size="wide" className="flex flex-1 flex-col pt-28 pb-8 md:pt-36 lg:pb-10">
-        {/* High: the name. */}
-        {/* Hidden from assistive technology: the heading below carries the
-            name for screen readers, so it is not announced twice. */}
-        <p
-          aria-hidden="true"
-          className="load-rise flex items-center gap-3 font-heading text-small font-semibold tracking-[0.32em] uppercase"
-          style={delay(120)}
-        >
-          <span aria-hidden="true" className="h-px w-10 bg-gold" />
-          <span>
-            <span className="text-white/90">{name.lead}</span>
-            {name.accent ? <span className="text-gold"> {name.accent}</span> : null}
-          </span>
-        </p>
+      <Container size="wide" className="flex flex-1 flex-col justify-center pt-28 pb-20 md:pt-36 md:pb-24">
+        {/* The name, then the statement it introduces, then the two actions. */}
+        <div className="flex flex-col gap-6 sm:gap-8 lg:max-w-3xl">
+          {/* Hidden from assistive technology: the heading below carries the
+              name for screen readers, so it is not announced twice. The rule
+              shrinks on a phone, where a 40px lead-in eats into a line that
+              has to hold the whole business name. */}
+          <p
+            aria-hidden="true"
+            className="load-rise flex items-center gap-2.5 font-heading text-small font-semibold tracking-[0.28em] uppercase sm:gap-3 sm:tracking-[0.32em]"
+            style={delay(120)}
+          >
+            <span aria-hidden="true" className="h-px w-6 shrink-0 bg-gold sm:w-10" />
+            <span className="min-w-0">
+              <span className="text-white/90">{name.lead}</span>
+              {name.accent ? <span className="text-gold"> {name.accent}</span> : null}
+            </span>
+          </p>
 
-        {/* The middle: the statement and the two actions. */}
-        <div className="flex flex-1 flex-col justify-center gap-10 py-14 lg:max-w-3xl">
           <h1 id="home-hero-heading" className="flex flex-col text-hero">
             <span className="sr-only">{businessName}: </span>
             {STATEMENT.map((line, index) => (
@@ -131,8 +158,13 @@ export function HomeHero({ businessName, vehicleCount, makeCount, showQuote }: H
             ))}
           </h1>
 
-          <div className="load-rise flex flex-wrap gap-3" style={delay(STATEMENT_DONE + 120)}>
-            <Button render={<Link href="/cars" />} size="lg" className="group/cta">
+          {/* Full-width buttons on the narrowest phones, where two side by
+              side leave each too small to be a comfortable tap target. */}
+          <div
+            className="load-rise flex flex-col gap-3 pt-1 sm:flex-row sm:flex-wrap"
+            style={delay(STATEMENT_DONE + 120)}
+          >
+            <Button render={<Link href="/cars" />} size="lg" className="group/cta w-full sm:w-auto">
               Explore cars
               <ArrowRight
                 aria-hidden="true"
@@ -140,34 +172,18 @@ export function HomeHero({ businessName, vehicleCount, makeCount, showQuote }: H
               />
             </Button>
             {showQuote ? (
-              <Button render={<Link href="/get-a-quote" />} variant="outline" size="lg" className="backdrop-blur-md">
+              <Button
+                render={<Link href="/get-a-quote" />}
+                variant="outline"
+                size="lg"
+                className="w-full backdrop-blur-md sm:w-auto"
+              >
                 <MessageSquareText aria-hidden="true" className="size-4" />
                 Get a quote
               </Button>
             ) : null}
           </div>
         </div>
-
-        {/* Low: the counts, along the bottom edge. Clears the video control
-            on the right, and the scroll cue sits between them. */}
-        {/* Content-width columns, not thirds: "Vehicles for sale" is half
-            again as wide as "Makes in stock", and equal columns clip it. */}
-        <dl
-          className="load-rise flex flex-wrap self-start border-t border-white/15 pt-6 pr-14 lg:pr-0"
-          style={delay(STATEMENT_DONE + 300)}
-        >
-          {stats.map((stat, index) => (
-            <div
-              key={stat.label}
-              className="flex flex-col gap-1 px-5 first:pl-0 not-first:border-l not-first:border-white/15 sm:px-8"
-            >
-              <dt className="order-2 text-small text-white/60">{stat.label}</dt>
-              <dd className="order-1 font-heading text-h3 font-bold text-white">
-                <CountUp value={stat.value} startDelay={STATEMENT_DONE + 400 + index * 120} />
-              </dd>
-            </div>
-          ))}
-        </dl>
       </Container>
 
       {/* A cue that there is more below. Decorative, and hidden where the

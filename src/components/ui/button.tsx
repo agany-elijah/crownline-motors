@@ -44,7 +44,12 @@ const buttonVariants = cva(
     "group/button relative inline-flex shrink-0 items-center justify-center gap-2",
     "rounded-lg border border-transparent bg-clip-padding",
     "font-semibold whitespace-nowrap select-none",
-    "outline-none transition-all duration-fast ease-crownline",
+    // The properties that actually change on hover/active, named explicitly.
+    // `transition-all` made the browser watch every animatable property on
+    // every button on the page, which is a measurable cost on the hover it
+    // exists to smooth — and the reason interactions felt heavy on lower-end
+    // phones.
+    "outline-none transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-fast ease-crownline",
     "focus-visible:ring-3 focus-visible:ring-ring/50",
     "disabled:pointer-events-none disabled:opacity-50",
     "aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20",

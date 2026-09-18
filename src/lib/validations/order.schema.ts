@@ -86,4 +86,18 @@ export const cancelOrderSchema = z.object({
       .min(3, "Say why this order is being cancelled.")
       .max(500, "Reason is too long.")
   ),
+  /**
+   * Whether to also mark the order's confirmed payments as refunded.
+   *
+   * Cancelling is never blocked by money already taken — an operator has to
+   * be able to close a dead order in real time. But whether that money has
+   * actually gone back to the customer is a fact only the operator knows, so
+   * it is asked rather than assumed: unticked leaves the ledger exactly as it
+   * stands and the refunds are recorded later from the payments panel.
+   *
+   * An unchecked checkbox submits nothing at all, so absence is false.
+   */
+  refundPayments: z
+    .union([z.literal("on"), z.literal("true"), z.literal("false"), z.undefined(), z.null()])
+    .transform((value) => value === "on" || value === "true"),
 })

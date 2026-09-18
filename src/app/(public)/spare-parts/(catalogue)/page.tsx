@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { PartsCatalogueQuoteButton } from "@/components/quotes/quote-request-triggers"
 import { RecentlyViewedParts } from "@/components/spare-parts/recently-viewed-parts"
 import { SparePartGrid } from "@/components/spare-parts/spare-part-grid"
+import { CatalogueHero } from "@/components/layout/catalogue-hero"
 import { SparePartsBar } from "@/components/spare-parts/spare-parts-bar"
 import { SparePartsCatalogueBar } from "@/components/spare-parts/spare-parts-catalogue-bar"
 import { PriceEstimateNote } from "@/components/spare-parts/spare-part-price"
@@ -188,6 +189,19 @@ export default async function SparePartsPage({
         result.
       */}
       <Breadcrumbs items={[{ label: "Spare Parts" }]} className="hidden" />
+
+      {/* ── The opening band ─────────────────────────────────────────
+          The same component the vehicle catalogue opens with, so the two
+          sections read as one company rather than two websites (brief §15).
+          It carries its own trail, which is why the machine-only one above
+          stays hidden. */}
+      <CatalogueHero
+        imageSrc="/images/spare-parts/hero.jpg"
+        breadcrumbLabel="Spare Parts"
+        eyebrow="Genuine &amp; aftermarket"
+        phrases={["The right part.", "Checked fitment.", "Delivered to you."]}
+        supporting="Parts for Japanese and Korean vehicles, sourced from the same suppliers our cars come from."
+      />
 
       {/* ── Search and categories ────────────────────────────────────
           One sticky band directly under the utility row: this is the

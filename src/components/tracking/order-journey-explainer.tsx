@@ -38,8 +38,8 @@ export function OrderJourneyExplainer() {
             <ol
               className={
                 phases.length === 5
-                  ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
-                  : "grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+                  ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5"
+                  : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
               }
             >
               {phases.map((phase, index) => (

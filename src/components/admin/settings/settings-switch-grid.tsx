@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
  */
 export function SettingsSwitchGrid({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <ul className={cn("grid min-w-0 overflow-hidden rounded-lg border border-border sm:grid-cols-2", className)}>
+    <ul className={cn("grid grid-cols-1 min-w-0 overflow-hidden rounded-lg border border-border sm:grid-cols-2", className)}>
       {children}
     </ul>
   )

@@ -154,7 +154,7 @@ export function SparePartFitmentBoard({
 
         <p className="text-small font-medium text-foreground">Add a vehicle</p>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <FitmentField
             id={makeId}
             label="Make"

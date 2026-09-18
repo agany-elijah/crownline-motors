@@ -84,7 +84,7 @@ export default async function HowItWorksPage() {
       <section className="relative isolate overflow-hidden bg-night text-white">
         <div aria-hidden="true" className="absolute inset-0 -z-10">
           <Image
-            src="/images/how-it-works/hero.jpg"
+            src="/images/journey/vehicle-mombasa.jpg"
             alt=""
             fill
             preload
@@ -209,7 +209,7 @@ export default async function HowItWorksPage() {
               />
               <div className="rv-up relative aspect-[16/10] overflow-hidden rounded-2xl" style={delay(500)}>
                 <Image
-                  src="/images/how-it-works/tracking.jpg"
+                  src="/images/journey/vehicle-road.jpg"
                   alt="A car transporter carrying vehicles by road"
                   fill
                   sizes="(min-width: 1024px) 45vw, 100vw"

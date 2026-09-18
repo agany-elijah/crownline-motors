@@ -135,7 +135,7 @@ export default async function AdminQuoteDetailPage(props: PageProps<"/Ricky@2000
             Two columns from lg: substantial, editable sections on the left;
             compact reference cards in a sticky sidebar on the right. Below
             lg the sidebar simply follows the main content in document order. */}
-        <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
           <div className="flex flex-col gap-6 lg:col-span-2">
             <QuoteDetailsForm
               quoteId={quote.id}

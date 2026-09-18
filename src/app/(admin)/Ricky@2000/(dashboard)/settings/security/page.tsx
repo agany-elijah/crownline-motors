@@ -53,7 +53,7 @@ export default async function AdministratorAccountPage() {
   return (
     <>
       <SettingsPanel id="account-overview" title="Administrator account" description="Your own sign-in details.">
-        <dl className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <dl className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <Detail label="Name">{admin.displayName}</Detail>
           <Detail label="Email">{authUser.user?.email ?? admin.email}</Detail>
           <Detail label="Role">{ADMIN_ROLE_LABELS[admin.role]}</Detail>

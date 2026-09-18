@@ -70,7 +70,7 @@ export async function WhatsAppFloatButton() {
         aria-hidden="true"
         className={cn(
           "hidden overflow-hidden whitespace-nowrap text-small font-semibold md:block",
-          "max-w-0 opacity-0 transition-all duration-base ease-crownline",
+          "max-w-0 opacity-0 transition-[max-width,opacity] duration-base ease-crownline",
           "group-hover/wa:ml-2.5 group-hover/wa:max-w-40 group-hover/wa:opacity-100"
         )}
       >

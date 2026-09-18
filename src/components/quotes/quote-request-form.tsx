@@ -25,6 +25,7 @@ import {
   submitQuoteRequestAction,
   type QuoteRequestState,
 } from "@/lib/actions/quote-request.actions"
+import { advanceOnEnter } from "@/lib/forms/enter-advances"
 import type { CartItem } from "@/lib/cart/cart-storage"
 import {
   COUNTRY_OPTIONS,
@@ -221,6 +222,9 @@ export function QuoteRequestForm({
       onSubmit={(event) => {
         submittedContactRef.current = contactFromFormData(new FormData(event.currentTarget))
       }}
+      // Enter moves to the next field rather than posting a form the
+      // customer is halfway through — see lib/forms/enter-advances.ts.
+      onKeyDown={advanceOnEnter}
       noValidate
       className={cn("flex flex-col gap-6", className)}
       aria-describedby={state.status === "error" && state.message ? "quote-form-error" : undefined}
@@ -245,11 +249,25 @@ export function QuoteRequestForm({
       ) : null}
 
       {/*
-        The honeypot. Off-screen rather than `display: none` (some bots skip
-        hidden fields), out of the tab order, and hidden from assistive
-        technology so nobody real is ever asked to fill it.
+        The honeypot. Still a real, rendered field rather than `display: none`
+        (some bots skip hidden fields), still out of the tab order, and still
+        hidden from assistive technology so nobody real is ever asked to fill
+        it.
+
+        ── Why it is clipped rather than pushed to -9999px ────────────────
+        It used to sit at `absolute -left-[9999px]`. Its containing block is
+        the viewport, so on a phone that is a 10,000px-wide element hanging
+        off the left of the document — which Safari and several Android
+        browsers resolve by letting the page drift sideways under the
+        customer's thumb, on the one page the site most needs to feel solid.
+        Clipping keeps the field in the layout at 1×1px with no geometry to
+        escape from, which is the standard visually-hidden recipe and is
+        equally invisible to a bot's "is this displayed" check.
       */}
-      <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+      <div
+        aria-hidden="true"
+        className="absolute h-px w-px overflow-hidden [clip-path:inset(50%)] whitespace-nowrap"
+      >
         <label>
           Leave this field empty
           <input type="text" name={QUOTE_HONEYPOT_FIELD} tabIndex={-1} autoComplete="off" defaultValue="" />
@@ -269,10 +287,10 @@ export function QuoteRequestForm({
 
       <div key={fieldsKey} className="flex flex-col gap-6">
         {/* ── Who is asking ──────────────────────────────────────── */}
-        <fieldset className="flex flex-col gap-4">
+        <fieldset className="flex min-w-0 flex-col gap-4">
           <legend className="mb-3 eyebrow text-muted-foreground">Your details</legend>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <TextField
               label="Full name"
               name="fullName"
@@ -294,7 +312,7 @@ export function QuoteRequestForm({
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <PhoneField
               label="Phone number"
               name="phone"
@@ -833,7 +851,7 @@ function GeneralRequestFields({
       {domainFixed ? (
         <input type="hidden" name="domain" value={domain} />
       ) : (
-        <fieldset className="flex flex-col gap-3">
+        <fieldset className="flex min-w-0 flex-col gap-3">
           <legend className="mb-3 eyebrow text-muted-foreground">I am looking for</legend>
           <div className="grid grid-cols-2 gap-3">
             {[
@@ -875,13 +893,13 @@ function GeneralRequestFields({
       )}
 
       {subject.detailed ? (
-        <fieldset className="flex flex-col gap-4">
+        <fieldset className="flex min-w-0 flex-col gap-4">
           <legend className="mb-3 eyebrow text-muted-foreground">
             {domain === QuoteType.SPARE_PART ? "The part, and your car" : "The vehicle"}
           </legend>
 
           {domain === QuoteType.SPARE_PART ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <TextField
                 label="Part name"
                 name="partName"
@@ -903,7 +921,7 @@ function GeneralRequestFields({
             </div>
           ) : null}
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <TextField
               label={domain === QuoteType.SPARE_PART ? "Car make" : "Make"}
               name="make"
@@ -937,7 +955,7 @@ function GeneralRequestFields({
           </div>
 
           {domain === QuoteType.VEHICLE ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <TextField
                 label="Maximum budget (USD)"
                 name="maxBudget"

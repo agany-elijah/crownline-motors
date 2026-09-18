@@ -75,12 +75,7 @@ export default async function HomePage() {
     <div className="dark bg-background text-foreground">
       <HomeJsonLd settings={settings} />
 
-      <HomeHero
-        businessName={settings.businessName}
-        vehicleCount={inventory.vehicleCount}
-        makeCount={inventory.makeCount}
-        showQuote={showQuote}
-      />
+      <HomeHero businessName={settings.businessName} showQuote={showQuote} />
       <FeaturedVehicles vehicles={vehicles} totalVehicles={inventory.vehicleCount} />
       <WhyCrownline businessName={settings.businessName} />
       <JourneyOverview />

@@ -44,7 +44,7 @@ export async function AdminAuthShell({
   return (
     <main
       data-tone="dark"
-      className="dark grid min-h-dvh bg-background text-foreground lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]"
+      className="dark grid min-h-dvh grid-cols-[minmax(0,1fr)] bg-background text-foreground lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]"
     >
       {/* ── The brand side, from lg ───────────────────────────────── */}
       <aside

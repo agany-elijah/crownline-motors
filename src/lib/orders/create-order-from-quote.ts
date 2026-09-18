@@ -1,20 +1,13 @@
 import "server-only"
 
 import type { Prisma } from "@/generated/prisma/client"
-import {
-  MilestoneStatus,
-  OrderStatus,
-  QuoteLineKind,
-  VehicleStatus,
-  type OrderType,
-} from "@/generated/prisma/enums"
+import { MilestoneStatus, OrderStatus, QuoteLineKind, type OrderType } from "@/generated/prisma/enums"
 import { recordAuditLog } from "@/lib/audit"
 import {
   planMilestones,
   sparePartMilestoneTemplates,
   vehicleMilestoneTemplates,
 } from "@/lib/orders/milestones"
-import { findOpenOrderForVehicle, lockVehicle } from "@/lib/orders/vehicle-holds"
 import { computeQuoteTotals, type PricedQuoteLine, type QuoteFees } from "@/lib/quotes/quote-pricing"
 import { fromCents, toCents } from "@/lib/utils/money"
 import { generateReference } from "@/lib/utils/generate-reference"
@@ -38,13 +31,26 @@ import { generateReference } from "@/lib/utils/generate-reference"
  * a message an operator cannot act on.
  *
  * ── Why inventory is reserved before anything is created ──────────────
- * Every reservation is a conditional write — `UPDATE ... WHERE status IN
- * (...)` for a vehicle, `UPDATE ... WHERE stockQuantity >= quantity` for a
- * part — exactly the pattern the schema documentation requires to avoid a
- * read-then-write oversell race. A single Prisma interactive transaction
- * makes the whole thing atomic: if any line fails, everything reserved by
- * earlier lines in the same call is rolled back with it, so a quote can
- * never end up "half converted".
+ * A spare-part reservation is a conditional write — `UPDATE ... WHERE
+ * stockQuantity >= quantity` — exactly the pattern the schema documentation
+ * requires to avoid a read-then-write oversell race. A single Prisma
+ * interactive transaction makes the whole thing atomic: if any line fails,
+ * everything reserved by earlier lines in the same call is rolled back with
+ * it, so a quote can never end up "half converted".
+ *
+ * ── Why vehicles are *not* reserved ───────────────────────────────────
+ * A spare part is a quantity on a shelf; selling the last one has to stop
+ * the next sale. A vehicle listing here is not that. The dealership sources
+ * from external dealers and suppliers rather than holding every car in
+ * physical stock, so a listing describes a vehicle it can obtain — and two
+ * customers ordering the same one is an ordinary thing the business fulfils
+ * twice, not a conflict.
+ *
+ * So placing an order no longer moves the listing to RESERVED, and
+ * completing one no longer moves it to SOLD (see order-status-sync.ts).
+ * RESERVED and SOLD remain in `VehicleStatus` and remain fully usable — they
+ * are now operator judgements, set by hand from the vehicle's status control
+ * when the business genuinely has committed or sold a specific car.
  */
 
 export class UnlinkedQuoteLineError extends Error {
@@ -135,46 +141,17 @@ export async function createOrderFromQuote(
       vehiclesOnThisOrder.add(line.vehicleId)
 
       /**
-       * Locked, checked for an open order, then reserved. RESERVED is still
-       * accepted, because an operator may have held the car by hand for this
-       * very customer — but never when another open order already holds it.
-       * The status alone cannot tell those apart, which is what used to let
-       * two quotes for one car both convert. The lock is what stops two
-       * conversions racing past the check together.
+       * A vehicle order takes no hold on the listing. See the note on
+       * inventory at the top of this file: the dealership sources from
+       * external suppliers, so a listing is a car it can obtain rather than
+       * one unit on a floor, and one customer ordering it must not take it
+       * away from the next. The listing's status stays exactly as the
+       * operator set it, and a second order for the same listing is a normal
+       * event rather than a race to be refused.
+       *
+       * The audit trail still records the order; what it no longer records
+       * is a status change that no longer happens.
        */
-      await lockVehicle(tx, line.vehicleId)
-
-      const holder = await findOpenOrderForVehicle(tx, line.vehicleId)
-      if (holder) {
-        throw new VehicleUnavailableError(line.description, holder.orderNumber)
-      }
-
-      const reserved = await tx.vehicle.updateMany({
-        where: {
-          id: line.vehicleId,
-          status: { in: [VehicleStatus.PUBLISHED, VehicleStatus.RESERVED] },
-        },
-        data: { status: VehicleStatus.RESERVED },
-      })
-
-      if (reserved.count === 0) {
-        throw new VehicleUnavailableError(line.description)
-      }
-
-      await recordAuditLog(
-        {
-          actorId: input.actorId,
-          action: "VEHICLE_STATUS_CHANGED",
-          entityType: "Vehicle",
-          entityId: line.vehicleId,
-          metadata: {
-            newStatus: VehicleStatus.RESERVED,
-            reason: "ORDER_CREATED",
-            quoteId: input.quoteId,
-          },
-        },
-        tx
-      )
     } else if (line.sparePartId) {
       const decremented = await tx.sparePart.updateMany({
         where: { id: line.sparePartId, stockQuantity: { gte: line.quantity } },

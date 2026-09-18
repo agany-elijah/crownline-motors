@@ -93,10 +93,18 @@ export default async function AdminOrderDetailPage(props: PageProps<"/Ricky@2000
             <StatusBadge tone={ORDER_STATUS_TONES[order.status]}>{ORDER_STATUS_LABELS[order.status]}</StatusBadge>
           </>
         }
-        actions={canCancel ? <OrderCancelDialog orderId={order.id} orderNumber={order.orderNumber} /> : null}
+        actions={
+          canCancel ? (
+            <OrderCancelDialog
+              orderId={order.id}
+              orderNumber={order.orderNumber}
+              amountPaid={order.finance.amountPaid}
+            />
+          ) : null
+        }
       />
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
         <div className="flex min-w-0 flex-col gap-6">
           <AdminPanel title="Items" description="What was sold, and the costs agreed on the quotation." flush>
             <ul className="flex flex-col divide-y divide-border/70 border-t border-border">

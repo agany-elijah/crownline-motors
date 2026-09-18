@@ -35,7 +35,7 @@ export function TrackingResult({
     <article aria-labelledby="tracking-result-heading" className="flex flex-col gap-6">
       {/* ── Where it is now ─────────────────────────────────────── */}
       <div className="overflow-hidden rounded-2xl bg-card shadow-[var(--shadow-raised)] ring-1 ring-foreground/10">
-        <div className="grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
           <div className="relative aspect-[16/10] md:aspect-auto md:min-h-72">
             {result.imageUrl ? (
               <Image

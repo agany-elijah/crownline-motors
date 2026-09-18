@@ -137,7 +137,7 @@ export default async function SecurityActivityPage(props: PageProps<"/Ricky@2000
                 {entry.changes.length > 0 ? (
                   <ul className="flex flex-col gap-1 rounded-lg border border-border bg-sunken/60 px-3 py-2">
                     {entry.changes.map((change, index) => (
-                      <li key={`${change.field}-${index}`} className="grid gap-x-3 text-xs sm:grid-cols-[10rem_minmax(0,1fr)]">
+                      <li key={`${change.field}-${index}`} className="grid grid-cols-1 gap-x-3 text-xs sm:grid-cols-[10rem_minmax(0,1fr)]">
                         <span className="font-medium text-foreground">{change.field}</span>
                         <span className="min-w-0 break-words text-muted-foreground">
                           <span className="line-through decoration-muted-foreground/40">{change.from ?? "—"}</span>

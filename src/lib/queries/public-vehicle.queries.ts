@@ -770,27 +770,25 @@ export async function listHomepageVehicles(
   return rows.map((row) => toCard(row, siteWide))
 }
 
-/** The figures the homepage hero counts up to. */
+/** The figures the homepage states about the inventory. */
 export interface InventorySummary {
   /** Published vehicles. */
   vehicleCount: number
-  /** Distinct makes among them. */
-  makeCount: number
 }
 
 /**
- * Live counts of what is for sale, for the homepage hero.
+ * A live count of what is for sale, for the homepage.
  *
- * Two small aggregate reads against the `[status, …]` indexes; neither
- * returns a row per vehicle.
+ * One aggregate read against the `[status, isFeatured]` index; it does not
+ * return a row per vehicle.
+ *
+ * It used to also group by `make` to count distinct makes for a statistics
+ * band in the hero. That band is gone, and the `groupBy` went with it rather
+ * than being left to run on every homepage request for a number nothing
+ * renders.
  */
 export const getInventorySummary = cache(async (): Promise<InventorySummary> => {
-  const where = publicVehicleWhere()
+  const vehicleCount = await prisma.vehicle.count({ where: publicVehicleWhere() })
 
-  const [vehicleCount, makes] = await Promise.all([
-    prisma.vehicle.count({ where }),
-    prisma.vehicle.groupBy({ by: ["make"], where }),
-  ])
-
-  return { vehicleCount, makeCount: makes.length }
+  return { vehicleCount }
 })

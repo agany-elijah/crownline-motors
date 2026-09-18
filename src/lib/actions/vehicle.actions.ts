@@ -11,7 +11,7 @@ import {
   canTransitionVehicleStatus,
   describeRefusedTransition,
 } from "@/lib/constants/vehicle-status-transitions"
-import { findOpenOrderForVehicle, lockVehicle } from "@/lib/orders/vehicle-holds"
+
 import { prisma } from "@/lib/prisma"
 import {
   prepareVehiclePhotos,
@@ -133,24 +133,21 @@ const INVALID = "Check the highlighted fields and try again."
 /** Signals that the vehicle changed after the form being saved was rendered. */
 class StaleVehicleError extends Error {}
 
-/** Signals that an open order holds the vehicle a status change would release. */
-class VehicleOnOrderError extends Error {
-  constructor(public readonly orderNumber: string) {
-    super(`Vehicle is held by order ${orderNumber}.`)
-  }
-}
-
-/**
- * Statuses that take a car away from the customer holding it — back on sale,
- * back to draft, or withdrawn. Refused while an open order holds the car;
- * cancelling the order is what releases it. SOLD is not among them: marking
- * the car sold is consistent with the order.
+/*
+ * A status change is no longer refused because an open order names the
+ * vehicle.
+ *
+ * It used to be: PUBLISHED, DRAFT and ARCHIVED were "releasing" statuses,
+ * blocked while an order held the car, on the reasoning that republishing it
+ * would resell a car a customer had paid a deposit against. That reasoning
+ * belonged to a dealership selling the one car on its floor. This one sources
+ * from external dealers, so a listing is a vehicle it can obtain and an order
+ * against it takes nothing off the marketplace — see create-order-from-quote.ts.
+ *
+ * The transition table (`canTransitionVehicleStatus`) is still enforced here,
+ * so the status graph itself is unchanged; what is gone is the extra refusal
+ * on top of it.
  */
-const RELEASING_STATUSES: readonly VehicleStatus[] = [
-  VehicleStatus.PUBLISHED,
-  VehicleStatus.DRAFT,
-  VehicleStatus.ARCHIVED,
-]
 
 /**
  * Creates a vehicle as a DRAFT, with the photographs staged alongside it.
@@ -601,15 +598,6 @@ export async function updateVehicleStatusAction(
 
   try {
     await prisma.$transaction(async (tx) => {
-      // Locked so a quote conversion for this car cannot slip in between the
-      // order check and the write (see vehicle-holds.ts).
-      await lockVehicle(tx, id)
-
-      if (RELEASING_STATUSES.includes(status)) {
-        const holder = await findOpenOrderForVehicle(tx, id)
-        if (holder) throw new VehicleOnOrderError(holder.orderNumber)
-      }
-
       // Conditional on the status the transition was checked from, so a
       // change landing since the read above is refused rather than skipped.
       const written = await tx.vehicle.updateMany({ where: { id, status: existing.status }, data: { status } })
@@ -631,13 +619,6 @@ export async function updateVehicleStatusAction(
       )
     })
   } catch (error) {
-    if (error instanceof VehicleOnOrderError) {
-      return {
-        status: "error",
-        message: `This vehicle is on order ${error.orderNumber}. Cancel that order before moving the vehicle to ${status.toLowerCase()}.`,
-      }
-    }
-
     if (error instanceof StaleVehicleError) {
       return {
         status: "error",

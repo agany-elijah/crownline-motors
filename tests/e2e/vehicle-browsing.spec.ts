@@ -140,7 +140,7 @@ test.describe("vehicle catalogue", () => {
     await page.goto("/cars")
 
     // The catalogue's h1 is its positioning line, not the word "Cars" —
-    // see CatalogueMasthead for why.
+    // see CatalogueHero for why.
     await expect(
       page.getByRole("heading", { level: 1, name: /quality vehicles/i })
     ).toBeVisible()

@@ -239,7 +239,7 @@ function AddTrackingEventForm({
         </p>
       ) : null}
 
-      <div className="grid gap-2.5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={statusId} className="text-xs font-medium text-muted-foreground">
             New status

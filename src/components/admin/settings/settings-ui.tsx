@@ -96,7 +96,7 @@ export function SettingsField({
 
 /** Two columns from `sm`, one below. */
 export function SettingsFieldGrid({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("grid min-w-0 gap-4 sm:grid-cols-2", className)}>{children}</div>
+  return <div className={cn("grid grid-cols-1 min-w-0 gap-4 sm:grid-cols-2", className)}>{children}</div>
 }
 
 /** A read-only value with an explanation, for things Settings shows but does not change. */

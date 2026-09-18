@@ -59,7 +59,7 @@ export default async function GetAQuotePage() {
       <section data-tone="dark" className="relative isolate overflow-hidden bg-night text-white">
         <div aria-hidden="true" className="absolute inset-0 -z-10">
           <Image
-            src="/images/quote/quote-hero.jpg"
+            src="/images/journey/quote-hero.jpg"
             alt=""
             fill
             preload
@@ -99,9 +99,9 @@ export default async function GetAQuotePage() {
 
       {/* ── The request ──────────────────────────────────────────── */}
       <Section spacing="default">
-        <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-14">
+        <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-14">
           {/* What happens after sending — beside the form on a desktop, above it on a phone. */}
-          <aside className="flex flex-col gap-8 lg:sticky lg:top-28 lg:self-start">
+          <aside className="flex min-w-0 flex-col gap-8 lg:sticky lg:top-28 lg:self-start">
             <JourneyArt
               image="/images/journey/vehicle-secured.jpg"
               icon="ship"
@@ -202,12 +202,16 @@ function QuoteStep({
   children: ReactNode
 }) {
   return (
-    <li className="flex gap-4">
+    <li className="flex min-w-0 gap-4">
       <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-foreground text-gold">
         <Icon aria-hidden="true" className="size-5" />
         <span className="sr-only">Step {step}</span>
       </span>
-      <div className="flex flex-col gap-1">
+      {/* min-w-0: the icon beside it is shrink-0, so this column is what has
+          to give on a narrow screen. A flex item defaults to
+          `min-width: auto`, which refuses to wrap below its own min-content
+          and pushed the whole aside past the viewport at 360px. */}
+      <div className="flex min-w-0 flex-col gap-1">
         <h3 className="text-body font-semibold">{title}</h3>
         <p className="text-small text-muted-foreground">{children}</p>
       </div>

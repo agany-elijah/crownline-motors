@@ -91,7 +91,7 @@ export function TwoFactorSetup() {
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-[auto_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-[auto_minmax(0,1fr)]">
       <div className="flex flex-col items-center gap-2">
         <div className="rounded-xl bg-white p-3 shadow-[var(--shadow-subtle)] ring-1 ring-border">
           {/* A data: URL of an SVG from Supabase, rendered as an image — which

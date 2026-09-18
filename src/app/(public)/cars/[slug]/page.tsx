@@ -11,6 +11,10 @@ import { delay } from "@/components/motion/motion"
 import { WhatsAppGlyph } from "@/components/shared/whatsapp-glyph"
 import { Button } from "@/components/ui/button"
 import { RelatedVehicles } from "@/components/vehicles/related-vehicles"
+import {
+  RecentlyViewedVehicles,
+  RecordRecentlyViewedVehicle,
+} from "@/components/vehicles/recently-viewed-vehicles"
 import { VehicleConditionTag } from "@/components/vehicles/vehicle-condition-tag"
 import { VehicleDetailTabs } from "@/components/vehicles/vehicle-detail-tabs"
 import { VehicleGallery } from "@/components/vehicles/vehicle-gallery"
@@ -454,6 +458,16 @@ export default async function VehiclePage({ params }: PageProps) {
       {/* ── Other vehicles from the same make ─────────────────────── */}
       <RelatedVehicles vehicles={relatedVehicles} make={vehicle.make} />
 
+      {/*
+        The customer's own trail, below the business's suggestion.
+
+        That order is deliberate: "More from Toyota" is the dealership
+        talking, and this is the customer's way back to the car they were
+        comparing this one against. It excludes the car being read — a
+        "recently viewed" row containing the page you are on is a mirror.
+      */}
+      <RecentlyViewedVehicles excludeSlug={vehicle.slug} />
+
       {/* Holds open the space the pinned bar covers, so the last section
           can still be scrolled clear of it. The footer gets its own
           clearance from globals.css, which can reach it and this page
@@ -461,6 +475,17 @@ export default async function VehiclePage({ params }: PageProps) {
       <div aria-hidden="true" className="action-bar-clearance lg:hidden" />
 
       <VehicleMobileActionBar {...quoteSubject} />
+      {/* Renders nothing; records this car in the visitor's own browser so
+          the strip above has something to show on the next listing. */}
+      <RecordRecentlyViewedVehicle
+        slug={vehicle.slug}
+        make={vehicle.make}
+        model={vehicle.model}
+        year={vehicle.year}
+        price={vehicle.price}
+        mileageKm={vehicle.mileageKm}
+        imageUrl={vehicle.photos[0]?.url ?? null}
+      />
       <VehicleStructuredData vehicle={vehicle} name={fullName} sellerName={siteSettings.businessName} />
     </>
   )

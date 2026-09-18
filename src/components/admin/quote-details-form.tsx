@@ -295,7 +295,7 @@ export function QuoteDetailsForm({
         {/* ── Fees ────────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-4 border-t border-border pt-6">
           <SubsectionHeading title="Costs and validity" description="Leave a cost empty if it is not part of this quotation." />
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="shippingCost" className="text-small font-medium">
                 Shipping estimate

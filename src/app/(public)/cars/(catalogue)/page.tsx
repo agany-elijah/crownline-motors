@@ -6,7 +6,8 @@ import { Pagination } from "@/components/shared/pagination"
 import { Section } from "@/components/layout/section"
 import { Button } from "@/components/ui/button"
 import { VehicleCatalogueQuoteButton } from "@/components/quotes/quote-request-triggers"
-import { CatalogueMasthead } from "@/components/vehicles/catalogue-masthead"
+import { CatalogueHero } from "@/components/layout/catalogue-hero"
+import { RecentlyViewedVehicles } from "@/components/vehicles/recently-viewed-vehicles"
 import { VehicleSearch } from "@/components/vehicles/vehicle-search"
 import { VehicleGrid } from "@/components/vehicles/vehicle-grid"
 import { siteConfig } from "@/config/site"
@@ -151,7 +152,20 @@ export default async function CarsPage({
 
   return (
     <>
-      <CatalogueMasthead />
+      <CatalogueHero
+        imageSrc="/images/cars/hero.jpg"
+        breadcrumbLabel="Cars"
+        eyebrow="Our vehicles"
+        /*
+          The tagline is the h1 rather than the word "Cars", which said
+          nothing a customer or a search engine could use. The terms the
+          business wants to rank for live in the page title (see
+          `generateMetadata`) and in the supporting line below, which is real
+          visible copy rather than hidden text.
+        */
+        phrases={["Quality vehicles.", "Trusted sourcing.", "Seamless delivery."]}
+        supporting="Imported from Japan and South Korea, delivered across South Sudan."
+      />
 
       {/*
         Compact at the top, standard at the bottom.
@@ -260,6 +274,17 @@ export default async function CarsPage({
           />
         </div>
       </Section>
+
+      {/*
+        The customer's own trail back into the catalogue.
+
+        Renders nothing on a first visit. It sits below the grid rather than
+        above it because a catalogue's first screen belongs to the catalogue —
+        a returning customer scrolls past what is new to reach what they were
+        looking at, not the other way round. No `excludeSlug`: on this page
+        every remembered car is somewhere else.
+      */}
+      <RecentlyViewedVehicles />
 
       {/*
         ── Closing prompt ─────────────────────────────────────────
